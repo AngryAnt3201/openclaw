@@ -411,12 +411,50 @@ describe("QmdMemoryManager", () => {
     if (!manager) {
       throw new Error("manager missing");
     }
+    const maxResults = resolved.qmd?.limits.maxResults;
+    if (!maxResults) {
+      throw new Error("qmd maxResults missing");
+    }
 
     await manager.search("test", { sessionKey: "agent:main:slack:dm:u123" });
     const queryCall = spawnMock.mock.calls.find((call) => call[1]?.[0] === "query");
-    expect(queryCall?.[1]).toEqual(
-      expect.arrayContaining(["query", "test", "-c", "workspace", "-c", "notes"]),
-    );
+    expect(queryCall?.[1]).toEqual([
+      "query",
+      "test",
+      "--json",
+      "-n",
+      String(maxResults),
+      "-c",
+      "workspace",
+      "-c",
+      "notes",
+    ]);
+    await manager.close();
+  });
+
+  it("fails closed when no managed collections are configured", async () => {
+    cfg = {
+      ...cfg,
+      memory: {
+        backend: "qmd",
+        qmd: {
+          includeDefaultMemory: false,
+          update: { interval: "0s", debounceMs: 60_000, onBoot: false },
+          paths: [],
+        },
+      },
+    } as OpenClawConfig;
+
+    const resolved = resolveMemoryBackendConfig({ cfg, agentId });
+    const manager = await QmdMemoryManager.create({ cfg, agentId, resolved });
+    expect(manager).toBeTruthy();
+    if (!manager) {
+      throw new Error("manager missing");
+    }
+
+    const results = await manager.search("test", { sessionKey: "agent:main:slack:dm:u123" });
+    expect(results).toEqual([]);
+    expect(spawnMock.mock.calls.some((call) => call[1]?.[0] === "query")).toBe(false);
     await manager.close();
   });
 
