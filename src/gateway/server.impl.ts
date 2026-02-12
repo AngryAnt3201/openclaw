@@ -67,6 +67,7 @@ import { resolveSessionKeyForRun } from "./server-session-key.js";
 import { logGatewayStartup } from "./server-startup-log.js";
 import { startGatewaySidecars } from "./server-startup.js";
 import { startGatewayTailscaleExposure } from "./server-tailscale.js";
+import { buildGatewayTaskService } from "./server-tasks.js";
 import { createWizardSessionTracker } from "./server-wizard-sessions.js";
 import { attachGatewayWsHandlers } from "./server-ws-runtime.js";
 import {
@@ -379,6 +380,13 @@ export async function startGatewayServer(
   });
   let { cron, storePath: cronStorePath } = cronState;
 
+  let taskState = buildGatewayTaskService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+  });
+  let { taskService, storePath: taskStorePath } = taskState;
+
   const channelManager = createChannelManager({
     loadConfig,
     channelLogs,
@@ -491,6 +499,8 @@ export async function startGatewayServer(
       deps,
       cron,
       cronStorePath,
+      taskService,
+      taskStorePath,
       loadGatewayModelCatalog,
       getHealthCache,
       refreshHealthSnapshot: refreshGatewayHealthSnapshot,

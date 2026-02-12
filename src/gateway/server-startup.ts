@@ -22,6 +22,7 @@ import {
   scheduleRestartSentinelWake,
   shouldWakeFromRestartSentinel,
 } from "./server-restart-sentinel.js";
+import { TunnelManager, type TunnelConfig } from "./tunnel-manager.js";
 
 export async function startGatewaySidecars(params: {
   cfg: ReturnType<typeof loadConfig>;
@@ -156,5 +157,28 @@ export async function startGatewaySidecars(params: {
     }, 750);
   }
 
-  return { browserControl, pluginServices };
+  // Start Cloudflare tunnel if configured
+  let tunnelManager: TunnelManager | null = null;
+  const tunnelConfig = (params.cfg as Record<string, unknown>).tunnel as TunnelConfig | undefined;
+  if (tunnelConfig?.enabled) {
+    tunnelManager = new TunnelManager();
+    try {
+      const gatewayPort =
+        tunnelConfig.targetPort ?? (params.cfg as Record<string, unknown>).port ?? 18789;
+      const status = await tunnelManager.start({
+        enabled: true,
+        provider: tunnelConfig.provider ?? "cloudflare",
+        targetPort: gatewayPort as number,
+      });
+      if (status.url) {
+        params.log.warn(`tunnel started: ${status.url}`);
+      } else if (status.error) {
+        params.log.warn(`tunnel failed: ${status.error}`);
+      }
+    } catch (err) {
+      params.log.warn(`tunnel failed to start: ${String(err)}`);
+    }
+  }
+
+  return { browserControl, pluginServices, tunnelManager };
 }

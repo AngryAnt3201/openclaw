@@ -39,8 +39,10 @@ import { getQueueSize } from "../process/command-queue.js";
 import { CommandLane } from "../process/lanes.js";
 import { normalizeAgentId, toAgentStoreSessionKey } from "../routing/session-key.js";
 import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
+import { resolveTaskStorePath } from "../tasks/store.js";
 import { formatErrorMessage } from "./errors.js";
 import { emitHeartbeatEvent, resolveIndicatorType } from "./heartbeat-events.js";
+import { resolveTaskContextForHeartbeat } from "./heartbeat-task-context.js";
 import { resolveHeartbeatVisibility } from "./heartbeat-visibility.js";
 import {
   type HeartbeatRunResult,
@@ -102,6 +104,14 @@ const EXEC_EVENT_PROMPT =
 const CRON_EVENT_PROMPT =
   "A scheduled reminder has been triggered. The reminder message is shown in the system messages above. " +
   "Please relay this reminder to the user in a helpful and friendly way.";
+
+// Prompt used when a Miranda task has received user input or an approval decision.
+// This overrides the standard heartbeat prompt so the model processes the task
+// event instead of responding with "HEARTBEAT_OK".
+const TASK_EVENT_PROMPT =
+  "A task in your Miranda task queue has received user input or an approval decision. " +
+  "The details are shown in the system messages above. " +
+  "Please process this task event and take appropriate action.";
 
 function resolveActiveHoursTimezone(cfg: OpenClawConfig, raw?: string): string {
   const trimmed = raw?.trim();
@@ -519,10 +529,11 @@ export async function runHeartbeatOnce(opts: {
 
   // Skip heartbeat if HEARTBEAT.md exists but has no actionable content.
   // This saves API calls/costs when the file is effectively empty (only comments/headers).
-  // EXCEPTION: Don't skip for exec events or cron events - they have pending system events
-  // to process regardless of HEARTBEAT.md content.
+  // EXCEPTION: Don't skip for exec events, cron events, or task events - they have pending
+  // system events to process regardless of HEARTBEAT.md content.
   const isExecEventReason = opts.reason === "exec-event";
   const isCronEventReason = Boolean(opts.reason?.startsWith("cron:"));
+  const isTaskEventReason = Boolean(opts.reason?.startsWith("task:"));
   const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
   const heartbeatFilePath = path.join(workspaceDir, DEFAULT_HEARTBEAT_FILENAME);
   try {
@@ -530,7 +541,8 @@ export async function runHeartbeatOnce(opts: {
     if (
       isHeartbeatContentEffectivelyEmpty(heartbeatFileContent) &&
       !isExecEventReason &&
-      !isCronEventReason
+      !isCronEventReason &&
+      !isTaskEventReason
     ) {
       emitHeartbeatEvent({
         status: "skipped",
@@ -574,25 +586,53 @@ export async function runHeartbeatOnce(opts: {
     accountId: delivery.accountId,
   }).responsePrefix;
 
-  // Check if this is an exec event or cron event with pending system events.
+  // Check if this is an exec event, cron event, or task event with pending system events.
   // If so, use a specialized prompt that instructs the model to relay the result
   // instead of the standard heartbeat prompt with "reply HEARTBEAT_OK".
   const isExecEvent = opts.reason === "exec-event";
   const isCronEvent = Boolean(opts.reason?.startsWith("cron:"));
-  const pendingEvents = isExecEvent || isCronEvent ? peekSystemEvents(sessionKey) : [];
+  const isTaskEvent = Boolean(opts.reason?.startsWith("task:"));
+  const pendingEvents =
+    isExecEvent || isCronEvent || isTaskEvent ? peekSystemEvents(sessionKey) : [];
   const hasExecCompletion = pendingEvents.some((evt) => evt.includes("Exec finished"));
   const hasCronEvents = isCronEvent && pendingEvents.length > 0;
+  const hasTaskEvents = isTaskEvent && pendingEvents.length > 0;
 
-  const prompt = hasExecCompletion
+  let prompt = hasExecCompletion
     ? EXEC_EVENT_PROMPT
     : hasCronEvents
       ? CRON_EVENT_PROMPT
-      : resolveHeartbeatPrompt(cfg, heartbeat);
+      : hasTaskEvents
+        ? TASK_EVENT_PROMPT
+        : resolveHeartbeatPrompt(cfg, heartbeat);
+
+  // Append active task context from the Miranda task queue so the agent knows
+  // about pending/in-progress tasks when processing the heartbeat.
+  try {
+    const taskStorePath = resolveTaskStorePath(
+      (cfg as Record<string, unknown>).tasks
+        ? ((cfg as Record<string, unknown>).tasks as { store?: string })?.store
+        : undefined,
+    );
+    const taskContext = await resolveTaskContextForHeartbeat(taskStorePath);
+    if (taskContext) {
+      prompt = `${prompt}${taskContext}`;
+    }
+  } catch {
+    // Task store unavailable — proceed without task context.
+  }
+
   const ctx = {
     Body: prompt,
     From: sender,
     To: sender,
-    Provider: hasExecCompletion ? "exec-event" : hasCronEvents ? "cron-event" : "heartbeat",
+    Provider: hasExecCompletion
+      ? "exec-event"
+      : hasCronEvents
+        ? "cron-event"
+        : hasTaskEvents
+          ? "task-event"
+          : "heartbeat",
     SessionKey: sessionKey,
   };
   if (!visibility.showAlerts && !visibility.showOk && !visibility.useIndicator) {

@@ -36,6 +36,8 @@ export const TOOL_GROUPS: Record<string, string[]> = {
   "group:messaging": ["message"],
   // Nodes + device tools
   "group:nodes": ["nodes"],
+  // Task management tools
+  "group:tasks": ["task"],
   // All OpenClaw native tools (excludes provider plugins).
   "group:openclaw": [
     "browser",
@@ -55,6 +57,7 @@ export const TOOL_GROUPS: Record<string, string[]> = {
     "web_search",
     "web_fetch",
     "image",
+    "task",
   ],
 };
 

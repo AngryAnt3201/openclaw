@@ -9,6 +9,8 @@ import { createCanvasTool } from "./tools/canvas-tool.js";
 import { createCronTool } from "./tools/cron-tool.js";
 import { createGatewayTool } from "./tools/gateway-tool.js";
 import { createImageTool } from "./tools/image-tool.js";
+import { createMaestroAppTool } from "./tools/maestro-app-tool.js";
+import { createMaestroSessionTool } from "./tools/maestro-session-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
 import { createSessionStatusTool } from "./tools/session-status-tool.js";
@@ -16,6 +18,7 @@ import { createSessionsHistoryTool } from "./tools/sessions-history-tool.js";
 import { createSessionsListTool } from "./tools/sessions-list-tool.js";
 import { createSessionsSendTool } from "./tools/sessions-send-tool.js";
 import { createSessionsSpawnTool } from "./tools/sessions-spawn-tool.js";
+import { createTaskTool } from "./tools/task-tool.js";
 import { createTtsTool } from "./tools/tts-tool.js";
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
 
@@ -146,6 +149,11 @@ export function createOpenClawTools(options?: {
     ...(webSearchTool ? [webSearchTool] : []),
     ...(webFetchTool ? [webFetchTool] : []),
     ...(imageTool ? [imageTool] : []),
+    createMaestroSessionTool(),
+    createMaestroAppTool(),
+    createTaskTool({
+      agentSessionKey: options?.agentSessionKey,
+    }),
   ];
 
   const pluginTools = resolvePluginTools({
