@@ -23,6 +23,7 @@ import { taskHandlers } from "./server-methods/tasks.js";
 import { ttsHandlers } from "./server-methods/tts.js";
 import { updateHandlers } from "./server-methods/update.js";
 import { usageHandlers } from "./server-methods/usage.js";
+import { vaultHandlers } from "./server-methods/vault.js";
 import { voicewakeHandlers } from "./server-methods/voicewake.js";
 import { webHandlers } from "./server-methods/web.js";
 import { wizardHandlers } from "./server-methods/wizard.js";
@@ -71,6 +72,17 @@ const READ_METHODS = new Set([
   "task.list",
   "task.get",
   "task.events",
+  "vault.list",
+  "vault.get",
+  "vault.search",
+  "vault.graph",
+  "vault.backlinks",
+  "vault.tree",
+  "vault.tags",
+  "vault.daily",
+  "vault.metadata",
+  "vault.canvas.get",
+  "vault.config",
   "system-presence",
   "last-heartbeat",
   "node.list",
@@ -99,6 +111,12 @@ const WRITE_METHODS = new Set([
   "task.approve",
   "task.reject",
   "task.progress",
+  "vault.create",
+  "vault.update",
+  "vault.delete",
+  "vault.move",
+  "vault.canvas.update",
+  "vault.sync.trigger",
 ]);
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
@@ -200,6 +218,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...agentsHandlers,
   ...browserHandlers,
   ...taskHandlers,
+  ...vaultHandlers,
 };
 
 export async function handleGatewayRequest(

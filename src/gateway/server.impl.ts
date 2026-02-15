@@ -68,6 +68,7 @@ import { logGatewayStartup } from "./server-startup-log.js";
 import { startGatewaySidecars } from "./server-startup.js";
 import { startGatewayTailscaleExposure } from "./server-tailscale.js";
 import { buildGatewayTaskService } from "./server-tasks.js";
+import { buildGatewayVaultService } from "./server-vault.js";
 import { createWizardSessionTracker } from "./server-wizard-sessions.js";
 import { attachGatewayWsHandlers } from "./server-ws-runtime.js";
 import {
@@ -387,6 +388,13 @@ export async function startGatewayServer(
   });
   let { taskService, storePath: taskStorePath } = taskState;
 
+  let vaultState = await buildGatewayVaultService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+  });
+  let { vaultService, vaultPath: vaultPathResolved } = vaultState;
+
   const channelManager = createChannelManager({
     loadConfig,
     channelLogs,
@@ -501,6 +509,8 @@ export async function startGatewayServer(
       cronStorePath,
       taskService,
       taskStorePath,
+      vaultService,
+      vaultPath: vaultPathResolved,
       loadGatewayModelCatalog,
       getHealthCache,
       refreshHealthSnapshot: refreshGatewayHealthSnapshot,
@@ -642,6 +652,7 @@ export async function startGatewayServer(
         skillsRefreshTimer = null;
       }
       skillsChangeUnsub();
+      await vaultState.close();
       await close(opts);
     },
   };

@@ -126,6 +126,7 @@ export class TaskService {
         parentTaskId: input.parentTaskId,
         permissions: input.permissions,
         cronBinding: input.cronBinding,
+        refs: input.refs,
         createdAtMs: now,
         updatedAtMs: now,
       };
@@ -205,6 +206,9 @@ export class TaskService {
       }
       if (patch.subTasks !== undefined) {
         task.subTasks = patch.subTasks;
+      }
+      if (patch.refs !== undefined) {
+        task.refs = patch.refs;
       }
       task.updatedAtMs = this.now();
 

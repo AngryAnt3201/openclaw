@@ -4,6 +4,7 @@ import type { HealthSummary } from "../../commands/health.js";
 import type { CronService } from "../../cron/service.js";
 import type { createSubsystemLogger } from "../../logging/subsystem.js";
 import type { TaskService } from "../../tasks/service.js";
+import type { VaultService } from "../../vault/service.js";
 import type { WizardSession } from "../../wizard/session.js";
 import type { ChatAbortControllerEntry } from "../chat-abort.js";
 import type { NodeRegistry } from "../node-registry.js";
@@ -31,6 +32,8 @@ export type GatewayRequestContext = {
   cronStorePath: string;
   taskService: TaskService;
   taskStorePath: string;
+  vaultService?: VaultService;
+  vaultPath?: string;
   loadGatewayModelCatalog: () => Promise<ModelCatalogEntry[]>;
   getHealthCache: () => HealthSummary | null;
   refreshHealthSnapshot: (opts?: { probe?: boolean }) => Promise<HealthSummary>;

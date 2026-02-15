@@ -173,6 +173,26 @@ export type CronBinding = {
 };
 
 // ---------------------------------------------------------------------------
+// Inline app reference (for embedding clickable app chips in text)
+// ---------------------------------------------------------------------------
+
+export type AppAction =
+  | { type: "open_url"; url: string }
+  | { type: "deep_link"; uri: string }
+  | { type: "launch_native"; appPath: string }
+  | { type: "noop" };
+
+export type AppRefStyle = "chip" | "obsidian-link";
+
+export type AppReference = {
+  appSlug: string;
+  label: string;
+  action: AppAction;
+  style?: AppRefStyle;
+  subtitle?: string;
+};
+
+// ---------------------------------------------------------------------------
 // Task app reference
 // ---------------------------------------------------------------------------
 
@@ -229,6 +249,9 @@ export type Task = {
   // Review summary (for review status)
   reviewSummary?: string;
 
+  // Inline app references
+  refs?: AppReference[];
+
   // Timestamps
   createdAtMs: number;
   updatedAtMs: number;
@@ -249,6 +272,7 @@ export type TaskCreateInput = {
   permissions?: TaskPolicy;
   app?: TaskApp;
   cronBinding?: CronBinding;
+  refs?: AppReference[];
 };
 
 // ---------------------------------------------------------------------------
@@ -271,6 +295,7 @@ export type TaskPatch = {
   budgetUsage?: BudgetUsage;
   permissions?: TaskPolicy;
   subTasks?: SubTask[];
+  refs?: AppReference[];
 };
 
 // ---------------------------------------------------------------------------

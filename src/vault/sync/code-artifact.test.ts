@@ -1,0 +1,165 @@
+import { describe, expect, it, vi } from "vitest";
+import type { VaultService } from "../service.js";
+import { syncCodeArtifactToVault, type CodeArtifact } from "./code-artifact.js";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function mockArtifact(overrides?: Partial<CodeArtifact>): CodeArtifact {
+  return {
+    type: "pull-request",
+    repo: "miranda",
+    identifier: "42",
+    title: "Add OAuth2 authentication",
+    body: "Added OAuth2 with JWT token rotation.",
+    author: "agent-main",
+    state: "open",
+    branch: "feature/auth",
+    createdAtMs: new Date("2026-02-15T11:00:00Z").getTime(),
+    ...overrides,
+  };
+}
+
+function mockVaultService() {
+  return {
+    get: vi.fn().mockResolvedValue(null),
+    create: vi.fn().mockResolvedValue({}),
+    update: vi.fn().mockResolvedValue({}),
+  } as unknown as VaultService & {
+    get: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("syncCodeArtifactToVault", () => {
+  it("creates a new code note when it does not exist", async () => {
+    const vs = mockVaultService();
+    vs.get.mockResolvedValue(null);
+
+    await syncCodeArtifactToVault(mockArtifact(), vs);
+
+    expect(vs.create).toHaveBeenCalledTimes(1);
+    expect(vs.update).not.toHaveBeenCalled();
+  });
+
+  it("updates an existing code note", async () => {
+    const vs = mockVaultService();
+    vs.get.mockResolvedValue({ path: "_system/code/PR-miranda-42.md" });
+
+    await syncCodeArtifactToVault(mockArtifact(), vs);
+
+    expect(vs.update).toHaveBeenCalledTimes(1);
+    expect(vs.create).not.toHaveBeenCalled();
+  });
+
+  it("uses PR- prefix for pull requests", async () => {
+    const vs = mockVaultService();
+
+    await syncCodeArtifactToVault(mockArtifact(), vs);
+
+    const createCall = vs.create.mock.calls[0]![0] as { path: string };
+    expect(createCall.path).toBe("_system/code/PR-miranda-42.md");
+  });
+
+  it("uses ISSUE- prefix for issues", async () => {
+    const vs = mockVaultService();
+
+    await syncCodeArtifactToVault(mockArtifact({ type: "issue", identifier: "38" }), vs);
+
+    const createCall = vs.create.mock.calls[0]![0] as { path: string };
+    expect(createCall.path).toBe("_system/code/ISSUE-miranda-38.md");
+  });
+
+  it("uses COMMIT- prefix for commits", async () => {
+    const vs = mockVaultService();
+
+    await syncCodeArtifactToVault(mockArtifact({ type: "commit", identifier: "e34996d" }), vs);
+
+    const createCall = vs.create.mock.calls[0]![0] as { path: string };
+    expect(createCall.path).toBe("_system/code/COMMIT-miranda-e34996d.md");
+  });
+
+  it("includes PR title with number in heading", async () => {
+    const vs = mockVaultService();
+
+    await syncCodeArtifactToVault(mockArtifact(), vs);
+
+    const createCall = vs.create.mock.calls[0]![0] as { content: string };
+    expect(createCall.content).toContain("# PR #42: Add OAuth2 authentication");
+  });
+
+  it("includes frontmatter with type, repo, state, author", async () => {
+    const vs = mockVaultService();
+
+    await syncCodeArtifactToVault(mockArtifact(), vs);
+
+    const createCall = vs.create.mock.calls[0]![0] as { content: string };
+    expect(createCall.content).toMatch(/^---\n/);
+    expect(createCall.content).toContain("type: pull-request");
+    expect(createCall.content).toContain("repo: miranda");
+    expect(createCall.content).toContain("state: open");
+    expect(createCall.content).toContain("author: agent-main");
+  });
+
+  it("includes file changes in body", async () => {
+    const vs = mockVaultService();
+
+    await syncCodeArtifactToVault(
+      mockArtifact({
+        changes: [
+          { path: "auth/service.ts", additions: 145, deletions: 0 },
+          { path: "package.json", additions: 2, deletions: 0 },
+        ],
+      }),
+      vs,
+    );
+
+    const createCall = vs.create.mock.calls[0]![0] as { content: string };
+    expect(createCall.content).toContain("## Changes");
+    expect(createCall.content).toContain("`auth/service.ts` (+145 -0)");
+    expect(createCall.content).toContain("`package.json` (+2 -0)");
+  });
+
+  it("includes task wikilink when taskId is provided", async () => {
+    const vs = mockVaultService();
+
+    await syncCodeArtifactToVault(mockArtifact({ taskId: "abc12345-defg-6789-hijk-lmnop" }), vs);
+
+    const createCall = vs.create.mock.calls[0]![0] as { content: string };
+    expect(createCall.content).toContain("[[TASK-abc12345]]");
+  });
+
+  it("includes branch in frontmatter and body", async () => {
+    const vs = mockVaultService();
+
+    await syncCodeArtifactToVault(mockArtifact({ branch: "feature/auth" }), vs);
+
+    const createCall = vs.create.mock.calls[0]![0] as { content: string };
+    expect(createCall.content).toContain("branch: feature/auth");
+    expect(createCall.content).toContain("**Branch:** `feature/auth`");
+  });
+
+  it("formats commit heading with short hash", async () => {
+    const vs = mockVaultService();
+
+    await syncCodeArtifactToVault(
+      mockArtifact({
+        type: "commit",
+        identifier: "e34996d1234567890",
+        title: "fix: Open web-embed apps in system browser",
+      }),
+      vs,
+    );
+
+    const createCall = vs.create.mock.calls[0]![0] as { content: string };
+    expect(createCall.content).toContain(
+      "# Commit e34996d: fix: Open web-embed apps in system browser",
+    );
+  });
+});
