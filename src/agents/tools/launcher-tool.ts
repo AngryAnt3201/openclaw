@@ -19,7 +19,14 @@ const LAUNCHER_ACTIONS = [
   "suggest",
 ] as const;
 
-const APP_CATEGORIES = ["native", "dev-server", "web-embed", "custom"] as const;
+const APP_CATEGORIES = [
+  "native",
+  "dev-server",
+  "web-embed",
+  "custom",
+  "service",
+  "script",
+] as const;
 
 const LauncherToolSchema = Type.Object({
   action: stringEnum(LAUNCHER_ACTIONS),
@@ -41,6 +48,11 @@ const LauncherToolSchema = Type.Object({
   run_command: Type.Optional(Type.String({ description: "Shell command (for dev-server)" })),
   working_dir: Type.Optional(Type.String({ description: "Working directory (for dev-server)" })),
   port: Type.Optional(Type.Number({ description: "Port number (for dev-server)" })),
+  device_id: Type.Optional(Type.String({ description: "Device ID to associate this app with" })),
+  env_vars: Type.Optional(
+    Type.Record(Type.String(), Type.String(), { description: "Environment variables" }),
+  ),
+  health_check_url: Type.Optional(Type.String({ description: "URL to check app health" })),
   tags: Type.Optional(Type.Array(Type.String(), { description: "Tags for the app" })),
   color: Type.Optional(Type.String({ description: "Color identifier" })),
   // get / update / delete / pin / unpin
@@ -58,7 +70,7 @@ export function createLauncherTool(_opts?: { agentSessionKey?: string }): AnyAge
     label: "Launcher",
     name: "launcher",
     description:
-      "Manage the user's app launcher. Add, remove, pin/unpin apps. Scan for installed macOS apps and suggest additions. Apps appear on the Miranda home screen arc.\n\nCategories: native (macOS .app), dev-server (local dev project), web-embed (website), custom (user-defined).",
+      "Manage the user's app launcher. Add, remove, pin/unpin apps. Scan for installed macOS apps and suggest additions. Apps appear on the Miranda home screen arc.\n\nCategories: native (macOS .app), dev-server (local dev project), web-embed (website), custom (user-defined), service (background service), script (runnable script).\n\nApps can be associated with a device via device_id.",
     parameters: LauncherToolSchema,
     execute: async (_toolCallId, args) => {
       const params = args as Record<string, unknown>;
@@ -96,6 +108,15 @@ export function createLauncherTool(_opts?: { agentSessionKey?: string }): AnyAge
           }
           if (params.port !== undefined) {
             createPayload.port = params.port;
+          }
+          if (params.device_id !== undefined) {
+            createPayload.device_id = params.device_id;
+          }
+          if (params.env_vars !== undefined) {
+            createPayload.env_vars = params.env_vars;
+          }
+          if (params.health_check_url !== undefined) {
+            createPayload.health_check_url = params.health_check_url;
           }
           if (params.tags !== undefined) {
             createPayload.tags = params.tags;
@@ -144,6 +165,15 @@ export function createLauncherTool(_opts?: { agentSessionKey?: string }): AnyAge
           }
           if (params.port !== undefined) {
             patch.port = params.port;
+          }
+          if (params.device_id !== undefined) {
+            patch.device_id = params.device_id;
+          }
+          if (params.env_vars !== undefined) {
+            patch.env_vars = params.env_vars;
+          }
+          if (params.health_check_url !== undefined) {
+            patch.health_check_url = params.health_check_url;
           }
           if (params.tags !== undefined) {
             patch.tags = params.tags;

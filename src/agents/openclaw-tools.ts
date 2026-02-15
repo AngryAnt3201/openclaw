@@ -7,6 +7,7 @@ import { createAgentsListTool } from "./tools/agents-list-tool.js";
 import { createBrowserTool } from "./tools/browser-tool.js";
 import { createCanvasTool } from "./tools/canvas-tool.js";
 import { createCronTool } from "./tools/cron-tool.js";
+import { createDeviceTool } from "./tools/device-tool.js";
 import { createGatewayTool } from "./tools/gateway-tool.js";
 import { createImageTool } from "./tools/image-tool.js";
 import { createLauncherTool } from "./tools/launcher-tool.js";
@@ -14,6 +15,7 @@ import { createMaestroAppTool } from "./tools/maestro-app-tool.js";
 import { createMaestroSessionTool } from "./tools/maestro-session-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
+import { createPluginTool } from "./tools/plugin-tool.js";
 import { createSessionStatusTool } from "./tools/session-status-tool.js";
 import { createSessionsHistoryTool } from "./tools/sessions-history-tool.js";
 import { createSessionsListTool } from "./tools/sessions-list-tool.js";
@@ -160,6 +162,12 @@ export function createOpenClawTools(options?: {
       agentSessionKey: options?.agentSessionKey,
     }),
     createVaultTool({
+      agentSessionKey: options?.agentSessionKey,
+    }),
+    createPluginTool({
+      agentSessionKey: options?.agentSessionKey,
+    }),
+    createDeviceTool({
       agentSessionKey: options?.agentSessionKey,
     }),
   ];

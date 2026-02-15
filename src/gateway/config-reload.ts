@@ -1,6 +1,8 @@
 import chokidar from "chokidar";
 import type { OpenClawConfig, ConfigFileSnapshot, GatewayReloadMode } from "../config/config.js";
 import { type ChannelId, listChannelPlugins } from "../channels/plugins/index.js";
+import { clearPluginRegistryCache } from "../plugins/loader.js";
+import { clearPluginManifestCache } from "../plugins/manifest-registry.js";
 import { getActivePluginRegistry } from "../plugins/runtime.js";
 import { isPlainObject } from "../utils.js";
 
@@ -17,6 +19,7 @@ export type GatewayReloadPlan = {
   restartReasons: string[];
   hotReasons: string[];
   reloadHooks: boolean;
+  reloadPlugins: boolean;
   restartGmailWatcher: boolean;
   restartBrowserControl: boolean;
   restartCron: boolean;
@@ -33,6 +36,7 @@ type ReloadRule = {
 
 type ReloadAction =
   | "reload-hooks"
+  | "reload-plugins"
   | "restart-gmail-watcher"
   | "restart-browser-control"
   | "restart-cron"
@@ -78,7 +82,7 @@ const BASE_RELOAD_RULES_TAIL: ReloadRule[] = [
   { prefix: "session", kind: "none" },
   { prefix: "talk", kind: "none" },
   { prefix: "skills", kind: "none" },
-  { prefix: "plugins", kind: "restart" },
+  { prefix: "plugins", kind: "hot", actions: ["reload-plugins"] },
   { prefix: "ui", kind: "none" },
   { prefix: "gateway", kind: "restart" },
   { prefix: "discovery", kind: "restart" },
@@ -177,6 +181,7 @@ export function buildGatewayReloadPlan(changedPaths: string[]): GatewayReloadPla
     restartReasons: [],
     hotReasons: [],
     reloadHooks: false,
+    reloadPlugins: false,
     restartGmailWatcher: false,
     restartBrowserControl: false,
     restartCron: false,
@@ -194,6 +199,11 @@ export function buildGatewayReloadPlan(changedPaths: string[]): GatewayReloadPla
     switch (action) {
       case "reload-hooks":
         plan.reloadHooks = true;
+        break;
+      case "reload-plugins":
+        plan.reloadPlugins = true;
+        clearPluginRegistryCache();
+        clearPluginManifestCache();
         break;
       case "restart-gmail-watcher":
         plan.restartGmailWatcher = true;

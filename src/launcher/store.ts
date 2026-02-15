@@ -119,6 +119,9 @@ export async function migrateLegacyLauncherStore(
       description: "",
       category: app.category as LaunchableApp["category"],
       status: (app.status as LaunchableApp["status"]) ?? "stopped",
+      device_id: null,
+      env_vars: null,
+      health_check_url: null,
       createdAtMs: now,
       updatedAtMs: now,
     }));

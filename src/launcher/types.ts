@@ -2,7 +2,7 @@
 // Launcher System – Core Types
 // ---------------------------------------------------------------------------
 
-export type AppCategory = "native" | "dev-server" | "web-embed" | "custom";
+export type AppCategory = "native" | "dev-server" | "web-embed" | "custom" | "service" | "script";
 export type LaunchStatus = "stopped" | "starting" | "running" | "error";
 
 // ---------------------------------------------------------------------------
@@ -34,6 +34,13 @@ export type LaunchableApp = {
 
   // Web embed fields
   url: string | null;
+
+  // Device association
+  device_id: string | null;
+
+  // Extended fields
+  env_vars: Record<string, string> | null;
+  health_check_url: string | null;
 
   tags: string[];
   color: string | null;
@@ -80,6 +87,13 @@ export type LaunchableAppCreateInput = {
   // Web embed
   url?: string | null;
 
+  // Device association
+  device_id?: string | null;
+
+  // Extended fields
+  env_vars?: Record<string, string> | null;
+  health_check_url?: string | null;
+
   tags?: string[];
   color?: string | null;
 };
@@ -107,6 +121,10 @@ export type LaunchableAppPatch = {
   maestro_app_id?: string | null;
   url?: string | null;
 
+  device_id?: string | null;
+  env_vars?: Record<string, string> | null;
+  health_check_url?: string | null;
+
   tags?: string[];
   color?: string | null;
 };
@@ -118,6 +136,7 @@ export type LaunchableAppPatch = {
 export type LauncherFilter = {
   category?: AppCategory;
   pinned?: boolean;
+  device_id?: string;
   limit?: number;
 };
 

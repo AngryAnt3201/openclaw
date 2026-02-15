@@ -115,6 +115,10 @@ export class LauncherService {
         maestro_app_id: input.maestro_app_id ?? null,
         url: input.url ?? null,
 
+        device_id: input.device_id ?? null,
+        env_vars: input.env_vars ?? null,
+        health_check_url: input.health_check_url ?? null,
+
         tags: input.tags ?? [],
         color: input.color ?? null,
 
@@ -194,6 +198,15 @@ export class LauncherService {
       if (patch.url !== undefined) {
         app.url = patch.url;
       }
+      if (patch.device_id !== undefined) {
+        app.device_id = patch.device_id;
+      }
+      if (patch.env_vars !== undefined) {
+        app.env_vars = patch.env_vars;
+      }
+      if (patch.health_check_url !== undefined) {
+        app.health_check_url = patch.health_check_url;
+      }
       if (patch.tags !== undefined) {
         app.tags = patch.tags;
       }
@@ -245,6 +258,9 @@ export class LauncherService {
       }
       if (filter.pinned !== undefined) {
         apps = apps.filter((a) => a.pinned === filter.pinned);
+      }
+      if (filter.device_id) {
+        apps = apps.filter((a) => a.device_id === filter.device_id);
       }
       if (filter.limit && filter.limit > 0) {
         apps = apps.slice(0, filter.limit);

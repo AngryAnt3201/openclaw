@@ -8,6 +8,7 @@ import { chatHandlers } from "./server-methods/chat.js";
 import { configHandlers } from "./server-methods/config.js";
 import { connectHandlers } from "./server-methods/connect.js";
 import { cronHandlers } from "./server-methods/cron.js";
+import { deviceRegistryHandlers } from "./server-methods/device-registry.js";
 import { deviceHandlers } from "./server-methods/devices.js";
 import { execApprovalsHandlers } from "./server-methods/exec-approvals.js";
 import { healthHandlers } from "./server-methods/health.js";
@@ -15,6 +16,7 @@ import { launcherHandlers } from "./server-methods/launcher.js";
 import { logsHandlers } from "./server-methods/logs.js";
 import { modelsHandlers } from "./server-methods/models.js";
 import { nodeHandlers } from "./server-methods/nodes.js";
+import { pluginsHandlers } from "./server-methods/plugins.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
 import { skillsHandlers } from "./server-methods/skills.js";
@@ -87,6 +89,9 @@ const READ_METHODS = new Set([
   "vault.metadata",
   "vault.canvas.get",
   "vault.config",
+  "plugins.list",
+  "device.registry.list",
+  "device.registry.get",
   "system-presence",
   "last-heartbeat",
   "node.list",
@@ -128,6 +133,10 @@ const WRITE_METHODS = new Set([
   "vault.move",
   "vault.canvas.update",
   "vault.sync.trigger",
+  "plugins.reload",
+  "device.registry.create",
+  "device.registry.update",
+  "device.registry.delete",
 ]);
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
@@ -231,6 +240,8 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...taskHandlers,
   ...launcherHandlers,
   ...vaultHandlers,
+  ...pluginsHandlers,
+  ...deviceRegistryHandlers,
 };
 
 export async function handleGatewayRequest(

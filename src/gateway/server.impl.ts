@@ -49,6 +49,7 @@ import { createChannelManager } from "./server-channels.js";
 import { createAgentEventHandler } from "./server-chat.js";
 import { createGatewayCloseHandler } from "./server-close.js";
 import { buildGatewayCronService } from "./server-cron.js";
+import { buildGatewayDeviceService } from "./server-devices-registry.js";
 import { startGatewayDiscovery } from "./server-discovery-runtime.js";
 import { applyGatewayLaneConcurrency } from "./server-lanes.js";
 import { buildGatewayLauncherService } from "./server-launcher.js";
@@ -396,6 +397,13 @@ export async function startGatewayServer(
   });
   let { launcherService, storePath: launcherStorePath } = launcherState;
 
+  const deviceState = buildGatewayDeviceService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+  });
+  const { deviceService, storePath: deviceStorePath } = deviceState;
+
   let vaultState = await buildGatewayVaultService({
     cfg: cfgAtStart,
     deps,
@@ -519,6 +527,8 @@ export async function startGatewayServer(
       taskStorePath,
       launcherService,
       launcherStorePath,
+      deviceService,
+      deviceStorePath,
       vaultService,
       vaultPath: vaultPathResolved,
       loadGatewayModelCatalog,

@@ -40,6 +40,10 @@ export type PluginLoadOptions = {
 
 const registryCache = new Map<string, PluginRegistry>();
 
+export function clearPluginRegistryCache(): void {
+  registryCache.clear();
+}
+
 const defaultLogger = () => createSubsystemLogger("plugins");
 
 const resolvePluginSdkAlias = (): string | null => {
