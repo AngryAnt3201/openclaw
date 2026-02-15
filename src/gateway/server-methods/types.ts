@@ -2,6 +2,7 @@ import type { ModelCatalogEntry } from "../../agents/model-catalog.js";
 import type { createDefaultDeps } from "../../cli/deps.js";
 import type { HealthSummary } from "../../commands/health.js";
 import type { CronService } from "../../cron/service.js";
+import type { LauncherService } from "../../launcher/service.js";
 import type { createSubsystemLogger } from "../../logging/subsystem.js";
 import type { TaskService } from "../../tasks/service.js";
 import type { VaultService } from "../../vault/service.js";
@@ -32,6 +33,8 @@ export type GatewayRequestContext = {
   cronStorePath: string;
   taskService: TaskService;
   taskStorePath: string;
+  launcherService: LauncherService;
+  launcherStorePath: string;
   vaultService?: VaultService;
   vaultPath?: string;
   loadGatewayModelCatalog: () => Promise<ModelCatalogEntry[]>;

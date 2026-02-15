@@ -51,6 +51,7 @@ import { createGatewayCloseHandler } from "./server-close.js";
 import { buildGatewayCronService } from "./server-cron.js";
 import { startGatewayDiscovery } from "./server-discovery-runtime.js";
 import { applyGatewayLaneConcurrency } from "./server-lanes.js";
+import { buildGatewayLauncherService } from "./server-launcher.js";
 import { startGatewayMaintenanceTimers } from "./server-maintenance.js";
 import { GATEWAY_EVENTS, listGatewayMethods } from "./server-methods-list.js";
 import { coreGatewayHandlers } from "./server-methods.js";
@@ -388,6 +389,13 @@ export async function startGatewayServer(
   });
   let { taskService, storePath: taskStorePath } = taskState;
 
+  let launcherState = buildGatewayLauncherService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+  });
+  let { launcherService, storePath: launcherStorePath } = launcherState;
+
   let vaultState = await buildGatewayVaultService({
     cfg: cfgAtStart,
     deps,
@@ -509,6 +517,8 @@ export async function startGatewayServer(
       cronStorePath,
       taskService,
       taskStorePath,
+      launcherService,
+      launcherStorePath,
       vaultService,
       vaultPath: vaultPathResolved,
       loadGatewayModelCatalog,

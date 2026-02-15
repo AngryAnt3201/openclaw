@@ -11,6 +11,7 @@ import { cronHandlers } from "./server-methods/cron.js";
 import { deviceHandlers } from "./server-methods/devices.js";
 import { execApprovalsHandlers } from "./server-methods/exec-approvals.js";
 import { healthHandlers } from "./server-methods/health.js";
+import { launcherHandlers } from "./server-methods/launcher.js";
 import { logsHandlers } from "./server-methods/logs.js";
 import { modelsHandlers } from "./server-methods/models.js";
 import { nodeHandlers } from "./server-methods/nodes.js";
@@ -72,6 +73,9 @@ const READ_METHODS = new Set([
   "task.list",
   "task.get",
   "task.events",
+  "launcher.list",
+  "launcher.get",
+  "launcher.discovered.list",
   "vault.list",
   "vault.get",
   "vault.search",
@@ -111,6 +115,13 @@ const WRITE_METHODS = new Set([
   "task.approve",
   "task.reject",
   "task.progress",
+  "launcher.create",
+  "launcher.update",
+  "launcher.delete",
+  "launcher.pin",
+  "launcher.unpin",
+  "launcher.reorder",
+  "launcher.discovered.update",
   "vault.create",
   "vault.update",
   "vault.delete",
@@ -218,6 +229,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...agentsHandlers,
   ...browserHandlers,
   ...taskHandlers,
+  ...launcherHandlers,
   ...vaultHandlers,
 };
 
