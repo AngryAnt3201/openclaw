@@ -8,18 +8,19 @@ const cliDir = path.join(distDir, "cli");
 
 const findCandidates = () =>
   fs.readdirSync(distDir).filter((entry) => {
-    if (!entry.startsWith("daemon-cli-")) {
+    // Match both the primary entry (daemon-cli.js) and hash-suffixed chunks (daemon-cli-HASH.js).
+    if (!entry.startsWith("daemon-cli")) {
       return false;
     }
     // tsdown can emit either .js or .mjs depending on bundler settings/runtime.
     return entry.endsWith(".js") || entry.endsWith(".mjs");
   });
 
-// In rare cases, build output can land slightly after this script starts (depending on FS timing).
-// Retry briefly to avoid flaky builds.
+// In watch mode, daemon-cli may not be built yet when this script runs.
+// Retry with enough headroom for tsdown to finish all config entries.
 let candidates = findCandidates();
-for (let i = 0; i < 10 && candidates.length === 0; i++) {
-  await new Promise((resolve) => setTimeout(resolve, 50));
+for (let i = 0; i < 40 && candidates.length === 0; i++) {
+  await new Promise((resolve) => setTimeout(resolve, 100));
   candidates = findCandidates();
 }
 
@@ -27,7 +28,9 @@ if (candidates.length === 0) {
   throw new Error("No daemon-cli bundle found in dist; cannot write legacy CLI shim.");
 }
 
-const target = candidates.toSorted()[0];
+// Prefer the primary entry (daemon-cli.js/mjs) over hash-suffixed chunks.
+const primary = candidates.find((c) => c === "daemon-cli.js" || c === "daemon-cli.mjs");
+const target = primary ?? candidates.toSorted()[0];
 const relPath = `../${target}`;
 
 const contents =

@@ -37,6 +37,12 @@ export default defineConfig([
     platform: "node",
   },
   {
+    entry: "src/cli/daemon-cli.ts",
+    env,
+    fixedExtension: false,
+    platform: "node",
+  },
+  {
     entry: ["src/hooks/bundled/*/handler.ts", "src/hooks/llm-slug-generator.ts"],
     env,
     fixedExtension: false,
