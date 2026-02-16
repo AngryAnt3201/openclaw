@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, watch } from "node:fs";
+import { watch } from "node:fs";
 import { resolve } from "node:path";
 import process from "node:process";
 
