@@ -4,6 +4,7 @@
 
 import type { CliDeps } from "../cli/deps.js";
 import type { loadConfig } from "../config/config.js";
+import type { NodeRegistry } from "./node-registry.js";
 import { getChildLogger } from "../logging.js";
 import { NotificationService } from "../notifications/service.js";
 import { resolveNotificationStorePath } from "../notifications/store.js";
@@ -19,6 +20,7 @@ export function buildGatewayNotificationService(params: {
   cfg: ReturnType<typeof loadConfig>;
   deps: CliDeps;
   broadcast: (event: string, payload: unknown, opts?: { dropIfSlow?: boolean }) => void;
+  nodeRegistry: NodeRegistry;
 }): GatewayNotificationState {
   const notifLogger = getChildLogger({ module: "notifications" });
   const storePath = resolveNotificationStorePath(params.cfg.notifications?.store);
@@ -50,6 +52,15 @@ export function buildGatewayNotificationService(params: {
         info: (msg) => notifLogger.info(msg),
         warn: (msg) => notifLogger.warn(msg),
         error: (msg) => notifLogger.error(msg),
+      },
+      nodeInvoker: {
+        listConnectedNodes: () =>
+          params.nodeRegistry.listConnected().map((n) => ({
+            nodeId: n.nodeId,
+            commands: n.commands,
+            platform: n.platform,
+          })),
+        invoke: (p) => params.nodeRegistry.invoke(p),
       },
     },
   });

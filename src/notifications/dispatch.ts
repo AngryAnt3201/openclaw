@@ -15,6 +15,17 @@ import { getNotificationChannel, hasNotificationChannel } from "./plugin-channel
 // Dependencies (injected)
 // ---------------------------------------------------------------------------
 
+export type NodeInvoker = {
+  listConnectedNodes: () => Array<{ nodeId: string; commands: string[]; platform?: string }>;
+  invoke: (params: {
+    nodeId: string;
+    command: string;
+    params?: unknown;
+    timeoutMs?: number;
+    idempotencyKey: string;
+  }) => Promise<{ ok: boolean; error?: { code?: string; message?: string } | null }>;
+};
+
 export type DispatchDeps = {
   cfg: OpenClawConfig;
   channelTargets: Record<string, string>;
@@ -32,6 +43,7 @@ export type DispatchDeps = {
     warn: (msg: string) => void;
     error: (msg: string) => void;
   };
+  nodeInvoker?: NodeInvoker;
 };
 
 // ---------------------------------------------------------------------------
@@ -196,6 +208,64 @@ async function dispatchToPluginChannel(
 }
 
 // ---------------------------------------------------------------------------
+// Node push dispatch
+// ---------------------------------------------------------------------------
+
+const NODE_PRIORITY_MAP: Record<string, string> = {
+  critical: "timeSensitive",
+  high: "active",
+  medium: "active",
+  low: "passive",
+};
+
+async function dispatchToNodes(
+  deps: DispatchDeps,
+  notification: Notification,
+): Promise<ChannelResult[]> {
+  if (!deps.nodeInvoker) {
+    return [];
+  }
+
+  const nodes = deps.nodeInvoker
+    .listConnectedNodes()
+    .filter((n) => n.commands.includes("system.notify"));
+
+  if (nodes.length === 0) {
+    return [];
+  }
+
+  const results: ChannelResult[] = [];
+  for (const node of nodes) {
+    try {
+      const res = await deps.nodeInvoker.invoke({
+        nodeId: node.nodeId,
+        command: "system.notify",
+        params: {
+          title: notification.title,
+          body: notification.body,
+          priority: NODE_PRIORITY_MAP[notification.priority] ?? "active",
+          delivery: "system",
+        },
+        timeoutMs: 10_000,
+        idempotencyKey: `notif-${notification.id}-${node.nodeId}`,
+      });
+      results.push({
+        channel: `node:${node.nodeId}`,
+        success: res.ok,
+        error: res.ok ? undefined : (res.error?.message ?? "invoke failed"),
+      });
+    } catch (err) {
+      results.push({
+        channel: `node:${node.nodeId}`,
+        success: false,
+        error: String(err),
+      });
+    }
+  }
+  return results;
+}
+
+// ---------------------------------------------------------------------------
 // Main dispatch function
 // ---------------------------------------------------------------------------
 
@@ -237,6 +307,12 @@ export async function dispatchNotification(
     if (!result.success) {
       deps.log.warn(`dispatch to webhook ${webhook.url} failed: ${result.error}`);
     }
+  }
+
+  // Push to connected nodes
+  if (preferences.nodePushEnabled !== false) {
+    const nodeResults = await dispatchToNodes(deps, notification);
+    results.push(...nodeResults);
   }
 
   return results;

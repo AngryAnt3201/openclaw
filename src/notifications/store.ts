@@ -32,6 +32,7 @@ export function resolveNotificationStorePath(customPath?: string): string {
 export function defaultPreferences(): NotificationPreferences {
   return {
     enabled: true,
+    nodePushEnabled: true,
     defaultChannels: [],
     routes: {},
     quietHours: {

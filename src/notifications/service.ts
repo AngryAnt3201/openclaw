@@ -385,6 +385,9 @@ export class NotificationService {
       if (patch.webhooks !== undefined) {
         store.preferences.webhooks = patch.webhooks;
       }
+      if (patch.nodePushEnabled !== undefined) {
+        store.preferences.nodePushEnabled = patch.nodePushEnabled;
+      }
 
       await writeNotificationStore(this.state.deps.storePath, store);
 

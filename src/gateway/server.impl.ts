@@ -389,6 +389,7 @@ export async function startGatewayServer(
     cfg: cfgAtStart,
     deps,
     broadcast,
+    nodeRegistry,
   });
   const {
     notificationService,

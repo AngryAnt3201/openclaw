@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import type { DispatchDeps } from "./dispatch.js";
+import type { DispatchDeps, NodeInvoker } from "./dispatch.js";
 import type { Notification, NotificationPreferences } from "./types.js";
 import { isInQuietHours, resolveChannels, dispatchNotification } from "./dispatch.js";
 import { defaultPreferences } from "./store.js";
@@ -234,5 +234,166 @@ describe("dispatchNotification", () => {
     expect(fetchSpy).toHaveBeenCalledOnce();
 
     fetchSpy.mockRestore();
+  });
+
+  it("dispatches to connected nodes with system.notify", async () => {
+    const invoke = vi.fn().mockResolvedValue({ ok: true });
+    const nodeInvoker: NodeInvoker = {
+      listConnectedNodes: () => [
+        { nodeId: "iphone-1", commands: ["system.notify", "system.haptic"], platform: "ios" },
+        { nodeId: "linux-1", commands: ["system.exec"], platform: "linux" },
+      ],
+      invoke,
+    };
+
+    const deps: DispatchDeps = {
+      cfg: {} as any,
+      channelTargets: {},
+      log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      nodeInvoker,
+    };
+
+    const notification = makeNotification({ id: "n-node-1", title: "Hello", body: "World" });
+    const results = await dispatchNotification(deps, notification, [], defaultPreferences());
+
+    expect(invoke).toHaveBeenCalledOnce();
+    expect(invoke).toHaveBeenCalledWith({
+      nodeId: "iphone-1",
+      command: "system.notify",
+      params: { title: "Hello", body: "World", priority: "active", delivery: "system" },
+      timeoutMs: 10_000,
+      idempotencyKey: "notif-n-node-1-iphone-1",
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0]!.channel).toBe("node:iphone-1");
+    expect(results[0]!.success).toBe(true);
+  });
+
+  it("skips node push when nodePushEnabled is false", async () => {
+    const invoke = vi.fn().mockResolvedValue({ ok: true });
+    const nodeInvoker: NodeInvoker = {
+      listConnectedNodes: () => [
+        { nodeId: "iphone-1", commands: ["system.notify"], platform: "ios" },
+      ],
+      invoke,
+    };
+
+    const deps: DispatchDeps = {
+      cfg: {} as any,
+      channelTargets: {},
+      log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      nodeInvoker,
+    };
+
+    const prefs: NotificationPreferences = { ...defaultPreferences(), nodePushEnabled: false };
+    const results = await dispatchNotification(deps, makeNotification(), [], prefs);
+
+    expect(invoke).not.toHaveBeenCalled();
+    expect(results).toEqual([]);
+  });
+
+  it("maps priority correctly for node push", async () => {
+    const invoke = vi.fn().mockResolvedValue({ ok: true });
+    const nodeInvoker: NodeInvoker = {
+      listConnectedNodes: () => [
+        { nodeId: "mac-1", commands: ["system.notify"], platform: "macos" },
+      ],
+      invoke,
+    };
+
+    const deps: DispatchDeps = {
+      cfg: {} as any,
+      channelTargets: {},
+      log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      nodeInvoker,
+    };
+
+    const mapping: Array<[string, string]> = [
+      ["critical", "timeSensitive"],
+      ["high", "active"],
+      ["medium", "active"],
+      ["low", "passive"],
+    ];
+
+    for (const [inputPriority, expectedPriority] of mapping) {
+      invoke.mockClear();
+      await dispatchNotification(
+        deps,
+        makeNotification({ priority: inputPriority as any }),
+        [],
+        defaultPreferences(),
+      );
+      expect(invoke).toHaveBeenCalledOnce();
+      expect(invoke.mock.calls[0]![0].params.priority).toBe(expectedPriority);
+    }
+  });
+
+  it("handles node invoke failure gracefully", async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      ok: false,
+      error: { code: "TIMEOUT", message: "timeout" },
+    });
+    const nodeInvoker: NodeInvoker = {
+      listConnectedNodes: () => [
+        { nodeId: "iphone-1", commands: ["system.notify"], platform: "ios" },
+      ],
+      invoke,
+    };
+
+    const deps: DispatchDeps = {
+      cfg: {} as any,
+      channelTargets: {},
+      log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      nodeInvoker,
+    };
+
+    const results = await dispatchNotification(deps, makeNotification(), [], defaultPreferences());
+
+    expect(results).toHaveLength(1);
+    expect(results[0]!.success).toBe(false);
+    expect(results[0]!.error).toBe("timeout");
+  });
+
+  it("suppresses node push during quiet hours for non-critical", async () => {
+    const invoke = vi.fn().mockResolvedValue({ ok: true });
+    const nodeInvoker: NodeInvoker = {
+      listConnectedNodes: () => [
+        { nodeId: "iphone-1", commands: ["system.notify"], platform: "ios" },
+      ],
+      invoke,
+    };
+
+    const deps: DispatchDeps = {
+      cfg: {} as any,
+      channelTargets: {},
+      log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      nodeInvoker,
+    };
+
+    const quietPrefs: NotificationPreferences = {
+      ...defaultPreferences(),
+      quietHours: { enabled: true, startHour: 0, endHour: 23 },
+    };
+
+    // Non-critical: suppressed
+    const results = await dispatchNotification(
+      deps,
+      makeNotification({ priority: "medium" }),
+      [],
+      quietPrefs,
+    );
+    expect(results).toEqual([]);
+    expect(invoke).not.toHaveBeenCalled();
+
+    // Critical: still pushes
+    const critResults = await dispatchNotification(
+      deps,
+      makeNotification({ priority: "critical" }),
+      [],
+      quietPrefs,
+    );
+    expect(critResults).toHaveLength(1);
+    expect(critResults[0]!.success).toBe(true);
+    expect(invoke).toHaveBeenCalledOnce();
   });
 });

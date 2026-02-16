@@ -112,6 +112,7 @@ export type WebhookConfig = {
 
 export type NotificationPreferences = {
   enabled: boolean;
+  nodePushEnabled: boolean;
   defaultChannels: string[];
   routes: Partial<Record<NotificationType, ChannelRouteConfig>>;
   quietHours: QuietHours;
