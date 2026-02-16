@@ -135,11 +135,18 @@ export class NotificationService {
       this.emit("notification.created", notification);
       this.state.deps.log.info(`notification created: ${notification.id} — ${notification.title}`);
 
-      // Dispatch to external channels in the background
+      // Dispatch to channels + node push in the background
       if (this.state.deps.dispatch) {
         const channels = resolveChannels(notification, store.preferences, input.channels);
-        if (channels.length > 0) {
-          void this.dispatchAndRecord(notification.id, notification, channels, store.preferences);
+        const skipNodePush = input.data?._skipNodePush === true;
+        const nodePushEnabled = !skipNodePush && store.preferences.nodePushEnabled !== false;
+        if (channels.length > 0 || nodePushEnabled) {
+          void this.dispatchAndRecord(
+            notification.id,
+            notification,
+            channels,
+            nodePushEnabled ? store.preferences : { ...store.preferences, nodePushEnabled: false },
+          );
         }
       }
 

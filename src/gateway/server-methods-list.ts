@@ -88,6 +88,17 @@ const BASE_METHODS = [
   "task.reject",
   "task.events",
   "task.progress",
+  // Notification methods
+  "notification.list",
+  "notification.get",
+  "notification.create",
+  "notification.markRead",
+  "notification.markAllRead",
+  "notification.dismiss",
+  "notification.dismissAll",
+  "notification.unreadCount",
+  "notification.preferences.get",
+  "notification.preferences.set",
   // Launcher methods
   "launcher.list",
   "launcher.get",
@@ -144,6 +155,14 @@ export const GATEWAY_EVENTS = [
   "task.completed",
   "task.input_required",
   "task.approval_required",
+  // Notification events
+  "notification.created",
+  "notification.read",
+  "notification.dismissed",
+  "notification.allRead",
+  "notification.allDismissed",
+  "notification.preferences.updated",
+  "notification.unreadCount",
   // Launcher events
   "launcher.created",
   "launcher.updated",

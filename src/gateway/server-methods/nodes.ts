@@ -446,6 +446,25 @@ export const nodeHandlers: GatewayRequestHandlers = {
         },
         undefined,
       );
+
+      // Capture system.notify calls as in-app notifications
+      if (command === "system.notify" && context.notificationService) {
+        const np = (p.params ?? {}) as Record<string, unknown>;
+        const title = typeof np.title === "string" ? np.title.trim() : "";
+        const body = typeof np.body === "string" ? np.body.trim() : "";
+        if (title || body) {
+          void context.notificationService
+            .create({
+              type: "agent_alert",
+              title: title || "Notification",
+              body: body || title,
+              priority: "medium",
+              source: "system.notify",
+              data: { nodeId, _skipNodePush: true },
+            })
+            .catch(() => {});
+        }
+      }
     });
   },
   "node.invoke.result": async ({ params, respond, context, client }) => {
