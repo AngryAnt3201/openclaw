@@ -55,7 +55,10 @@ const MaestroSessionSchema = Type.Object({
     }),
   ),
   text: Type.Optional(
-    Type.String({ description: "Text to send to session stdin (required for 'input')." }),
+    Type.String({
+      description:
+        "Text to send to session stdin. REQUIRED when action is 'input' — omitting this will cause an error.",
+    }),
   ),
   cursor: Type.Optional(
     Type.Number({
@@ -69,7 +72,7 @@ export function createMaestroSessionTool(): AnyAgentTool {
     label: "Maestro",
     name: "maestro_session",
     description:
-      "Create and manage Maestro Claude Code sessions. Use this to spin up isolated Claude Code terminals that work on code, run tests, and push changes. Actions: create (new session), status (check session), input (send text), output (read terminal output), list (all sessions), kill (terminate).",
+      "Create and manage Maestro Claude Code sessions. Use this to spin up isolated Claude Code terminals that work on code, run tests, and push changes.\n\nActions:\n- create: new session (requires projectPath, prompt)\n- status: check session (requires sessionId)\n- input: send text to session stdin (requires sessionId AND text — you MUST provide the text param)\n- output: read terminal output (requires sessionId, optional cursor)\n- list: all sessions (no extra params)\n- kill: terminate session (requires sessionId)",
     parameters: MaestroSessionSchema,
     execute: async (_toolCallId, args) => {
       const params = args as Record<string, unknown>;

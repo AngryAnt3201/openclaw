@@ -265,7 +265,22 @@ export function buildAllowedModelSet(params: {
 } {
   const rawAllowlist = (() => {
     const modelMap = params.cfg.agents?.defaults?.models ?? {};
-    return Object.keys(modelMap);
+    // Only treat the models map as a restrictive allowlist when at least one
+    // entry carries an `alias` — which signals explicit user intent to curate
+    // the visible model set.  Entries that only contain `params` / `streaming`
+    // are per-model configuration (e.g. auto-injected cacheRetention) and
+    // should not restrict which models are allowed.
+    const keys = Object.keys(modelMap);
+    const hasExplicitAllowEntry = keys.some((k) => {
+      const entry = modelMap[k];
+      return (
+        entry &&
+        typeof entry === "object" &&
+        "alias" in entry &&
+        (entry as { alias?: string }).alias
+      );
+    });
+    return hasExplicitAllowEntry ? keys : [];
   })();
   const allowAny = rawAllowlist.length === 0;
   const defaultModel = params.defaultModel?.trim();
