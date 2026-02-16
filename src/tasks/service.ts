@@ -341,6 +341,52 @@ export class TaskService {
   }
 
   // -------------------------------------------------------------------------
+  // delete
+  // -------------------------------------------------------------------------
+
+  async delete(taskId: string): Promise<boolean> {
+    return locked(this.state, async () => {
+      const store = await readTaskStore(this.state.deps.storePath);
+      const idx = store.tasks.findIndex((t) => t.id === taskId);
+      if (idx === -1) {
+        return false;
+      }
+
+      store.tasks.splice(idx, 1);
+      await writeTaskStore(this.state.deps.storePath, store);
+
+      this.emit("task.deleted", { taskId });
+      this.state.deps.log.info(`task deleted: ${taskId}`);
+      return true;
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // clearFinished (remove all complete / cancelled / failed)
+  // -------------------------------------------------------------------------
+
+  async clearFinished(): Promise<string[]> {
+    return locked(this.state, async () => {
+      const store = await readTaskStore(this.state.deps.storePath);
+      const finished = new Set<TaskStatus>(["complete", "cancelled", "failed"]);
+      const removed = store.tasks.filter((t) => finished.has(t.status)).map((t) => t.id);
+
+      if (removed.length === 0) {
+        return [];
+      }
+
+      store.tasks = store.tasks.filter((t) => !finished.has(t.status));
+      await writeTaskStore(this.state.deps.storePath, store);
+
+      for (const id of removed) {
+        this.emit("task.deleted", { taskId: id });
+      }
+      this.state.deps.log.info(`cleared ${removed.length} finished task(s)`);
+      return removed;
+    });
+  }
+
+  // -------------------------------------------------------------------------
   // addEvent
   // -------------------------------------------------------------------------
 

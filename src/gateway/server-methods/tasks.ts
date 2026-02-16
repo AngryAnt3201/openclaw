@@ -204,6 +204,35 @@ export const taskHandlers: GatewayRequestHandlers = {
   },
 
   // -------------------------------------------------------------------------
+  // task.delete
+  // -------------------------------------------------------------------------
+  "task.delete": async ({ params, respond, context }) => {
+    const taskId = requireString(params, "taskId") ?? requireString(params, "id");
+    if (!taskId) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing taskId"));
+      return;
+    }
+    const deleted = await context.taskService.delete(taskId);
+    if (!deleted) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, `task not found: ${taskId}`),
+      );
+      return;
+    }
+    respond(true, { taskId }, undefined);
+  },
+
+  // -------------------------------------------------------------------------
+  // task.clearFinished
+  // -------------------------------------------------------------------------
+  "task.clearFinished": async ({ params, respond, context }) => {
+    const removed = await context.taskService.clearFinished();
+    respond(true, { removed }, undefined);
+  },
+
+  // -------------------------------------------------------------------------
   // task.events (read event log)
   // -------------------------------------------------------------------------
   "task.events": async ({ params, respond, context }) => {

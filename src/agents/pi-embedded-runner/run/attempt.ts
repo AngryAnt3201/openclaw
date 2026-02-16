@@ -7,11 +7,14 @@ import os from "node:os";
 import type { EmbeddedRunAttemptParams, EmbeddedRunAttemptResult } from "./types.js";
 import { resolveHeartbeatPrompt } from "../../../auto-reply/heartbeat.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
+import { getAgentRunContext } from "../../../infra/agent-events.js";
+import { resolveTaskContextForHeartbeat } from "../../../infra/heartbeat-task-context.js";
 import { getMachineDisplayName } from "../../../infra/machine-name.js";
 import { MAX_IMAGE_BYTES } from "../../../media/constants.js";
 import { getGlobalHookRunner } from "../../../plugins/hook-runner-global.js";
 import { isSubagentSessionKey, normalizeAgentId } from "../../../routing/session-key.js";
 import { resolveSignalReactionLevel } from "../../../signal/reaction-level.js";
+import { resolveTaskStorePath } from "../../../tasks/store.js";
 import { resolveTelegramInlineButtonsScope } from "../../../telegram/inline-buttons.js";
 import { resolveTelegramReactionLevel } from "../../../telegram/reaction-level.js";
 import { buildTtsSystemPromptHint } from "../../../tts/tts.js";
@@ -348,11 +351,34 @@ export async function runEmbeddedAttempt(
     });
     const ttsHint = params.config ? buildTtsSystemPromptHint(params.config) : undefined;
 
+    // Inject active task context so the LLM knows about {ref:N} markers for tasks.
+    // Prefer the pre-resolved snapshot from the run context (same store read as refs)
+    // to guarantee index alignment. Fall back to a fresh read if not available.
+    let extraSystemPrompt = params.extraSystemPrompt;
+    try {
+      const runCtx = getAgentRunContext(params.runId);
+      let taskContext = runCtx?.taskContextText;
+      if (taskContext === undefined) {
+        // Fallback: no snapshot on run context — read store directly
+        const taskStorePath = resolveTaskStorePath(
+          (params.config as Record<string, unknown>)?.tasks
+            ? ((params.config as Record<string, unknown>).tasks as { store?: string })?.store
+            : undefined,
+        );
+        taskContext = await resolveTaskContextForHeartbeat(taskStorePath);
+      }
+      if (taskContext) {
+        extraSystemPrompt = extraSystemPrompt ? `${extraSystemPrompt}${taskContext}` : taskContext;
+      }
+    } catch {
+      // Task store unavailable — proceed without task context
+    }
+
     const appendPrompt = buildEmbeddedSystemPrompt({
       workspaceDir: effectiveWorkspace,
       defaultThinkLevel: params.thinkLevel,
       reasoningLevel: params.reasoningLevel ?? "off",
-      extraSystemPrompt: params.extraSystemPrompt,
+      extraSystemPrompt,
       ownerNumbers: params.ownerNumbers,
       reasoningTagHint,
       heartbeatPrompt: isDefaultAgent

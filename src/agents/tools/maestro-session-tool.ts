@@ -16,6 +16,7 @@ const MaestroSessionSchema = Type.Object({
       Type.Literal("create"),
       Type.Literal("status"),
       Type.Literal("input"),
+      Type.Literal("output"),
       Type.Literal("list"),
       Type.Literal("kill"),
     ],
@@ -36,13 +37,30 @@ const MaestroSessionSchema = Type.Object({
       default: false,
     }),
   ),
+  skipPermissions: Type.Optional(
+    Type.Boolean({
+      description:
+        "Skip permission prompts (e.g. --dangerously-skip-permissions). Overrides user settings if provided.",
+    }),
+  ),
+  customFlags: Type.Optional(
+    Type.String({
+      description:
+        "Additional CLI flags to pass to the AI tool (e.g. '--model opus'). Overrides user settings if provided.",
+    }),
+  ),
   sessionId: Type.Optional(
     Type.Number({
-      description: "Session ID (required for 'status', 'input', 'kill').",
+      description: "Session ID (required for 'status', 'input', 'output', 'kill').",
     }),
   ),
   text: Type.Optional(
     Type.String({ description: "Text to send to session stdin (required for 'input')." }),
+  ),
+  cursor: Type.Optional(
+    Type.Number({
+      description: "Output cursor for incremental reads (for 'output' action).",
+    }),
   ),
 });
 
@@ -51,7 +69,7 @@ export function createMaestroSessionTool(): AnyAgentTool {
     label: "Maestro",
     name: "maestro_session",
     description:
-      "Create and manage Maestro Claude Code sessions. Use this to spin up isolated Claude Code terminals that work on code, run tests, and push changes. Actions: create (new session), status (check session), input (send text), list (all sessions), kill (terminate).",
+      "Create and manage Maestro Claude Code sessions. Use this to spin up isolated Claude Code terminals that work on code, run tests, and push changes. Actions: create (new session), status (check session), input (send text), output (read terminal output), list (all sessions), kill (terminate).",
     parameters: MaestroSessionSchema,
     execute: async (_toolCallId, args) => {
       const params = args as Record<string, unknown>;
@@ -71,6 +89,9 @@ export function createMaestroSessionTool(): AnyAgentTool {
           const branch = readStringParam(params, "branch");
           const prompt = readStringParam(params, "prompt");
           const autoPush = params.autoPush === true;
+          const skipPermissions =
+            typeof params.skipPermissions === "boolean" ? params.skipPermissions : undefined;
+          const customFlags = readStringParam(params, "customFlags");
 
           try {
             const session = await client.createSession({
@@ -78,6 +99,8 @@ export function createMaestroSessionTool(): AnyAgentTool {
               branch,
               initialPrompt: prompt,
               autoPush,
+              skipPermissions,
+              customFlags,
             });
             return jsonResult({
               success: true,
@@ -144,6 +167,23 @@ export function createMaestroSessionTool(): AnyAgentTool {
             });
           } catch (err) {
             return jsonResult({ error: `Failed to list sessions: ${String(err)}` });
+          }
+        }
+
+        case "output": {
+          const sessionId = readNumberParam(params, "sessionId", {
+            required: true,
+            integer: true,
+          })!;
+          const cursor = readNumberParam(params, "cursor", { integer: true });
+          try {
+            const result = await client.getOutput(sessionId, cursor ?? undefined);
+            return jsonResult({
+              output: result.output,
+              cursor: result.cursor,
+            });
+          } catch (err) {
+            return jsonResult({ error: `Failed to get output: ${String(err)}` });
           }
         }
 

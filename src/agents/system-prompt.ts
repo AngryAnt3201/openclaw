@@ -243,6 +243,9 @@ export function buildAgentSystemPrompt(params: {
     session_status:
       "Show a /status-equivalent status card (usage + time + Reasoning/Verbose/Elevated); use for model-use questions (📊 session_status); optional per-session model override",
     image: "Analyze an image with the configured image model",
+    task: "Manage Miranda task queue (create/update/list/cancel tasks visible in the user's UI)",
+    vault:
+      "Read, create, update, search, and manage notes in the Miranda knowledge vault (Obsidian-compatible markdown). Use to persist research, context, and findings.",
   };
 
   const toolOrder = [
@@ -269,6 +272,8 @@ export function buildAgentSystemPrompt(params: {
     "sessions_send",
     "session_status",
     "image",
+    "task",
+    "vault",
   ];
 
   const rawToolNames = (params.toolNames ?? []).map((tool) => tool.trim());

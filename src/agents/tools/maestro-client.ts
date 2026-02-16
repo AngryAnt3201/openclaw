@@ -98,6 +98,8 @@ export class MaestroClient {
     initialPrompt?: string;
     autoPush?: boolean;
     env?: Record<string, string>;
+    skipPermissions?: boolean;
+    customFlags?: string;
   }): Promise<MaestroSession> {
     return this.request("POST", "/sessions", {
       project_path: params.projectPath,
@@ -106,6 +108,8 @@ export class MaestroClient {
       initial_prompt: params.initialPrompt,
       auto_push: params.autoPush ?? false,
       env: params.env,
+      skip_permissions: params.skipPermissions,
+      custom_flags: params.customFlags,
     });
   }
 
@@ -119,6 +123,11 @@ export class MaestroClient {
 
   async sendInput(id: number, text: string): Promise<void> {
     await this.request("POST", `/sessions/${id}/input`, { text });
+  }
+
+  async getOutput(id: number, cursor?: number): Promise<{ output: string; cursor: number }> {
+    const qs = cursor != null ? `?cursor=${cursor}` : "";
+    return this.request("GET", `/sessions/${id}/output${qs}`);
   }
 
   async killSession(id: number): Promise<void> {

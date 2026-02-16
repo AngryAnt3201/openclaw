@@ -22,10 +22,12 @@ import type {
 } from "./types.messages.js";
 import type { ModelsConfig } from "./types.models.js";
 import type { NodeHostConfig } from "./types.node-host.js";
+import type { NotificationsConfig } from "./types.notifications.js";
 import type { PluginsConfig } from "./types.plugins.js";
 import type { SkillsConfig } from "./types.skills.js";
 import type { TasksConfig } from "./types.tasks.js";
 import type { ToolsConfig } from "./types.tools.js";
+import type { WorkflowConfig } from "./types.workflow.js";
 
 export type OpenClawConfig = {
   meta?: {
@@ -94,6 +96,7 @@ export type OpenClawConfig = {
   channels?: ChannelsConfig;
   cron?: CronConfig;
   tasks?: TasksConfig;
+  notifications?: NotificationsConfig;
   launcher?: LauncherConfig;
   hooks?: HooksConfig;
   discovery?: DiscoveryConfig;
@@ -101,6 +104,7 @@ export type OpenClawConfig = {
   talk?: TalkConfig;
   gateway?: GatewayConfig;
   memory?: MemoryConfig;
+  workflow?: WorkflowConfig;
 };
 
 export type ConfigValidationIssue = {

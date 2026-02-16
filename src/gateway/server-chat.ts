@@ -264,6 +264,8 @@ export function createAgentEventHandler({
     chatRunState.buffers.delete(clientRunId);
     chatRunState.deltaSentAt.delete(clientRunId);
     if (jobState === "done") {
+      const runContext = getAgentRunContext(clientRunId);
+      const refs = runContext?.refs;
       const payload = {
         runId: clientRunId,
         sessionKey,
@@ -276,6 +278,7 @@ export function createAgentEventHandler({
               timestamp: Date.now(),
             }
           : undefined,
+        ...(refs && refs.length > 0 ? { refs } : {}),
       };
       // Suppress webchat broadcast for heartbeat runs when showOk is false
       if (!shouldSuppressHeartbeatBroadcast(clientRunId)) {

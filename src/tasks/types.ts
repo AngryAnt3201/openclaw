@@ -180,6 +180,7 @@ export type AppAction =
   | { type: "open_url"; url: string }
   | { type: "deep_link"; uri: string }
   | { type: "launch_native"; appPath: string }
+  | { type: "open_task"; taskId: string }
   | { type: "noop" };
 
 export type AppRefStyle = "chip" | "obsidian-link";

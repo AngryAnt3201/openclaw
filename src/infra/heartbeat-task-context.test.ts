@@ -174,7 +174,7 @@ describe("resolveTaskContextForHeartbeat", () => {
   // Formatting
   // -----------------------------------------------------------------------
 
-  it("includes short task ID", async () => {
+  it("includes task-level ref index for the task", async () => {
     const store: TaskStoreFile = {
       version: 1,
       tasks: [
@@ -187,7 +187,9 @@ describe("resolveTaskContextForHeartbeat", () => {
     };
     await writeTaskStore(storePath, store);
     const result = await resolveTaskContextForHeartbeat(storePath);
-    expect(result).toContain("[abcdefgh]");
+    // First task gets {ref:0}
+    expect(result).toContain("{ref:0}");
+    expect(result).toContain("Test task");
   });
 
   it("includes priority", async () => {

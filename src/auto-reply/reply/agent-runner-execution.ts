@@ -26,7 +26,9 @@ import {
 } from "../../config/sessions.js";
 import { logVerbose } from "../../globals.js";
 import { emitAgentEvent, registerAgentRunContext } from "../../infra/agent-events.js";
+import { resolveTaskContextSnapshot } from "../../infra/heartbeat-task-context.js";
 import { defaultRuntime } from "../../runtime.js";
+import { resolveTaskStorePath } from "../../tasks/store.js";
 import {
   isMarkdownCapableMessageChannel,
   resolveMessageChannel,
@@ -87,10 +89,29 @@ export async function runAgentTurnWithFallback(params: {
   const runId = params.opts?.runId ?? crypto.randomUUID();
   params.opts?.onAgentRunStart?.(runId);
   if (params.sessionKey) {
+    // Resolve task context snapshot (context text + refs) from a single store read.
+    // The snapshot is stored on the run context so the refs are available when
+    // the chat finalizes, and the context text can be injected into the system prompt.
+    let taskSnapshot:
+      | import("../../infra/heartbeat-task-context.js").TaskContextSnapshot
+      | undefined;
+    try {
+      const storePath = resolveTaskStorePath();
+      const snapshot = await resolveTaskContextSnapshot(storePath);
+      if (snapshot.refs.length > 0) {
+        taskSnapshot = snapshot;
+      }
+    } catch {
+      // Non-critical — continue without refs
+    }
+
     registerAgentRunContext(runId, {
       sessionKey: params.sessionKey,
       verboseLevel: params.resolvedVerboseLevel,
       isHeartbeat: params.isHeartbeat,
+      ...(taskSnapshot
+        ? { refs: taskSnapshot.refs, taskContextText: taskSnapshot.contextText }
+        : {}),
     });
   }
   let runResult: Awaited<ReturnType<typeof runEmbeddedPiAgent>>;

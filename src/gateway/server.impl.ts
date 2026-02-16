@@ -61,6 +61,7 @@ import { safeParseJson } from "./server-methods/nodes.helpers.js";
 import { hasConnectedMobileNode } from "./server-mobile-nodes.js";
 import { loadGatewayModelCatalog } from "./server-model-catalog.js";
 import { createNodeSubscriptionManager } from "./server-node-subscriptions.js";
+import { buildGatewayNotificationService } from "./server-notifications.js";
 import { loadGatewayPlugins } from "./server-plugins.js";
 import { createGatewayReloadHandlers } from "./server-reload-handlers.js";
 import { resolveGatewayRuntimeConfig } from "./server-runtime-config.js";
@@ -72,6 +73,7 @@ import { startGatewayTailscaleExposure } from "./server-tailscale.js";
 import { buildGatewayTaskService } from "./server-tasks.js";
 import { buildGatewayVaultService } from "./server-vault.js";
 import { createWizardSessionTracker } from "./server-wizard-sessions.js";
+import { buildGatewayWorkflowService } from "./server-workflow.js";
 import { attachGatewayWsHandlers } from "./server-ws-runtime.js";
 import {
   getHealthCache,
@@ -383,12 +385,38 @@ export async function startGatewayServer(
   });
   let { cron, storePath: cronStorePath } = cronState;
 
-  let taskState = buildGatewayTaskService({
+  const notificationState = buildGatewayNotificationService({
     cfg: cfgAtStart,
     deps,
     broadcast,
   });
+  const {
+    notificationService,
+    storePath: notificationStorePath,
+    triggers: notificationTriggers,
+  } = notificationState;
+
+  // Wrap broadcast for task service: task events also trigger notifications
+  const taskBroadcast: typeof broadcast = (event, payload, opts) => {
+    broadcast(event, payload, opts);
+    if (event.startsWith("task.")) {
+      void notificationTriggers.handleBroadcastEvent(event, payload);
+    }
+  };
+
+  let taskState = buildGatewayTaskService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast: taskBroadcast,
+  });
   let { taskService, storePath: taskStorePath } = taskState;
+
+  const workflowState = buildGatewayWorkflowService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+  });
+  const { workflowService, workflowEngine, storePath: workflowStorePath } = workflowState;
 
   let launcherState = buildGatewayLauncherService({
     cfg: cfgAtStart,
@@ -493,6 +521,8 @@ export async function startGatewayServer(
 
   void cron.start().catch((err) => logCron.error(`failed to start: ${String(err)}`));
 
+  workflowEngine.start();
+
   const execApprovalManager = new ExecApprovalManager();
   const execApprovalForwarder = createExecApprovalForwarder();
   const execApprovalHandlers = createExecApprovalHandlers(execApprovalManager, {
@@ -525,12 +555,17 @@ export async function startGatewayServer(
       cronStorePath,
       taskService,
       taskStorePath,
+      notificationService,
+      notificationStorePath,
       launcherService,
       launcherStorePath,
       deviceService,
       deviceStorePath,
       vaultService,
       vaultPath: vaultPathResolved,
+      workflowService,
+      workflowEngine,
+      workflowStorePath,
       loadGatewayModelCatalog,
       getHealthCache,
       refreshHealthSnapshot: refreshGatewayHealthSnapshot,
@@ -672,6 +707,7 @@ export async function startGatewayServer(
         skillsRefreshTimer = null;
       }
       skillsChangeUnsub();
+      workflowEngine.stop();
       await vaultState.close();
       await close(opts);
     },

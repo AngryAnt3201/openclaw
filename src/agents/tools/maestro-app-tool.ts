@@ -9,6 +9,7 @@ import { Type } from "@sinclair/typebox";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { AnyAgentTool } from "./common.js";
+import { stripAnsi, lastLineEndsWith } from "../../terminal/ansi.js";
 import { jsonResult, readStringParam } from "./common.js";
 import { tryCreateMaestroClient } from "./maestro-client.js";
 
@@ -201,8 +202,51 @@ export function createMaestroAppTool(): AnyAgentTool {
               mode: "plain",
             });
 
-            // Wait a moment then send the run command
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            // Poll for shell readiness using end-of-line matching.
+            // Checks that the last non-empty line ends with a prompt char,
+            // preventing false positives from $ in MOTD, PATH vars, or OSC titles.
+            // Includes a 300ms stability window: after a match, waits for output
+            // to stop changing before declaring ready.
+            const shellMarkers = ["$", "%", ">"];
+            const pollInterval = 200;
+            const maxWait = 5000;
+            const stabilityMs = 300;
+            let ready = false;
+            let cursor = 0;
+            let accumulated = "";
+            let stabilityStart: number | null = null;
+
+            for (let elapsed = 0; elapsed < maxWait; elapsed += pollInterval) {
+              try {
+                const resp = await client.getOutput(session.session_id, cursor);
+                const gotNew = resp.cursor > cursor;
+                if (gotNew) {
+                  accumulated += stripAnsi(resp.output);
+                  cursor = resp.cursor;
+                  stabilityStart = null; // reset stability on new output
+                }
+
+                const matched = shellMarkers.some((m) => lastLineEndsWith(accumulated, m));
+
+                if (matched) {
+                  if (stabilityStart === null) {
+                    stabilityStart = Date.now();
+                  }
+                  if (Date.now() - stabilityStart >= stabilityMs) {
+                    ready = true;
+                    break;
+                  }
+                } else {
+                  stabilityStart = null;
+                }
+              } catch {
+                // Session output not available yet — keep polling
+              }
+              await new Promise((resolve) => setTimeout(resolve, pollInterval));
+            }
+            if (!ready) {
+              // Timeout — send anyway (better than silently giving up)
+            }
             await client.sendInput(session.session_id, `${runCommand}\n`);
 
             return jsonResult({

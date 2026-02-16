@@ -16,6 +16,7 @@ import { launcherHandlers } from "./server-methods/launcher.js";
 import { logsHandlers } from "./server-methods/logs.js";
 import { modelsHandlers } from "./server-methods/models.js";
 import { nodeHandlers } from "./server-methods/nodes.js";
+import { notificationHandlers } from "./server-methods/notifications.js";
 import { pluginsHandlers } from "./server-methods/plugins.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
@@ -30,6 +31,7 @@ import { vaultHandlers } from "./server-methods/vault.js";
 import { voicewakeHandlers } from "./server-methods/voicewake.js";
 import { webHandlers } from "./server-methods/web.js";
 import { wizardHandlers } from "./server-methods/wizard.js";
+import { workflowHandlers } from "./server-methods/workflow.js";
 
 const ADMIN_SCOPE = "operator.admin";
 const READ_SCOPE = "operator.read";
@@ -75,6 +77,10 @@ const READ_METHODS = new Set([
   "task.list",
   "task.get",
   "task.events",
+  "notification.list",
+  "notification.get",
+  "notification.unreadCount",
+  "notification.preferences.get",
   "launcher.list",
   "launcher.get",
   "launcher.discovered.list",
@@ -92,6 +98,15 @@ const READ_METHODS = new Set([
   "plugins.list",
   "device.registry.list",
   "device.registry.get",
+  "workflow.get",
+  "workflow.list",
+  "workflow.events",
+  "workflow.policies.get",
+  "pr.get",
+  "pr.list",
+  "pr.checks",
+  "issue.get",
+  "issue.list",
   "system-presence",
   "last-heartbeat",
   "node.list",
@@ -120,6 +135,12 @@ const WRITE_METHODS = new Set([
   "task.approve",
   "task.reject",
   "task.progress",
+  "notification.create",
+  "notification.markRead",
+  "notification.markAllRead",
+  "notification.dismiss",
+  "notification.dismissAll",
+  "notification.preferences.set",
   "launcher.create",
   "launcher.update",
   "launcher.delete",
@@ -137,6 +158,24 @@ const WRITE_METHODS = new Set([
   "device.registry.create",
   "device.registry.update",
   "device.registry.delete",
+  "workflow.create",
+  "workflow.pause",
+  "workflow.resume",
+  "workflow.cancel",
+  "workflow.retry_step",
+  "workflow.delete",
+  "workflow.policies.update",
+  "pr.create",
+  "pr.update",
+  "pr.merge",
+  "pr.comment",
+  "issue.create",
+  "issue.update",
+  "issue.close",
+  "issue.comment",
+  "issue.to_workflow",
+  "review.run",
+  "review.diff",
 ]);
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
@@ -238,10 +277,12 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...agentsHandlers,
   ...browserHandlers,
   ...taskHandlers,
+  ...notificationHandlers,
   ...launcherHandlers,
   ...vaultHandlers,
   ...pluginsHandlers,
   ...deviceRegistryHandlers,
+  ...workflowHandlers,
 };
 
 export async function handleGatewayRequest(

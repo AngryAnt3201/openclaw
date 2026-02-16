@@ -168,6 +168,7 @@ function broadcastChatFinal(params: {
   runId: string;
   sessionKey: string;
   message?: Record<string, unknown>;
+  refs?: import("../../tasks/types.js").AppReference[];
 }) {
   const seq = nextChatSeq({ agentRunSeq: params.context.agentRunSeq }, params.runId);
   const payload = {
@@ -176,6 +177,7 @@ function broadcastChatFinal(params: {
     seq,
     state: "final" as const,
     message: params.message,
+    ...(params.refs && params.refs.length > 0 ? { refs: params.refs } : {}),
   };
   params.context.broadcast("chat", payload);
   params.context.nodeSendToSession(params.sessionKey, "chat", payload);

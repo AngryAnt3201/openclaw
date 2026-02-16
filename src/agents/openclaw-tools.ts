@@ -9,6 +9,7 @@ import { createCanvasTool } from "./tools/canvas-tool.js";
 import { createCronTool } from "./tools/cron-tool.js";
 import { createDeviceTool } from "./tools/device-tool.js";
 import { createGatewayTool } from "./tools/gateway-tool.js";
+import { createGitHubTool } from "./tools/github-tool.js";
 import { createImageTool } from "./tools/image-tool.js";
 import { createLauncherTool } from "./tools/launcher-tool.js";
 import { createMaestroAppTool } from "./tools/maestro-app-tool.js";
@@ -25,6 +26,7 @@ import { createTaskTool } from "./tools/task-tool.js";
 import { createTtsTool } from "./tools/tts-tool.js";
 import { createVaultTool } from "./tools/vault-tool.js";
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
+import { createWorkflowTool } from "./tools/workflow-tool.js";
 
 export function createOpenClawTools(options?: {
   sandboxBrowserBridgeUrl?: string;
@@ -168,6 +170,12 @@ export function createOpenClawTools(options?: {
       agentSessionKey: options?.agentSessionKey,
     }),
     createDeviceTool({
+      agentSessionKey: options?.agentSessionKey,
+    }),
+    createWorkflowTool({
+      agentSessionKey: options?.agentSessionKey,
+    }),
+    createGitHubTool({
       agentSessionKey: options?.agentSessionKey,
     }),
   ];

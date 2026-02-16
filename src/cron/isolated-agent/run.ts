@@ -47,6 +47,7 @@ import {
   updateSessionStore,
 } from "../../config/sessions.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
+import { resolveTaskContextSnapshot } from "../../infra/heartbeat-task-context.js";
 import { deliverOutboundPayloads } from "../../infra/outbound/deliver.js";
 import { getRemoteSkillEligibility } from "../../infra/skills-remote.js";
 import { logWarn } from "../../logger.js";
@@ -57,6 +58,7 @@ import {
   getHookType,
   isExternalHookSession,
 } from "../../security/external-content.js";
+import { resolveTaskStorePath } from "../../tasks/store.js";
 import { resolveCronDeliveryPlan } from "../delivery.js";
 import { resolveDeliveryTarget } from "./delivery-target.js";
 import {
@@ -371,9 +373,26 @@ export async function runCronIsolatedAgentTurn(params: {
       normalizeVerboseLevel(cronSession.sessionEntry.verboseLevel) ??
       normalizeVerboseLevel(agentCfg?.verboseDefault) ??
       "off";
+    // Resolve task context snapshot (context text + refs) from a single store read.
+    let taskSnapshot:
+      | import("../../infra/heartbeat-task-context.js").TaskContextSnapshot
+      | undefined;
+    try {
+      const storePath = resolveTaskStorePath();
+      const snapshot = await resolveTaskContextSnapshot(storePath);
+      if (snapshot.refs.length > 0) {
+        taskSnapshot = snapshot;
+      }
+    } catch {
+      // Non-critical — continue without refs
+    }
+
     registerAgentRunContext(cronSession.sessionEntry.sessionId, {
       sessionKey: agentSessionKey,
       verboseLevel: resolvedVerboseLevel,
+      ...(taskSnapshot
+        ? { refs: taskSnapshot.refs, taskContextText: taskSnapshot.contextText }
+        : {}),
     });
     const messageChannel = resolvedDelivery.channel;
     const fallbackResult = await runWithModelFallback({

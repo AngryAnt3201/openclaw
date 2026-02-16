@@ -43,6 +43,7 @@ import { resolveTaskStorePath } from "../tasks/store.js";
 import { formatErrorMessage } from "./errors.js";
 import { emitHeartbeatEvent, resolveIndicatorType } from "./heartbeat-events.js";
 import { resolveTaskContextForHeartbeat } from "./heartbeat-task-context.js";
+import { resolveVaultContextForHeartbeat } from "./heartbeat-vault-context.js";
 import { resolveHeartbeatVisibility } from "./heartbeat-visibility.js";
 import {
   type HeartbeatRunResult,
@@ -620,6 +621,19 @@ export async function runHeartbeatOnce(opts: {
     }
   } catch {
     // Task store unavailable — proceed without task context.
+  }
+
+  // Append vault context so the agent knows about recent knowledge base activity.
+  try {
+    const vaultPath = (cfg as Record<string, unknown>).vault
+      ? ((cfg as Record<string, unknown>).vault as { vaultPath?: string })?.vaultPath
+      : undefined;
+    const vaultContext = await resolveVaultContextForHeartbeat(vaultPath);
+    if (vaultContext) {
+      prompt = `${prompt}${vaultContext}`;
+    }
+  } catch {
+    // Vault unavailable — proceed without vault context.
   }
 
   const ctx = {

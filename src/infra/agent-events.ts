@@ -1,4 +1,5 @@
 import type { VerboseLevel } from "../auto-reply/thinking.js";
+import type { AppReference } from "../tasks/types.js";
 
 export type AgentEventStream = "lifecycle" | "tool" | "assistant" | "error" | (string & {});
 
@@ -15,6 +16,9 @@ export type AgentRunContext = {
   sessionKey?: string;
   verboseLevel?: VerboseLevel;
   isHeartbeat?: boolean;
+  refs?: AppReference[];
+  /** Pre-resolved task context text from the same store read as refs. */
+  taskContextText?: string | null;
 };
 
 // Keep per-run counters so streams stay strictly monotonic per runId.
@@ -39,6 +43,9 @@ export function registerAgentRunContext(runId: string, context: AgentRunContext)
   }
   if (context.isHeartbeat !== undefined && existing.isHeartbeat !== context.isHeartbeat) {
     existing.isHeartbeat = context.isHeartbeat;
+  }
+  if (context.refs && context.refs.length > 0) {
+    existing.refs = context.refs;
   }
 }
 
