@@ -590,6 +590,110 @@ describe("TaskService.getEvents", () => {
 });
 
 // ---------------------------------------------------------------------------
+// addStatusUpdate / getStatusUpdates
+// ---------------------------------------------------------------------------
+
+describe("TaskService.addStatusUpdate", () => {
+  it("creates a status update and emits event", async () => {
+    const tmp = await makeTmpStore();
+    const { service, broadcasts } = makeService(tmp.storePath);
+
+    const task = await service.create({ title: "Task" });
+    broadcasts.length = 0;
+
+    const update = await service.addStatusUpdate({
+      taskId: task.id,
+      type: "milestone",
+      title: "Step 1 complete",
+      body: "Finished the first step",
+    });
+
+    expect(update.id).toBeTruthy();
+    expect(update.taskId).toBe(task.id);
+    expect(update.type).toBe("milestone");
+    expect(update.title).toBe("Step 1 complete");
+    expect(update.body).toBe("Finished the first step");
+    expect(update.source).toBe("agent");
+    expect(update.timestamp).toBe(1000000);
+
+    const statusBroadcasts = broadcasts.filter((b) => b.event === "task.statusUpdate");
+    expect(statusBroadcasts).toHaveLength(1);
+
+    await tmp.cleanup();
+  });
+
+  it("syncs progress to task when provided", async () => {
+    const tmp = await makeTmpStore();
+    const { service } = makeService(tmp.storePath);
+
+    const task = await service.create({ title: "Task" });
+    await service.addStatusUpdate({
+      taskId: task.id,
+      title: "Halfway",
+      progress: 50,
+    });
+
+    const updated = await service.get(task.id);
+    expect(updated!.progress).toBe(50);
+
+    await tmp.cleanup();
+  });
+
+  it("throws for non-existent task", async () => {
+    const tmp = await makeTmpStore();
+    const { service } = makeService(tmp.storePath);
+
+    await expect(service.addStatusUpdate({ taskId: "missing", title: "Oops" })).rejects.toThrow(
+      "task not found: missing",
+    );
+
+    await tmp.cleanup();
+  });
+
+  it("defaults to progress type and agent source", async () => {
+    const tmp = await makeTmpStore();
+    const { service } = makeService(tmp.storePath);
+
+    const task = await service.create({ title: "Task" });
+    const update = await service.addStatusUpdate({
+      taskId: task.id,
+      title: "Some update",
+    });
+
+    expect(update.type).toBe("progress");
+    expect(update.source).toBe("agent");
+
+    await tmp.cleanup();
+  });
+});
+
+describe("TaskService.getStatusUpdates", () => {
+  it("returns updates for a task", async () => {
+    const tmp = await makeTmpStore();
+    const { service } = makeService(tmp.storePath);
+
+    const task = await service.create({ title: "Task" });
+    await service.addStatusUpdate({ taskId: task.id, title: "Update 1" });
+    await service.addStatusUpdate({ taskId: task.id, title: "Update 2" });
+
+    const updates = await service.getStatusUpdates(task.id);
+    expect(updates).toHaveLength(2);
+
+    await tmp.cleanup();
+  });
+
+  it("returns empty array for task with no updates", async () => {
+    const tmp = await makeTmpStore();
+    const { service } = makeService(tmp.storePath);
+
+    const updates = await service.getStatusUpdates("nonexistent");
+    expect(updates).toEqual([]);
+
+    await tmp.cleanup();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Concurrent access safety
 // ---------------------------------------------------------------------------
 

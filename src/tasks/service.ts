@@ -13,10 +13,18 @@ import type {
   TaskEventType,
   TaskFilter,
   TaskPatch,
-  TaskPolicy,
   TaskStatus,
+  StatusUpdate,
+  StatusUpdateCreateInput,
 } from "./types.js";
-import { appendTaskEvent, readTaskEvents, readTaskStore, writeTaskStore } from "./store.js";
+import {
+  appendTaskEvent,
+  readTaskEvents,
+  readTaskStore,
+  writeTaskStore,
+  appendStatusUpdate,
+  readStatusUpdates,
+} from "./store.js";
 
 // ---------------------------------------------------------------------------
 // Dependencies (injected at construction)
@@ -415,6 +423,55 @@ export class TaskService {
       this.emit("task.progress", { taskId, progress: task.progress, message });
     }
     return task;
+  }
+
+  // -------------------------------------------------------------------------
+  // addStatusUpdate
+  // -------------------------------------------------------------------------
+
+  async addStatusUpdate(input: StatusUpdateCreateInput): Promise<StatusUpdate> {
+    return locked(this.state, async () => {
+      const store = await readTaskStore(this.state.deps.storePath);
+      const task = store.tasks.find((t) => t.id === input.taskId);
+      if (!task) {
+        throw new Error(`task not found: ${input.taskId}`);
+      }
+
+      const update: StatusUpdate = {
+        id: randomUUID(),
+        taskId: input.taskId,
+        type: input.type ?? "progress",
+        title: input.title,
+        body: input.body ?? "",
+        attachments: input.attachments ?? [],
+        progress: input.progress,
+        timestamp: this.now(),
+        source: input.source ?? "agent",
+      };
+
+      await appendStatusUpdate(this.state.deps.storePath, update);
+
+      // Optionally sync progress to the task
+      if (input.progress !== undefined) {
+        task.progress = Math.min(100, Math.max(0, input.progress));
+        task.updatedAtMs = this.now();
+        await writeTaskStore(this.state.deps.storePath, store);
+      }
+
+      this.emit("task.statusUpdate", update);
+      return update;
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // getStatusUpdates
+  // -------------------------------------------------------------------------
+
+  async getStatusUpdates(
+    taskId: string,
+    opts?: { limit?: number; since?: number },
+  ): Promise<StatusUpdate[]> {
+    return readStatusUpdates(this.state.deps.storePath, taskId, opts);
   }
 
   // -------------------------------------------------------------------------

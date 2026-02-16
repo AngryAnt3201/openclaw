@@ -88,6 +88,8 @@ const BASE_METHODS = [
   "task.reject",
   "task.events",
   "task.progress",
+  "task.statusUpdate.create",
+  "task.statusUpdates",
   // Notification methods
   "notification.list",
   "notification.get",
@@ -155,6 +157,7 @@ export const GATEWAY_EVENTS = [
   "task.completed",
   "task.input_required",
   "task.approval_required",
+  "task.statusUpdate",
   // Notification events
   "notification.created",
   "notification.read",

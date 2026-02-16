@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TaskEvent, TaskStoreFile } from "./types.js";
+import type { TaskEvent, TaskStoreFile, StatusUpdate } from "./types.js";
 import {
   appendTaskEvent,
   readTaskEvents,
@@ -11,6 +11,10 @@ import {
   resolveTaskEventLogPath,
   resolveTaskScreenshotDir,
   resolveTaskStorePath,
+  resolveTaskUpdatesDir,
+  resolveTaskUpdateLogPath,
+  appendStatusUpdate,
+  readStatusUpdates,
   writeTaskStore,
 } from "./store.js";
 
@@ -274,6 +278,120 @@ describe("appendTaskEvent / readTaskEvents", () => {
     });
     const events = await readTaskEvents(tmp.storePath, "t1");
     expect(events).toHaveLength(1);
+    await tmp.cleanup();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Status update path resolution
+// ---------------------------------------------------------------------------
+
+describe("resolveTaskUpdatesDir", () => {
+  it("returns updates dir relative to store parent", () => {
+    const result = resolveTaskUpdatesDir("/home/user/.openclaw/tasks/store.json");
+    expect(result).toBe(path.join("/home/user/.openclaw/tasks", "updates"));
+  });
+});
+
+describe("resolveTaskUpdateLogPath", () => {
+  it("returns JSONL path for task ID", () => {
+    const result = resolveTaskUpdateLogPath("/home/user/.openclaw/tasks/store.json", "task-abc");
+    expect(result).toBe(path.join("/home/user/.openclaw/tasks", "updates", "task-abc.jsonl"));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Status update log
+// ---------------------------------------------------------------------------
+
+describe("appendStatusUpdate / readStatusUpdates", () => {
+  function makeUpdate(overrides?: Partial<StatusUpdate>): StatusUpdate {
+    return {
+      id: "su1",
+      taskId: "t1",
+      type: "milestone",
+      title: "Test update",
+      body: "Some body",
+      attachments: [],
+      timestamp: 1000,
+      source: "agent",
+      ...overrides,
+    };
+  }
+
+  it("appends and reads status updates", async () => {
+    const tmp = await makeTmpStore();
+    const u1 = makeUpdate({ id: "su1", timestamp: 1000 });
+    const u2 = makeUpdate({ id: "su2", timestamp: 2000, type: "progress" });
+
+    await appendStatusUpdate(tmp.storePath, u1);
+    await appendStatusUpdate(tmp.storePath, u2);
+
+    const updates = await readStatusUpdates(tmp.storePath, "t1");
+    expect(updates).toHaveLength(2);
+    expect(updates[0]!.id).toBe("su1");
+    expect(updates[1]!.id).toBe("su2");
+    await tmp.cleanup();
+  });
+
+  it("returns empty array when no updates exist", async () => {
+    const tmp = await makeTmpStore();
+    const updates = await readStatusUpdates(tmp.storePath, "nonexistent");
+    expect(updates).toEqual([]);
+    await tmp.cleanup();
+  });
+
+  it("respects limit parameter", async () => {
+    const tmp = await makeTmpStore();
+    for (let i = 0; i < 10; i++) {
+      await appendStatusUpdate(tmp.storePath, makeUpdate({ id: `su${i}`, timestamp: i * 1000 }));
+    }
+    const updates = await readStatusUpdates(tmp.storePath, "t1", { limit: 3 });
+    expect(updates).toHaveLength(3);
+    expect(updates[0]!.id).toBe("su7");
+    expect(updates[2]!.id).toBe("su9");
+    await tmp.cleanup();
+  });
+
+  it("filters by since timestamp", async () => {
+    const tmp = await makeTmpStore();
+    await appendStatusUpdate(tmp.storePath, makeUpdate({ id: "su1", timestamp: 1000 }));
+    await appendStatusUpdate(tmp.storePath, makeUpdate({ id: "su2", timestamp: 2000 }));
+    await appendStatusUpdate(tmp.storePath, makeUpdate({ id: "su3", timestamp: 3000 }));
+
+    const updates = await readStatusUpdates(tmp.storePath, "t1", { since: 1500 });
+    expect(updates).toHaveLength(2);
+    expect(updates[0]!.id).toBe("su2");
+    expect(updates[1]!.id).toBe("su3");
+    await tmp.cleanup();
+  });
+
+  it("skips malformed JSONL lines", async () => {
+    const tmp = await makeTmpStore();
+    const updatesDir = resolveTaskUpdatesDir(tmp.storePath);
+    await fs.mkdir(updatesDir, { recursive: true });
+    const logPath = resolveTaskUpdateLogPath(tmp.storePath, "t1");
+    await fs.writeFile(
+      logPath,
+      JSON.stringify(makeUpdate({ id: "su1" })) +
+        "\n" +
+        "BROKEN LINE\n" +
+        JSON.stringify(makeUpdate({ id: "su2" })) +
+        "\n",
+      "utf-8",
+    );
+    const updates = await readStatusUpdates(tmp.storePath, "t1");
+    expect(updates).toHaveLength(2);
+    expect(updates[0]!.id).toBe("su1");
+    expect(updates[1]!.id).toBe("su2");
+    await tmp.cleanup();
+  });
+
+  it("creates updates directory automatically", async () => {
+    const tmp = await makeTmpStore();
+    await appendStatusUpdate(tmp.storePath, makeUpdate());
+    const updates = await readStatusUpdates(tmp.storePath, "t1");
+    expect(updates).toHaveLength(1);
     await tmp.cleanup();
   });
 });

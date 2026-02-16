@@ -2,11 +2,14 @@ import path from "node:path";
 import type { CanvasHostServer } from "../canvas-host/server.js";
 import type { PluginServicesHandle } from "../plugins/services.js";
 import type { RuntimeEnv } from "../runtime.js";
+import type { TaskService } from "../tasks/service.js";
+import type { TaskEvent } from "../tasks/types.js";
 import type { ControlUiRootState } from "./control-ui.js";
 import type { startBrowserControlServerIfEnabled } from "./server-browser.js";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { registerSkillsChangeListener } from "../agents/skills/refresh.js";
 import { initSubagentRegistry } from "../agents/subagent-registry.js";
+import { shouldAutoUpdate } from "../agents/task-auto-updates.js";
 import { type ChannelId, listChannelPlugins } from "../channels/plugins/index.js";
 import { formatCliCommand } from "../cli/command-format.js";
 import { createDefaultDeps } from "../cli/deps.js";
@@ -85,6 +88,25 @@ import {
 import { loadGatewayTlsRuntime } from "./server/tls.js";
 
 export { __resetModelCatalogCacheForTest } from "./server-model-catalog.js";
+
+/** Process a task event through auto-synthesis and create a status update if warranted. */
+async function handleAutoSynthesis(
+  payload: unknown,
+  getTaskService: () => TaskService,
+): Promise<void> {
+  try {
+    const event = payload as TaskEvent;
+    if (!event?.taskId) {
+      return;
+    }
+    const input = shouldAutoUpdate(event.taskId, event);
+    if (input) {
+      await getTaskService().addStatusUpdate(input);
+    }
+  } catch {
+    // Auto-synthesis is best-effort; never block the event pipeline
+  }
+}
 
 ensureOpenClawCliOnPath();
 
@@ -397,11 +419,15 @@ export async function startGatewayServer(
     triggers: notificationTriggers,
   } = notificationState;
 
-  // Wrap broadcast for task service: task events also trigger notifications
+  // Wrap broadcast for task service: task events also trigger notifications + auto-synthesis
   const taskBroadcast: typeof broadcast = (event, payload, opts) => {
     broadcast(event, payload, opts);
     if (event.startsWith("task.")) {
       void notificationTriggers.handleBroadcastEvent(event, payload);
+    }
+    // Auto-synthesis for timeline status updates
+    if (event === "task.event") {
+      void handleAutoSynthesis(payload, () => taskService);
     }
   };
 

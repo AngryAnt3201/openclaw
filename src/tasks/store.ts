@@ -11,7 +11,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { Task, TaskStoreFile, TaskEvent } from "./types.js";
+import type { TaskStoreFile, TaskEvent, StatusUpdate } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Path resolution
@@ -37,6 +37,14 @@ export function resolveTaskEventLogPath(storePath: string, taskId: string): stri
 
 export function resolveTaskScreenshotDir(storePath: string, taskId: string): string {
   return path.join(path.dirname(storePath), "screenshots", taskId);
+}
+
+export function resolveTaskUpdatesDir(storePath: string): string {
+  return path.join(path.dirname(storePath), "updates");
+}
+
+export function resolveTaskUpdateLogPath(storePath: string, taskId: string): string {
+  return path.join(resolveTaskUpdatesDir(storePath), `${taskId}.jsonl`);
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +115,49 @@ export async function readTaskEvents(
       return events.slice(-opts.limit);
     }
     return events;
+  } catch {
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Status update log (append-only JSONL, per task)
+// ---------------------------------------------------------------------------
+
+export async function appendStatusUpdate(storePath: string, update: StatusUpdate): Promise<void> {
+  const updatesDir = resolveTaskUpdatesDir(storePath);
+  if (!existsSync(updatesDir)) {
+    mkdirSync(updatesDir, { recursive: true });
+  }
+  const logPath = resolveTaskUpdateLogPath(storePath, update.taskId);
+  const line = JSON.stringify(update) + "\n";
+  await fs.appendFile(logPath, line, "utf-8");
+}
+
+export async function readStatusUpdates(
+  storePath: string,
+  taskId: string,
+  opts?: { limit?: number; since?: number },
+): Promise<StatusUpdate[]> {
+  const logPath = resolveTaskUpdateLogPath(storePath, taskId);
+  try {
+    const raw = await fs.readFile(logPath, "utf-8");
+    const lines = raw.trim().split("\n").filter(Boolean);
+    let updates: StatusUpdate[] = [];
+    for (const line of lines) {
+      try {
+        updates.push(JSON.parse(line) as StatusUpdate);
+      } catch {
+        // Skip malformed lines
+      }
+    }
+    if (opts?.since && opts.since > 0) {
+      updates = updates.filter((u) => u.timestamp > opts.since!);
+    }
+    if (opts?.limit && opts.limit > 0) {
+      return updates.slice(-opts.limit);
+    }
+    return updates;
   } catch {
     return [];
   }

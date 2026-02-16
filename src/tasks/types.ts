@@ -328,6 +328,46 @@ export type TaskEvent = {
 };
 
 // ---------------------------------------------------------------------------
+// Status updates (timeline cards)
+// ---------------------------------------------------------------------------
+
+export type StatusUpdateType =
+  | "milestone" // Major accomplishment
+  | "progress" // Incremental progress
+  | "screenshot" // Visual capture
+  | "error" // Error encountered
+  | "complete"; // Final summary
+
+export type StatusUpdateAttachment =
+  | { kind: "screenshot"; path: string; url?: string; caption?: string }
+  | { kind: "url"; url: string; title?: string }
+  | { kind: "file_change"; path: string; action: "created" | "modified" | "deleted" }
+  | { kind: "code_snippet"; language?: string; code: string; filename?: string }
+  | { kind: "ref"; appSlug: string; label: string; action?: AppAction };
+
+export type StatusUpdate = {
+  id: string;
+  taskId: string;
+  type: StatusUpdateType;
+  title: string;
+  body: string; // Markdown
+  attachments: StatusUpdateAttachment[];
+  progress?: number; // 0-100 snapshot
+  timestamp: number;
+  source: "agent" | "auto";
+};
+
+export type StatusUpdateCreateInput = {
+  taskId: string;
+  type?: StatusUpdateType;
+  title: string;
+  body?: string;
+  attachments?: StatusUpdateAttachment[];
+  progress?: number;
+  source?: "agent" | "auto";
+};
+
+// ---------------------------------------------------------------------------
 // Task store file shape (persisted to disk)
 // ---------------------------------------------------------------------------
 

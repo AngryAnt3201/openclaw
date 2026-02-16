@@ -7,7 +7,15 @@ import { stringEnum, optionalStringEnum } from "../schema/typebox.js";
 import { type AnyAgentTool, jsonResult, readStringParam, readNumberParam } from "./common.js";
 import { callGatewayTool } from "./gateway.js";
 
-const TASK_ACTIONS = ["create", "update", "get", "list", "cancel", "progress"] as const;
+const TASK_ACTIONS = [
+  "create",
+  "update",
+  "get",
+  "list",
+  "cancel",
+  "progress",
+  "status_update",
+] as const;
 const APP_ACTION_TYPES = ["open_url", "deep_link", "launch_native", "noop"] as const;
 const APP_REF_STYLES = ["chip", "obsidian-link"] as const;
 
@@ -88,6 +96,40 @@ const TaskToolSchema = Type.Object({
         "Array of app references. Text fields use {ref:0}, {ref:1} etc. to embed clickable app chips inline.",
     }),
   ),
+  // status_update fields
+  updateType: Type.Optional(
+    stringEnum(["milestone", "progress", "screenshot", "error", "complete"] as const, {
+      description:
+        "Type of status update. milestone: major accomplishment. progress: incremental step. screenshot: visual capture. error: encountered error. complete: final summary.",
+    }),
+  ),
+  body: Type.Optional(
+    Type.String({
+      description:
+        "Markdown body for status updates. Describe what happened, what was found, or what changed.",
+    }),
+  ),
+  attachments: Type.Optional(
+    Type.Array(
+      Type.Object({
+        kind: stringEnum(["screenshot", "url", "file_change", "code_snippet", "ref"] as const),
+        path: Type.Optional(Type.String()),
+        url: Type.Optional(Type.String()),
+        caption: Type.Optional(Type.String()),
+        title: Type.Optional(Type.String()),
+        action: Type.Optional(stringEnum(["created", "modified", "deleted"] as const)),
+        language: Type.Optional(Type.String()),
+        code: Type.Optional(Type.String()),
+        filename: Type.Optional(Type.String()),
+        appSlug: Type.Optional(Type.String()),
+        label: Type.Optional(Type.String()),
+      }),
+      {
+        description:
+          "Attachments for status updates: screenshots, URLs visited, file changes, code snippets.",
+      },
+    ),
+  ),
 });
 
 export function createTaskTool(opts?: { agentSessionKey?: string }): AnyAgentTool {
@@ -95,7 +137,7 @@ export function createTaskTool(opts?: { agentSessionKey?: string }): AnyAgentToo
     label: "Task",
     name: "task",
     description:
-      "Manage Miranda tasks. Create new tasks, update progress, check status, or cancel tasks. Tasks appear in the user's Miranda Task Queue.\n\nTo embed clickable app references in task text, provide a `refs` array and use `{ref:0}`, `{ref:1}` etc. markers in description/inputPrompt/reviewSummary. Each ref needs: appSlug (e.g. 'slack', 'notion', 'chrome', 'cursor', 'terminal', 'finder', 'discord', 'gmail'), label, and action ({type:'open_url',url:...} or {type:'deep_link',uri:...} or {type:'launch_native',appPath:...}). Use style:'obsidian-link' for note/page links (Notion, Obsidian).",
+      "Manage Miranda tasks. Create new tasks, update progress, check status, cancel tasks, or post status updates. Tasks appear in the user's Miranda Task Queue.\n\nTo embed clickable app references in task text, provide a `refs` array and use `{ref:0}`, `{ref:1}` etc. markers in description/inputPrompt/reviewSummary. Each ref needs: appSlug (e.g. 'slack', 'notion', 'chrome', 'cursor', 'terminal', 'finder', 'discord', 'gmail'), label, and action ({type:'open_url',url:...} or {type:'deep_link',uri:...} or {type:'launch_native',appPath:...}). Use style:'obsidian-link' for note/page links (Notion, Obsidian).\n\nUse action:'status_update' to post milestone cards to the task timeline. Include taskId, title, and optionally body (markdown), updateType (milestone/progress/screenshot/error/complete), progress (0-100), and attachments (URLs visited, files changed, screenshots taken). Post updates at natural breakpoints: completing a major step, resolving an error, finishing research, or completing the task.",
     parameters: TaskToolSchema,
     execute: async (_toolCallId, args) => {
       const params = args as Record<string, unknown>;
@@ -217,6 +259,40 @@ export function createTaskTool(opts?: { agentSessionKey?: string }): AnyAgentToo
             progress,
             message,
           });
+          return jsonResult(result);
+        }
+        case "status_update": {
+          const taskId = readStringParam(params, "taskId") ?? readStringParam(params, "id");
+          if (!taskId) {
+            throw new Error("taskId is required for status_update");
+          }
+          const title = readStringParam(params, "title", { required: true });
+          const updatePayload: Record<string, unknown> = {
+            taskId,
+            title,
+          };
+          const updateType = readStringParam(params, "updateType");
+          if (updateType) {
+            updatePayload.type = updateType;
+          }
+          const body = readStringParam(params, "body");
+          if (body) {
+            updatePayload.body = body;
+          }
+          const progress = readNumberParam(params, "progress");
+          if (progress !== undefined) {
+            updatePayload.progress = progress;
+          }
+          if (params.attachments && Array.isArray(params.attachments)) {
+            updatePayload.attachments = params.attachments;
+          }
+          updatePayload.source = "agent";
+
+          const result = await callGatewayTool(
+            "task.statusUpdate.create",
+            gatewayOpts,
+            updatePayload,
+          );
           return jsonResult(result);
         }
         default:

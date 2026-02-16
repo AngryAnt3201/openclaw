@@ -2,7 +2,12 @@
 // Gateway RPC handlers for task.* methods – follows cron.ts pattern
 // ---------------------------------------------------------------------------
 
-import type { TaskCreateInput, TaskFilter, TaskPatch, TaskPolicy } from "../../tasks/types.js";
+import type {
+  TaskCreateInput,
+  TaskFilter,
+  TaskPatch,
+  StatusUpdateCreateInput,
+} from "../../tasks/types.js";
 import type { GatewayRequestHandlers } from "./types.js";
 import { requestHeartbeatNow } from "../../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../../infra/system-events.js";
@@ -271,5 +276,57 @@ export const taskHandlers: GatewayRequestHandlers = {
       return;
     }
     respond(true, task, undefined);
+  },
+
+  // -------------------------------------------------------------------------
+  // task.statusUpdate.create
+  // -------------------------------------------------------------------------
+  "task.statusUpdate.create": async ({ params, respond, context }) => {
+    const taskId = requireString(params, "taskId") ?? requireString(params, "id");
+    const title = requireString(params, "title");
+    if (!taskId) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing taskId"));
+      return;
+    }
+    if (!title) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing title"));
+      return;
+    }
+    try {
+      const input: StatusUpdateCreateInput = {
+        taskId,
+        title,
+        type: requireString(params, "type") as StatusUpdateCreateInput["type"],
+        body: requireString(params, "body") ?? undefined,
+        attachments: Array.isArray(params.attachments)
+          ? (params.attachments as StatusUpdateCreateInput["attachments"])
+          : undefined,
+        progress: typeof params.progress === "number" ? params.progress : undefined,
+        source: (requireString(params, "source") as "agent" | "auto") ?? undefined,
+      };
+      const update = await context.taskService.addStatusUpdate(input);
+      respond(true, update, undefined);
+    } catch (err) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, err instanceof Error ? err.message : String(err)),
+      );
+    }
+  },
+
+  // -------------------------------------------------------------------------
+  // task.statusUpdates
+  // -------------------------------------------------------------------------
+  "task.statusUpdates": async ({ params, respond, context }) => {
+    const taskId = requireString(params, "taskId") ?? requireString(params, "id");
+    if (!taskId) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing taskId"));
+      return;
+    }
+    const limit = typeof params.limit === "number" ? params.limit : undefined;
+    const since = typeof params.since === "number" ? params.since : undefined;
+    const updates = await context.taskService.getStatusUpdates(taskId, { limit, since });
+    respond(true, { updates }, undefined);
   },
 };

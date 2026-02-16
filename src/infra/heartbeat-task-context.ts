@@ -111,7 +111,11 @@ export async function resolveTaskContextSnapshot(
       "under each task are app resources (Google Search, LinkedIn, etc.) — only " +
       "use those when you need to reference the specific app, not the task itself.\n" +
       "If you discover new work items, create tasks via task_create. " +
-      "If you have progress on active tasks, update via task_update.";
+      "If you have progress on active tasks, update via task_update.\n" +
+      "When working on a task, use task({ action: 'status_update', taskId, title, body }) " +
+      "to log significant milestones. Do this when you: complete a major step, encounter " +
+      "and resolve an error, finish browser research, or complete the task. Include " +
+      "relevant attachments (URLs visited, files changed, screenshots taken).";
 
     const contextText = `\n\nActive tasks (${activeTasks.length}):\n${lines.join("\n")}${overflow}${footer}`;
 
