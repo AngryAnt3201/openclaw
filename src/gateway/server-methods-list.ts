@@ -42,6 +42,10 @@ const BASE_METHODS = [
   "skills.bins",
   "skills.install",
   "skills.update",
+  // ClawHub methods
+  "clawhub.search",
+  "clawhub.inspect",
+  "clawhub.install",
   "update.run",
   "voicewake.get",
   "voicewake.set",

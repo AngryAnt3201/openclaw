@@ -1,30 +1,56 @@
 // ---------------------------------------------------------------------------
 // Task System – Core Types
 // ---------------------------------------------------------------------------
+// Const arrays are the single source of truth. Types are derived from them
+// so runtime validation and compile-time types stay in sync automatically.
+// ---------------------------------------------------------------------------
 
-export type TaskStatus =
-  | "pending"
-  | "queued"
-  | "in_progress"
-  | "input_required"
-  | "approval_required"
-  | "review"
-  | "paused"
-  | "complete"
-  | "failed"
-  | "cancelled";
+export const TASK_STATUSES = [
+  "pending",
+  "queued",
+  "in_progress",
+  "blocked",
+  "input_required",
+  "approval_required",
+  "review",
+  "paused",
+  "complete",
+  "failed",
+  "cancelled",
+] as const;
 
-export type TaskSource = "user" | "heartbeat" | "cron" | "agent" | "api";
+export type TaskStatus = (typeof TASK_STATUSES)[number];
 
-export type TaskType =
-  | "instruction"
-  | "app_launch"
-  | "workflow"
-  | "scheduled"
-  | "monitoring"
-  | "approval_gate";
+export const TASK_SOURCES = ["user", "heartbeat", "cron", "agent", "api"] as const;
 
-export type TaskPriority = "high" | "medium" | "low";
+export type TaskSource = (typeof TASK_SOURCES)[number];
+
+export const TASK_TYPES = [
+  "instruction",
+  "research",
+  "coding",
+  "design",
+  "bug_fix",
+  "communication",
+  "deployment",
+  "app_launch",
+  "workflow",
+  "scheduled",
+  "monitoring",
+  "approval_gate",
+] as const;
+
+export type TaskType = (typeof TASK_TYPES)[number];
+
+export const TASK_PRIORITIES = ["high", "medium", "low"] as const;
+
+export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+
+/** Runtime set lookups for O(1) validation in RPC handlers. */
+export const VALID_STATUSES = new Set<string>(TASK_STATUSES);
+export const VALID_TYPES = new Set<string>(TASK_TYPES);
+export const VALID_SOURCES = new Set<string>(TASK_SOURCES);
+export const VALID_PRIORITIES = new Set<string>(TASK_PRIORITIES);
 
 // ---------------------------------------------------------------------------
 // Domain / Category classification (used by policy enforcer)

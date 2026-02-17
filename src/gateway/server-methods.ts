@@ -5,6 +5,7 @@ import { agentsHandlers } from "./server-methods/agents.js";
 import { browserHandlers } from "./server-methods/browser.js";
 import { channelsHandlers } from "./server-methods/channels.js";
 import { chatHandlers } from "./server-methods/chat.js";
+import { clawhubHandlers } from "./server-methods/clawhub.js";
 import { configHandlers } from "./server-methods/config.js";
 import { connectHandlers } from "./server-methods/connect.js";
 import { cronHandlers } from "./server-methods/cron.js";
@@ -108,6 +109,8 @@ const READ_METHODS = new Set([
   "pr.checks",
   "issue.get",
   "issue.list",
+  "clawhub.search",
+  "clawhub.inspect",
   "system-presence",
   "last-heartbeat",
   "node.list",
@@ -269,6 +272,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...talkHandlers,
   ...ttsHandlers,
   ...skillsHandlers,
+  ...clawhubHandlers,
   ...sessionsHandlers,
   ...systemHandlers,
   ...updateHandlers,

@@ -11,6 +11,14 @@ import type {
 import type { GatewayRequestHandlers } from "./types.js";
 import { requestHeartbeatNow } from "../../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../../infra/system-events.js";
+import {
+  VALID_STATUSES,
+  VALID_TYPES,
+  VALID_SOURCES,
+  VALID_PRIORITIES,
+  TASK_STATUSES,
+  TASK_TYPES,
+} from "../../tasks/types.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 
 function requireString(params: Record<string, unknown>, key: string): string | null {
@@ -74,6 +82,33 @@ export const taskHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing title"));
       return;
     }
+    if (input.type && !VALID_TYPES.has(input.type)) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          `invalid type "${input.type}" — must be one of: ${TASK_TYPES.join(", ")}`,
+        ),
+      );
+      return;
+    }
+    if (input.source && !VALID_SOURCES.has(input.source)) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, `invalid source "${input.source}"`),
+      );
+      return;
+    }
+    if (input.priority && !VALID_PRIORITIES.has(input.priority)) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, `invalid priority "${input.priority}"`),
+      );
+      return;
+    }
     const task = await context.taskService.create(input);
     respond(true, task, undefined);
   },
@@ -88,6 +123,25 @@ export const taskHandlers: GatewayRequestHandlers = {
       return;
     }
     const patch = (params.patch ?? params) as TaskPatch;
+    if (patch.status && !VALID_STATUSES.has(patch.status)) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          `invalid status "${patch.status}" — must be one of: ${TASK_STATUSES.join(", ")}`,
+        ),
+      );
+      return;
+    }
+    if (patch.priority && !VALID_PRIORITIES.has(patch.priority)) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, `invalid priority "${patch.priority}"`),
+      );
+      return;
+    }
     const task = await context.taskService.update(taskId, patch);
     if (!task) {
       respond(
