@@ -107,6 +107,13 @@ export interface WorkflowStep {
   tokenUsage: number;
   toolCalls: number;
 
+  // Credentials
+  requiredCredentials?: Array<{
+    credentialId: string;
+    purpose: string;
+    required: boolean;
+  }>;
+
   // Timing
   startedAtMs?: number;
   completedAtMs?: number;

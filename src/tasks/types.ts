@@ -139,6 +139,12 @@ export type TaskPolicy = {
     denyPaths?: string[];
     blockDelete?: boolean;
   };
+  credentials?: {
+    allow?: string[];
+    deny?: string[];
+    allowCategories?: string[];
+    autoLease?: string[];
+  };
   budgets?: {
     maxTokens?: number;
     maxCostUsd?: number;

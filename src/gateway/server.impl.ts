@@ -51,6 +51,7 @@ import { NodeRegistry } from "./node-registry.js";
 import { createChannelManager } from "./server-channels.js";
 import { createAgentEventHandler } from "./server-chat.js";
 import { createGatewayCloseHandler } from "./server-close.js";
+import { buildGatewayCredentialService } from "./server-credentials.js";
 import { buildGatewayCronService } from "./server-cron.js";
 import { buildGatewayDeviceService } from "./server-devices-registry.js";
 import { startGatewayDiscovery } from "./server-discovery-runtime.js";
@@ -419,7 +420,7 @@ export async function startGatewayServer(
     triggers: notificationTriggers,
   } = notificationState;
 
-  // Wrap broadcast for task service: task events also trigger notifications + auto-synthesis
+  // Wrap broadcast for task service: task events also trigger notifications + auto-synthesis + credential lease cleanup
   const taskBroadcast: typeof broadcast = (event, payload, opts) => {
     broadcast(event, payload, opts);
     if (event.startsWith("task.")) {
@@ -428,6 +429,16 @@ export async function startGatewayServer(
     // Auto-synthesis for timeline status updates
     if (event === "task.event") {
       void handleAutoSynthesis(payload, () => taskService);
+    }
+    // Revoke credential leases when tasks complete/fail/cancel
+    if (event === "task.completed" || event === "task.updated") {
+      const task = payload as { id?: string; status?: string };
+      if (
+        task?.id &&
+        (event === "task.completed" || task.status === "failed" || task.status === "cancelled")
+      ) {
+        void credentialService.revokeTaskLeases(task.id);
+      }
     }
   };
 
@@ -465,6 +476,13 @@ export async function startGatewayServer(
     broadcast,
   });
   let { vaultService, vaultPath: vaultPathResolved } = vaultState;
+
+  const credentialState = await buildGatewayCredentialService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+  });
+  const { credentialService, storePath: credentialStorePath } = credentialState;
 
   const channelManager = createChannelManager({
     loadConfig,
@@ -588,6 +606,8 @@ export async function startGatewayServer(
       launcherStorePath,
       deviceService,
       deviceStorePath,
+      credentialService,
+      credentialStorePath,
       vaultService,
       vaultPath: vaultPathResolved,
       workflowService,
@@ -735,6 +755,7 @@ export async function startGatewayServer(
       }
       skillsChangeUnsub();
       workflowEngine.stop();
+      credentialService.stopLeaseExpiryTimer();
       await vaultState.close();
       await close(opts);
     },

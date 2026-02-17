@@ -8,6 +8,7 @@ import { chatHandlers } from "./server-methods/chat.js";
 import { clawhubHandlers } from "./server-methods/clawhub.js";
 import { configHandlers } from "./server-methods/config.js";
 import { connectHandlers } from "./server-methods/connect.js";
+import { credentialHandlers } from "./server-methods/credentials.js";
 import { cronHandlers } from "./server-methods/cron.js";
 import { deviceRegistryHandlers } from "./server-methods/device-registry.js";
 import { deviceHandlers } from "./server-methods/devices.js";
@@ -111,6 +112,8 @@ const READ_METHODS = new Set([
   "issue.list",
   "clawhub.search",
   "clawhub.inspect",
+  "credential.list",
+  "credential.get",
   "system-presence",
   "last-heartbeat",
   "node.list",
@@ -181,6 +184,21 @@ const WRITE_METHODS = new Set([
   "issue.to_workflow",
   "review.run",
   "review.diff",
+  "credential.create",
+  "credential.update",
+  "credential.delete",
+  "credential.rotate",
+  "credential.enable",
+  "credential.disable",
+  "credential.grant",
+  "credential.revoke",
+  "credential.lease.create",
+  "credential.lease.revoke",
+  "credential.rule.add",
+  "credential.rule.update",
+  "credential.rule.remove",
+  "credential.checkout",
+  "credential.import",
 ]);
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
@@ -289,6 +307,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...pluginsHandlers,
   ...deviceRegistryHandlers,
   ...workflowHandlers,
+  ...credentialHandlers,
 };
 
 export async function handleGatewayRequest(
