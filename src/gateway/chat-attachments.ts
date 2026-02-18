@@ -50,8 +50,83 @@ async function sniffMimeFromBase64(base64: string): Promise<string | undefined> 
   }
 }
 
+const BLOCKED_EXTENSIONS = new Set([
+  ".exe",
+  ".bat",
+  ".cmd",
+  ".com",
+  ".msi",
+  ".dll",
+  ".scr",
+  ".pif",
+  ".sh",
+  ".bash",
+  ".zsh",
+  ".csh",
+  ".ksh",
+  ".app",
+  ".dmg",
+  ".pkg",
+  ".deb",
+  ".rpm",
+  ".sys",
+  ".drv",
+  ".vbs",
+  ".vbe",
+  ".jse",
+  ".ws",
+  ".wsf",
+  ".ps1",
+  ".psm1",
+  ".psd1",
+  ".reg",
+  ".inf",
+  ".hta",
+]);
+
 function isImageMime(mime?: string): boolean {
   return typeof mime === "string" && mime.startsWith("image/");
+}
+
+function isTextMime(mime?: string): boolean {
+  if (!mime) {
+    return false;
+  }
+  if (mime.startsWith("text/")) {
+    return true;
+  }
+  if (
+    mime === "application/json" ||
+    mime === "application/xml" ||
+    mime === "application/x-yaml" ||
+    mime === "application/toml"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function isBlockedFile(fileName?: string): boolean {
+  if (!fileName) {
+    return false;
+  }
+  const ext = fileName.includes(".") ? `.${fileName.split(".").pop()!.toLowerCase()}` : "";
+  return ext !== "" && BLOCKED_EXTENSIONS.has(ext);
+}
+
+function formatSizeKB(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes}B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${Math.round(bytes / 1024)}KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+function extensionForLabel(fileName: string): string {
+  const parts = fileName.split(".");
+  return parts.length > 1 ? parts.pop()! : "";
 }
 
 /**
@@ -71,6 +146,7 @@ export async function parseMessageWithAttachments(
   }
 
   const images: ChatImageContent[] = [];
+  const documentBlocks: string[] = [];
 
   for (const [idx, att] of attachments.entries()) {
     if (!att) {
@@ -104,30 +180,51 @@ export async function parseMessageWithAttachments(
       throw new Error(`attachment ${label}: exceeds size limit (${sizeBytes} > ${maxBytes} bytes)`);
     }
 
+    // Block dangerous file types
+    if (isBlockedFile(att.fileName)) {
+      log?.warn(`attachment ${label}: blocked file type, skipping`);
+      continue;
+    }
+
     const providedMime = normalizeMime(mime);
     const sniffedMime = normalizeMime(await sniffMimeFromBase64(b64));
-    if (sniffedMime && !isImageMime(sniffedMime)) {
-      log?.warn(`attachment ${label}: detected non-image (${sniffedMime}), dropping`);
-      continue;
-    }
-    if (!sniffedMime && !isImageMime(providedMime)) {
-      log?.warn(`attachment ${label}: unable to detect image mime type, dropping`);
-      continue;
-    }
+    const effectiveMime = sniffedMime ?? providedMime ?? mime;
+
     if (sniffedMime && providedMime && sniffedMime !== providedMime) {
       log?.warn(
         `attachment ${label}: mime mismatch (${providedMime} -> ${sniffedMime}), using sniffed`,
       );
     }
 
-    images.push({
-      type: "image",
-      data: b64,
-      mimeType: sniffedMime ?? providedMime ?? mime,
-    });
+    if (isImageMime(effectiveMime)) {
+      // Image: push as structured content block for Claude vision
+      images.push({
+        type: "image",
+        data: b64,
+        mimeType: effectiveMime,
+      });
+    } else if (isTextMime(effectiveMime)) {
+      // Text-based: decode and append as fenced code block
+      try {
+        const decoded = Buffer.from(b64, "base64").toString("utf-8");
+        const ext = extensionForLabel(label);
+        const fence = ext ? `\`\`\`${ext}` : "```";
+        documentBlocks.push(`\n\n[File: ${label}]\n${fence}\n${decoded}\n\`\`\``);
+      } catch {
+        log?.warn(`attachment ${label}: failed to decode text content`);
+      }
+    } else {
+      // Other non-blocked files: append metadata note
+      documentBlocks.push(
+        `\n\n[File attached: ${label} (${effectiveMime}, ${formatSizeKB(sizeBytes)})]`,
+      );
+    }
   }
 
-  return { message, images };
+  // Append document blocks to the message text
+  const augmentedMessage = documentBlocks.length > 0 ? message + documentBlocks.join("") : message;
+
+  return { message: augmentedMessage, images };
 }
 
 /**
