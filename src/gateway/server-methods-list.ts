@@ -141,6 +141,12 @@ const BASE_METHODS = [
   "agent.identity.get",
   "agent.wait",
   "browser.request",
+  "browser.snapshot",
+  "browser.tabs",
+  // File browsing methods
+  "file.list",
+  "file.read",
+  "file.stat",
   // WebChat WebSocket-native chat methods
   "chat.history",
   "chat.abort",
@@ -163,6 +169,8 @@ export const GATEWAY_EVENTS = [
   "health",
   "heartbeat",
   "cron",
+  "node.connected",
+  "node.disconnected",
   "node.pair.requested",
   "node.pair.resolved",
   "node.invoke.request",

@@ -199,6 +199,13 @@ export function attachGatewayWsConnectionHandler(params: {
         const nodeId = context.nodeRegistry.unregister(connId);
         if (nodeId) {
           context.nodeUnsubscribeAll(nodeId);
+          broadcast(
+            "node.disconnected",
+            { nodeId, ts: Date.now() },
+            {
+              dropIfSlow: true,
+            },
+          );
         }
       }
       logWs("out", "close", {

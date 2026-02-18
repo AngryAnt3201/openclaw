@@ -13,6 +13,7 @@ import { cronHandlers } from "./server-methods/cron.js";
 import { deviceRegistryHandlers } from "./server-methods/device-registry.js";
 import { deviceHandlers } from "./server-methods/devices.js";
 import { execApprovalsHandlers } from "./server-methods/exec-approvals.js";
+import { fileHandlers } from "./server-methods/files.js";
 import { healthHandlers } from "./server-methods/health.js";
 import { launcherHandlers } from "./server-methods/launcher.js";
 import { logsHandlers } from "./server-methods/logs.js";
@@ -308,6 +309,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...deviceRegistryHandlers,
   ...workflowHandlers,
   ...credentialHandlers,
+  ...fileHandlers,
 };
 
 export async function handleGatewayRequest(

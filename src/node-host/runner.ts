@@ -45,6 +45,14 @@ import { detectMime } from "../media/mime.js";
 import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../utils/message-channel.js";
 import { VERSION } from "../version.js";
 import { ensureNodeHostConfig, saveNodeHostConfig, type NodeHostGatewayConfig } from "./config.js";
+import {
+  handleFileList,
+  handleFileRead,
+  handleFileStat,
+  type FileListParams,
+  type FileReadParams,
+  type FileStatParams,
+} from "./file-commands.js";
 
 type NodeHostRunOptions = {
   gatewayHost: string;
@@ -613,7 +621,10 @@ export async function runNodeHost(opts: NodeHostRunOptions): Promise<void> {
       "system.which",
       "system.execApprovals.get",
       "system.execApprovals.set",
-      ...(browserProxyEnabled ? ["browser.proxy"] : []),
+      "file.list",
+      "file.read",
+      "file.stat",
+      ...(browserProxyEnabled ? ["browser.proxy", "browser.snapshot", "browser.tabs"] : []),
     ],
     pathEnv,
     permissions: undefined,
@@ -745,6 +756,88 @@ async function handleInvoke(
     return;
   }
 
+  if (command === "browser.snapshot") {
+    try {
+      const proxyConfig = resolveBrowserProxyConfig();
+      if (!proxyConfig.enabled) {
+        throw new Error("UNAVAILABLE: node browser proxy disabled");
+      }
+      await ensureBrowserControlService();
+      const dispatcher = createBrowserRouteDispatcher(createBrowserControlContext());
+      // Get current page info via /page endpoint
+      const pageResponse = await withTimeout(
+        dispatcher.dispatch({ method: "GET", path: "/page", query: {}, body: undefined }),
+        30_000,
+        "browser snapshot page",
+      );
+      // Get screenshot via /screenshot endpoint
+      const screenshotResponse = await withTimeout(
+        dispatcher.dispatch({ method: "GET", path: "/screenshot", query: {}, body: undefined }),
+        30_000,
+        "browser snapshot screenshot",
+      );
+      const pageInfo = pageResponse.status < 400 ? pageResponse.body : null;
+      const screenshot = screenshotResponse.status < 400 ? screenshotResponse.body : null;
+      let screenshotFile: BrowserProxyFile | undefined;
+      if (screenshot && typeof screenshot === "object") {
+        const screenshotObj = screenshot as Record<string, unknown>;
+        const screenshotPath = typeof screenshotObj.path === "string" ? screenshotObj.path : "";
+        if (screenshotPath) {
+          const file = await readBrowserProxyFile(screenshotPath);
+          if (file) {
+            screenshotFile = file;
+          }
+        }
+      }
+      const payload = {
+        page: pageInfo,
+        screenshot: screenshotFile
+          ? { base64: screenshotFile.base64, mimeType: screenshotFile.mimeType }
+          : null,
+        ts: Date.now(),
+      };
+      await sendInvokeResult(client, frame, {
+        ok: true,
+        payloadJSON: JSON.stringify(payload),
+      });
+    } catch (err) {
+      await sendInvokeResult(client, frame, {
+        ok: false,
+        error: { code: "UNAVAILABLE", message: String(err) },
+      });
+    }
+    return;
+  }
+
+  if (command === "browser.tabs") {
+    try {
+      const proxyConfig = resolveBrowserProxyConfig();
+      if (!proxyConfig.enabled) {
+        throw new Error("UNAVAILABLE: node browser proxy disabled");
+      }
+      await ensureBrowserControlService();
+      const dispatcher = createBrowserRouteDispatcher(createBrowserControlContext());
+      const response = await withTimeout(
+        dispatcher.dispatch({ method: "GET", path: "/tabs", query: {}, body: undefined }),
+        15_000,
+        "browser tabs",
+      );
+      if (response.status >= 400) {
+        throw new Error(`browser tabs failed: HTTP ${response.status}`);
+      }
+      await sendInvokeResult(client, frame, {
+        ok: true,
+        payloadJSON: JSON.stringify(response.body),
+      });
+    } catch (err) {
+      await sendInvokeResult(client, frame, {
+        ok: false,
+        error: { code: "UNAVAILABLE", message: String(err) },
+      });
+    }
+    return;
+  }
+
   if (command === "browser.proxy") {
     try {
       const params = decodeParams<BrowserProxyParams>(frame.paramsJSON);
@@ -845,6 +938,66 @@ async function handleInvoke(
       await sendInvokeResult(client, frame, {
         ok: true,
         payloadJSON: JSON.stringify(payload),
+      });
+    } catch (err) {
+      await sendInvokeResult(client, frame, {
+        ok: false,
+        error: { code: "INVALID_REQUEST", message: String(err) },
+      });
+    }
+    return;
+  }
+
+  if (command === "file.list") {
+    try {
+      const params = decodeParams<FileListParams>(frame.paramsJSON);
+      if (!params.path || typeof params.path !== "string") {
+        throw new Error("INVALID_REQUEST: path required");
+      }
+      const result = await handleFileList(params);
+      await sendInvokeResult(client, frame, {
+        ok: true,
+        payloadJSON: JSON.stringify(result),
+      });
+    } catch (err) {
+      await sendInvokeResult(client, frame, {
+        ok: false,
+        error: { code: "INVALID_REQUEST", message: String(err) },
+      });
+    }
+    return;
+  }
+
+  if (command === "file.read") {
+    try {
+      const params = decodeParams<FileReadParams>(frame.paramsJSON);
+      if (!params.path || typeof params.path !== "string") {
+        throw new Error("INVALID_REQUEST: path required");
+      }
+      const result = await handleFileRead(params);
+      await sendInvokeResult(client, frame, {
+        ok: true,
+        payloadJSON: JSON.stringify(result),
+      });
+    } catch (err) {
+      await sendInvokeResult(client, frame, {
+        ok: false,
+        error: { code: "INVALID_REQUEST", message: String(err) },
+      });
+    }
+    return;
+  }
+
+  if (command === "file.stat") {
+    try {
+      const params = decodeParams<FileStatParams>(frame.paramsJSON);
+      if (!params.path || typeof params.path !== "string") {
+        throw new Error("INVALID_REQUEST: path required");
+      }
+      const result = await handleFileStat(params);
+      await sendInvokeResult(client, frame, {
+        ok: true,
+        payloadJSON: JSON.stringify(result),
       });
     } catch (err) {
       await sendInvokeResult(client, frame, {

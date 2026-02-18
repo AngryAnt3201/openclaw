@@ -39,6 +39,10 @@ const SMS_DANGEROUS_COMMANDS = ["sms.send"];
 // iOS nodes don't implement system.run/which, but they do support notifications.
 const IOS_SYSTEM_COMMANDS = ["system.notify"];
 
+const FILE_COMMANDS = ["file.list", "file.read", "file.stat"];
+
+const FILE_DANGEROUS_COMMANDS = ["file.write", "file.delete"];
+
 const SYSTEM_COMMANDS = [
   "system.run",
   "system.which",
@@ -46,6 +50,9 @@ const SYSTEM_COMMANDS = [
   "system.execApprovals.get",
   "system.execApprovals.set",
   "browser.proxy",
+  "browser.snapshot",
+  "browser.tabs",
+  ...FILE_COMMANDS,
 ];
 
 // "High risk" node commands. These can be enabled by explicitly adding them to
@@ -57,6 +64,7 @@ export const DEFAULT_DANGEROUS_NODE_COMMANDS = [
   ...CALENDAR_DANGEROUS_COMMANDS,
   ...REMINDERS_DANGEROUS_COMMANDS,
   ...SMS_DANGEROUS_COMMANDS,
+  ...FILE_DANGEROUS_COMMANDS,
 ];
 
 const PLATFORM_DEFAULTS: Record<string, string[]> = {

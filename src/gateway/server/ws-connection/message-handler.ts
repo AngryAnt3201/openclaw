@@ -934,6 +934,25 @@ export function attachGatewayWsMessageHandler(params: {
                 `voicewake snapshot failed for ${nodeSession.nodeId}: ${formatForLog(err)}`,
               ),
             );
+          // Broadcast node.connected to all operators
+          context.broadcast(
+            "node.connected",
+            {
+              nodeId: nodeSession.nodeId,
+              displayName: nodeSession.displayName,
+              platform: nodeSession.platform,
+              version: nodeSession.version,
+              deviceFamily: nodeSession.deviceFamily,
+              modelIdentifier: nodeSession.modelIdentifier,
+              remoteIp: nodeSession.remoteIp,
+              caps: nodeSession.caps,
+              commands: nodeSession.commands,
+              connectedAtMs: nodeSession.connectedAtMs,
+              paired: true,
+              connected: true,
+            },
+            { dropIfSlow: true },
+          );
         }
 
         logWs("out", "hello-ok", {

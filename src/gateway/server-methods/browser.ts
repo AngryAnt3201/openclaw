@@ -274,4 +274,104 @@ export const browserHandlers: GatewayRequestHandlers = {
 
     respond(true, result.body);
   },
+
+  "browser.snapshot": async ({ params, respond, context }) => {
+    const p = params as { nodeId?: string };
+    const nodeId = typeof p.nodeId === "string" ? p.nodeId.trim() : "";
+    if (!nodeId) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "nodeId required"));
+      return;
+    }
+    const nodeSession = context.nodeRegistry.get(nodeId);
+    if (!nodeSession) {
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, "node not connected"));
+      return;
+    }
+    if (!isBrowserNode(nodeSession)) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, "node does not have browser capability"),
+      );
+      return;
+    }
+    const cfg = loadConfig();
+    const allowlist = resolveNodeCommandAllowlist(cfg, nodeSession);
+    const allowed = isNodeCommandAllowed({
+      command: "browser.snapshot",
+      declaredCommands: nodeSession.commands,
+      allowlist,
+    });
+    if (!allowed.ok) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "browser.snapshot not allowed"),
+      );
+      return;
+    }
+    const result = await context.nodeRegistry.invoke({
+      nodeId,
+      command: "browser.snapshot",
+      timeoutMs: 30_000,
+    });
+    if (!result.ok) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, result.error?.message ?? "snapshot failed"),
+      );
+      return;
+    }
+    const payload = result.payloadJSON ? safeParseJson(result.payloadJSON) : result.payload;
+    respond(true, payload);
+  },
+
+  "browser.tabs": async ({ params, respond, context }) => {
+    const p = params as { nodeId?: string };
+    const nodeId = typeof p.nodeId === "string" ? p.nodeId.trim() : "";
+    if (!nodeId) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "nodeId required"));
+      return;
+    }
+    const nodeSession = context.nodeRegistry.get(nodeId);
+    if (!nodeSession) {
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, "node not connected"));
+      return;
+    }
+    if (!isBrowserNode(nodeSession)) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, "node does not have browser capability"),
+      );
+      return;
+    }
+    const cfg = loadConfig();
+    const allowlist = resolveNodeCommandAllowlist(cfg, nodeSession);
+    const allowed = isNodeCommandAllowed({
+      command: "browser.tabs",
+      declaredCommands: nodeSession.commands,
+      allowlist,
+    });
+    if (!allowed.ok) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "browser.tabs not allowed"));
+      return;
+    }
+    const result = await context.nodeRegistry.invoke({
+      nodeId,
+      command: "browser.tabs",
+      timeoutMs: 15_000,
+    });
+    if (!result.ok) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, result.error?.message ?? "tabs failed"),
+      );
+      return;
+    }
+    const payload = result.payloadJSON ? safeParseJson(result.payloadJSON) : result.payload;
+    respond(true, payload);
+  },
 };
