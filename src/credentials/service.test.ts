@@ -329,4 +329,113 @@ describe("CredentialService", () => {
       expect(enabled!.enabled).toBe(true);
     });
   });
+
+  describe("accounts", () => {
+    it("should create and list accounts", async () => {
+      const account = await service.createAccount({ name: "Test", provider: "github" });
+      expect(account.id).toBeTruthy();
+      expect(account.name).toBe("Test");
+      expect(account.provider).toBe("github");
+
+      const accounts = await service.listAccounts();
+      expect(accounts).toHaveLength(1);
+    });
+
+    it("should add credential to account", async () => {
+      const account = await service.createAccount({ name: "GH", provider: "github" });
+      const cred = await service.create({
+        name: "GH Token",
+        category: "service",
+        provider: "github",
+        secret: { kind: "token", token: "ghp-test" },
+      });
+
+      const updated = await service.addCredentialToAccount(account.id, cred.id);
+      expect(updated).not.toBeNull();
+      expect(updated!.credentialIds).toContain(cred.id);
+
+      const fetchedCred = await service.get(cred.id);
+      expect(fetchedCred!.accountId).toBe(account.id);
+    });
+
+    it("should delete account and unlink credentials", async () => {
+      const account = await service.createAccount({ name: "Del", provider: "github" });
+      const cred = await service.create({
+        name: "Token",
+        category: "service",
+        provider: "github",
+        secret: { kind: "token", token: "ghp-del" },
+      });
+      await service.addCredentialToAccount(account.id, cred.id);
+
+      const deleted = await service.deleteAccount(account.id);
+      expect(deleted).toBe(true);
+
+      const fetchedCred = await service.get(cred.id);
+      expect(fetchedCred).not.toBeNull();
+      expect(fetchedCred!.accountId).toBeUndefined();
+    });
+  });
+
+  describe("agent profiles", () => {
+    it("should bind and unbind agent to account", async () => {
+      const account = await service.createAccount({ name: "Bind", provider: "anthropic" });
+      await service.bindAgentToAccount("agent-1", account.id, "user");
+
+      const profile = await service.getAgentProfile("agent-1");
+      expect(profile).not.toBeNull();
+      expect(profile!.accountBindings).toHaveLength(1);
+      expect(profile!.accountBindings[0]!.accountId).toBe(account.id);
+
+      await service.unbindAgentFromAccount("agent-1", account.id);
+      const updated = await service.getAgentProfile("agent-1");
+      expect(updated!.accountBindings).toHaveLength(0);
+    });
+
+    it("should resolve agent credential IDs", async () => {
+      const account = await service.createAccount({ name: "Resolve", provider: "github" });
+      const cred = await service.create({
+        name: "Key",
+        category: "service",
+        provider: "github",
+        secret: { kind: "token", token: "ghp-resolve" },
+      });
+      await service.addCredentialToAccount(account.id, cred.id);
+      await service.bindAgentToAccount("agent-2", account.id);
+
+      const ids = await service.resolveAgentCredentialIds("agent-2");
+      expect(ids).toContain(cred.id);
+    });
+
+    it("should checkout with agent profile access", async () => {
+      const account = await service.createAccount({ name: "Checkout", provider: "anthropic" });
+      const cred = await service.create({
+        name: "API Key",
+        category: "ai_provider",
+        provider: "anthropic",
+        secret: { kind: "api_key", key: "sk-profile-test" },
+      });
+      await service.addCredentialToAccount(account.id, cred.id);
+      await service.bindAgentToAccount("agent-3", account.id);
+
+      const result = await service.checkout({ credentialId: cred.id, agentId: "agent-3" });
+      expect(result.secret).toEqual({ kind: "api_key", key: "sk-profile-test" });
+      expect(result.credentialId).toBe(cred.id);
+    });
+  });
+
+  describe("createFromPaste", () => {
+    it("should auto-detect anthropic key", async () => {
+      const { credential } = await service.createFromPaste("sk-ant-api03-test123456789");
+      expect(credential.provider).toBe("anthropic");
+      expect(credential.category).toBe("ai_provider");
+    });
+
+    it("should use override name", async () => {
+      const { credential } = await service.createFromPaste("sk-ant-api03-test123456789", {
+        name: "My Key",
+      });
+      expect(credential.name).toBe("My Key");
+    });
+  });
 });

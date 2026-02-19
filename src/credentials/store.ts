@@ -3,16 +3,25 @@
 // ---------------------------------------------------------------------------
 // Storage layout:
 //   ~/.openclaw/credentials/
-//     store.enc.json   – { version: 2, credentials, secrets, masterKeyCheck }
+//     store.enc.json   – { version: 3, credentials, secrets, masterKeyCheck, accounts, agentProfiles }
 //     audit.jsonl      – Append-only audit log
 //     .keyfile         – Auto-generated master key (chmod 0600)
 // ---------------------------------------------------------------------------
 
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, chmodSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { CredentialStoreFile, CredentialAuditEntry } from "./types.js";
+import type {
+  CredentialStoreFile,
+  CredentialStoreFileV2,
+  CredentialAuditEntry,
+  Account,
+  AccountProvider,
+  AgentCredentialProfile,
+} from "./types.js";
 import { resolveCredentialAuditPath } from "./constants.js";
+import { VALID_ACCOUNT_PROVIDERS } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Path resolution
@@ -29,21 +38,145 @@ export function resolveCredentialStorePath(customPath?: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// v2 → v3 migration
+// ---------------------------------------------------------------------------
+
+export function upgradeV2toV3(v2: CredentialStoreFileV2): CredentialStoreFile {
+  const now = Date.now();
+
+  // Group credentials by provider → create one Account per provider
+  const providerGroups = new Map<string, string[]>();
+  for (const cred of v2.credentials) {
+    const provider = cred.provider.toLowerCase();
+    if (!providerGroups.has(provider)) {
+      providerGroups.set(provider, []);
+    }
+    providerGroups.get(provider)!.push(cred.id);
+  }
+
+  const accounts: Account[] = [];
+  const credAccountMap = new Map<string, string>(); // credentialId → accountId
+
+  for (const [provider, credIds] of providerGroups) {
+    const accountId = randomUUID();
+    const accountProvider: AccountProvider = VALID_ACCOUNT_PROVIDERS.has(provider)
+      ? (provider as AccountProvider)
+      : "custom";
+
+    accounts.push({
+      id: accountId,
+      name: provider.charAt(0).toUpperCase() + provider.slice(1),
+      provider: accountProvider,
+      credentialIds: credIds,
+      tags: [],
+      metadata: {},
+      createdAtMs: now,
+      updatedAtMs: now,
+    });
+
+    for (const credId of credIds) {
+      credAccountMap.set(credId, accountId);
+    }
+  }
+
+  // Set accountId back-reference on each credential
+  const credentials = v2.credentials.map((cred) => ({
+    ...cred,
+    accountId: credAccountMap.get(cred.id),
+  }));
+
+  // Convert per-credential accessGrants → AgentCredentialProfile per unique agentId
+  const agentBindings = new Map<string, { accountIds: Set<string>; directGrants: Set<string> }>();
+
+  for (const cred of v2.credentials) {
+    for (const grant of cred.accessGrants) {
+      if (!agentBindings.has(grant.agentId)) {
+        agentBindings.set(grant.agentId, {
+          accountIds: new Set(),
+          directGrants: new Set(),
+        });
+      }
+      const entry = agentBindings.get(grant.agentId)!;
+      const accountId = credAccountMap.get(cred.id);
+      if (accountId) {
+        entry.accountIds.add(accountId);
+      }
+      entry.directGrants.add(cred.id);
+    }
+  }
+
+  const agentProfiles: AgentCredentialProfile[] = [];
+  for (const [agentId, { accountIds, directGrants }] of agentBindings) {
+    agentProfiles.push({
+      agentId,
+      accountBindings: [...accountIds].map((accountId) => ({
+        accountId,
+        grantedAtMs: now,
+        grantedBy: "migration",
+      })),
+      directGrants: [...directGrants],
+      createdAtMs: now,
+      updatedAtMs: now,
+    });
+  }
+
+  return {
+    version: 3,
+    credentials,
+    secrets: v2.secrets,
+    masterKeyCheck: v2.masterKeyCheck,
+    accounts,
+    agentProfiles,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Read / write store file (atomic)
 // ---------------------------------------------------------------------------
 
 function emptyStore(): CredentialStoreFile {
-  return { version: 2, credentials: [], secrets: {}, masterKeyCheck: "" };
+  return {
+    version: 3,
+    credentials: [],
+    secrets: {},
+    masterKeyCheck: "",
+    accounts: [],
+    agentProfiles: [],
+  };
 }
 
 export async function readCredentialStore(storePath: string): Promise<CredentialStoreFile> {
   try {
     const raw = await fs.readFile(storePath, "utf-8");
-    const parsed = JSON.parse(raw) as CredentialStoreFile;
-    if (parsed.version !== 2 || !Array.isArray(parsed.credentials)) {
+    const parsed = JSON.parse(raw) as { version?: number };
+
+    if (!parsed.version || !Array.isArray((parsed as CredentialStoreFile).credentials)) {
       return emptyStore();
     }
-    return parsed;
+
+    // v3 — current format
+    if (parsed.version === 3) {
+      const v3 = parsed as CredentialStoreFile;
+      // Ensure arrays exist (defensive)
+      if (!Array.isArray(v3.accounts)) {
+        v3.accounts = [];
+      }
+      if (!Array.isArray(v3.agentProfiles)) {
+        v3.agentProfiles = [];
+      }
+      return v3;
+    }
+
+    // v2 — auto-upgrade
+    if (parsed.version === 2) {
+      const v2 = parsed as CredentialStoreFileV2;
+      const upgraded = upgradeV2toV3(v2);
+      // Persist the upgrade immediately
+      await writeCredentialStore(storePath, upgraded);
+      return upgraded;
+    }
+
+    return emptyStore();
   } catch {
     return emptyStore();
   }

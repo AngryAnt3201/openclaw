@@ -571,3 +571,113 @@ describe("preset resolution", () => {
     expect(result.allowed).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Credential restrictions
+// ---------------------------------------------------------------------------
+
+describe("credential restrictions", () => {
+  it("blocks credential in deny list", () => {
+    enforcer.attach("s1", {
+      credentials: { deny: ["cred-secret-123"] },
+    } satisfies TaskPolicy);
+
+    const result = enforcer.enforce("s1", {
+      toolName: "checkout",
+      params: {},
+      credentialId: "cred-secret-123",
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.triggeredRules).toContain("credential:deny");
+  });
+
+  it("allows credential not in deny list", () => {
+    enforcer.attach("s1", {
+      credentials: { deny: ["cred-blocked"] },
+    } satisfies TaskPolicy);
+
+    const result = enforcer.enforce("s1", {
+      toolName: "checkout",
+      params: {},
+      credentialId: "cred-safe",
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("blocks credential not in allow list", () => {
+    enforcer.attach("s1", {
+      credentials: { allow: ["cred-allowed-1", "cred-allowed-2"] },
+    } satisfies TaskPolicy);
+
+    const result = enforcer.enforce("s1", {
+      toolName: "checkout",
+      params: {},
+      credentialId: "cred-not-allowed",
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.triggeredRules).toContain("credential:allow");
+  });
+
+  it("allows credential in allow list", () => {
+    enforcer.attach("s1", {
+      credentials: { allow: ["cred-ok"] },
+    } satisfies TaskPolicy);
+
+    const result = enforcer.enforce("s1", {
+      toolName: "checkout",
+      params: {},
+      credentialId: "cred-ok",
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("blocks credential category not in allowCategories", () => {
+    enforcer.attach("s1", {
+      credentials: { allowCategories: ["ai_provider"] },
+    } satisfies TaskPolicy);
+
+    const result = enforcer.enforce("s1", {
+      toolName: "checkout",
+      params: {},
+      credentialCategory: "channel_bot",
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.triggeredRules).toContain("credential:category");
+  });
+
+  it("allows credential category in allowCategories", () => {
+    enforcer.attach("s1", {
+      credentials: { allowCategories: ["ai_provider", "service"] },
+    } satisfies TaskPolicy);
+
+    const result = enforcer.enforce("s1", {
+      toolName: "checkout",
+      params: {},
+      credentialCategory: "service",
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("skips credential checks when no credential context", () => {
+    enforcer.attach("s1", {
+      credentials: { deny: ["cred-blocked"] },
+    } satisfies TaskPolicy);
+
+    const result = enforcer.enforce("s1", {
+      toolName: "read",
+      params: {},
+    });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("skips credential checks when no credentials policy", () => {
+    enforcer.attach("s1", {} satisfies TaskPolicy);
+
+    const result = enforcer.enforce("s1", {
+      toolName: "checkout",
+      params: {},
+      credentialId: "any-cred",
+    });
+    expect(result.allowed).toBe(true);
+  });
+});

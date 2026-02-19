@@ -1,5 +1,7 @@
 import type { GatewayRequestHandlers, GatewayRequestOptions } from "./server-methods/types.js";
 import { ErrorCodes, errorShape } from "./protocol/index.js";
+import { accountHandlers } from "./server-methods/accounts.js";
+import { agentProfileHandlers } from "./server-methods/agent-profiles.js";
 import { agentHandlers } from "./server-methods/agent.js";
 import { agentsHandlers } from "./server-methods/agents.js";
 import { browserHandlers } from "./server-methods/browser.js";
@@ -310,6 +312,8 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...deviceRegistryHandlers,
   ...workflowHandlers,
   ...credentialHandlers,
+  ...accountHandlers,
+  ...agentProfileHandlers,
   ...pipelineHandlers,
   ...fileHandlers,
 };

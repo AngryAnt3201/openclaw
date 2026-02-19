@@ -10,6 +10,7 @@ import type {
   CredentialSecret,
 } from "../../credentials/types.js";
 import type { GatewayRequestHandlers } from "./types.js";
+import { detectProvider } from "../../credentials/provider-detection.js";
 import { VALID_CATEGORIES, VALID_SECRET_KINDS } from "../../credentials/types.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 
@@ -606,5 +607,63 @@ export const credentialHandlers: GatewayRequestHandlers = {
     }
     // Migration is handled at startup; this endpoint triggers a manual re-run
     respond(true, { message: "migration triggered — check gateway logs" }, undefined);
+  },
+
+  // -------------------------------------------------------------------------
+  // credential.detect – smart paste provider detection
+  // -------------------------------------------------------------------------
+  "credential.detect": async ({ params, respond }) => {
+    const rawKey = requireString(params, "rawKey") ?? requireString(params, "key");
+    if (!rawKey) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing rawKey"));
+      return;
+    }
+    const result = detectProvider(rawKey);
+    respond(true, { detection: result }, undefined);
+  },
+
+  // -------------------------------------------------------------------------
+  // credential.createFromPaste – detect + create in one step
+  // -------------------------------------------------------------------------
+  "credential.createFromPaste": async ({ params, respond, context }) => {
+    try {
+      requireService(context);
+    } catch {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "credential service not available"),
+      );
+      return;
+    }
+    const rawKey = requireString(params, "rawKey") ?? requireString(params, "key");
+    if (!rawKey) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing rawKey"));
+      return;
+    }
+    try {
+      const overrides: { name?: string; description?: string; accountId?: string } = {};
+      const name = requireString(params, "name");
+      if (name) {
+        overrides.name = name;
+      }
+      const description = requireString(params, "description");
+      if (description) {
+        overrides.description = description;
+      }
+      const accountId = requireString(params, "accountId");
+      if (accountId) {
+        overrides.accountId = accountId;
+      }
+
+      const result = await context.credentialService!.createFromPaste(rawKey, overrides);
+      respond(true, result, undefined);
+    } catch (err) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, err instanceof Error ? err.message : String(err)),
+      );
+    }
   },
 };

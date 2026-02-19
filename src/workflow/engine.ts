@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { randomUUID } from "node:crypto";
+import type { CredentialService } from "../credentials/service.js";
 import type { WorkflowService } from "./service.js";
 import type { Workflow, WorkflowPolicies, WorkflowStep, StepStatus, FileChange } from "./types.js";
 import * as github from "./github.js";
@@ -38,6 +39,7 @@ export type WorkflowEngineDeps = {
     toolCalls?: number;
   }>;
   broadcast: (event: string, payload: unknown) => void;
+  credentialService?: CredentialService;
   nowMs?: () => number;
 };
 
@@ -225,8 +227,11 @@ export class WorkflowEngine {
         commitsBefore,
       });
 
+      // Provision credentials for this step
+      const credentialInfo = await this.provisionStepCredentials(wf, step);
+
       // Build session prompt
-      const prompt = this.buildStepPrompt(wf, step, policies);
+      const prompt = this.buildStepPrompt(wf, step, policies, credentialInfo);
       const sessionKey = `agent:default:workflow:${wf.id}:step:${step.id}`;
 
       const systemPrompt = [
@@ -283,7 +288,48 @@ export class WorkflowEngine {
   // Step prompt construction
   // -------------------------------------------------------------------------
 
-  private buildStepPrompt(wf: Workflow, step: WorkflowStep, _policies: WorkflowPolicies): string {
+  private async provisionStepCredentials(wf: Workflow, step: WorkflowStep): Promise<string[]> {
+    const credService = this.deps.credentialService;
+    if (!credService || !step.requiredCredentials?.length) {
+      return [];
+    }
+
+    const provisioned: string[] = [];
+    const taskId = `workflow:${wf.id}:step:${step.id}`;
+
+    for (const req of step.requiredCredentials) {
+      try {
+        const lease = await credService.createLease({
+          credentialId: req.credentialId,
+          taskId,
+          agentId: `workflow:${wf.id}`,
+        });
+        if (lease) {
+          provisioned.push(`${req.purpose} (${req.credentialId})`);
+          this.deps.log.info(
+            `provisioned credential ${req.credentialId} for workflow step ${step.title}`,
+          );
+        }
+      } catch (err) {
+        if (req.required) {
+          throw new Error(
+            `required credential ${req.credentialId} (${req.purpose}) not available: ${String(err)}`,
+            { cause: err },
+          );
+        }
+        this.deps.log.warn(`optional credential ${req.credentialId} not available: ${String(err)}`);
+      }
+    }
+
+    return provisioned;
+  }
+
+  private buildStepPrompt(
+    wf: Workflow,
+    step: WorkflowStep,
+    _policies: WorkflowPolicies,
+    credentialInfo: string[] = [],
+  ): string {
     const lines: string[] = [];
 
     lines.push(`# Step ${step.index + 1}: ${step.title}`);
@@ -299,6 +345,15 @@ export class WorkflowEngine {
         if (dep?.result) {
           lines.push(`- Step ${dep.index + 1} (${dep.title}): ${dep.result}`);
         }
+      }
+      lines.push("");
+    }
+
+    // Add available credentials
+    if (credentialInfo.length > 0) {
+      lines.push("## Available Credentials:");
+      for (const info of credentialInfo) {
+        lines.push(`- ${info}`);
       }
       lines.push("");
     }

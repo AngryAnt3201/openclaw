@@ -19,6 +19,14 @@ import type {
   UsageRecord,
   CredentialAuditEntry,
   CredentialCategory,
+  Account,
+  AccountCreateInput,
+  AccountPatch,
+  AccountFilter,
+  AccountProvider,
+  AgentCredentialProfile,
+  AgentAccountBinding,
+  CredentialStoreFile,
 } from "./types.js";
 import { MAX_USAGE_HISTORY, DEFAULT_LEASE_TTL_MS } from "./constants.js";
 import {
@@ -28,8 +36,9 @@ import {
   validateMasterKey,
 } from "./encryption.js";
 import { compileRule, evaluateRules } from "./policy-engine.js";
+import { detectProvider } from "./provider-detection.js";
 import { readCredentialStore, writeCredentialStore, appendAuditEntry } from "./store.js";
-import { VALID_CATEGORIES } from "./types.js";
+import { VALID_CATEGORIES, VALID_ACCOUNT_PROVIDERS } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Dependencies (injected at construction)
@@ -186,9 +195,20 @@ export class CredentialService {
         createdAtMs: now,
         updatedAtMs: now,
         enabled: true,
+        accountId: input.accountId,
+        secretKind: input.secret.kind,
       };
 
       store.credentials.push(credential);
+
+      // If accountId specified, add credential to account
+      if (input.accountId) {
+        const account = store.accounts.find((a) => a.id === input.accountId);
+        if (account && !account.credentialIds.includes(id)) {
+          account.credentialIds.push(id);
+          account.updatedAtMs = now;
+        }
+      }
       await writeCredentialStore(this.state.deps.storePath, store);
 
       await this.audit("create", id, { credentialName: input.name, outcome: "success" });
@@ -225,6 +245,10 @@ export class CredentialService {
       }
       if (filter.enabled !== undefined) {
         creds = creds.filter((c) => c.enabled === filter.enabled);
+      }
+      if (filter.accountId) {
+        const accId = filter.accountId;
+        creds = creds.filter((c) => c.accountId === accId);
       }
       if (filter.agentId) {
         const aid = filter.agentId;
@@ -277,6 +301,9 @@ export class CredentialService {
       if (patch.enabled !== undefined) {
         cred.enabled = patch.enabled;
       }
+      if (patch.accountId !== undefined) {
+        cred.accountId = patch.accountId;
+      }
       cred.updatedAtMs = this.now();
 
       store.credentials[idx] = cred;
@@ -303,6 +330,21 @@ export class CredentialService {
       const cred = store.credentials[idx]!;
       store.credentials.splice(idx, 1);
       delete store.secrets[cred.secretRef];
+
+      // Remove from account
+      if (cred.accountId) {
+        const account = store.accounts.find((a) => a.id === cred.accountId);
+        if (account) {
+          account.credentialIds = account.credentialIds.filter((id) => id !== credentialId);
+          account.updatedAtMs = this.now();
+        }
+      }
+
+      // Remove from agent profile direct grants
+      for (const profile of store.agentProfiles) {
+        profile.directGrants = profile.directGrants.filter((id) => id !== credentialId);
+      }
+
       await writeCredentialStore(this.state.deps.storePath, store);
 
       await this.audit("delete", credentialId, { credentialName: cred.name, outcome: "success" });
@@ -607,7 +649,13 @@ export class CredentialService {
         throw new Error("credential is disabled");
       }
 
-      // Check access: permanent grant OR active lease
+      // Check access: agent profile → legacy grant → active lease
+      const hasProfileAccess = this.checkAgentProfileAccess(
+        store,
+        opts.agentId,
+        opts.credentialId,
+        cred.accountId,
+      );
       const hasGrant = cred.accessGrants.some((g) => g.agentId === opts.agentId);
       const activeLease = cred.activeLeases.find(
         (l) =>
@@ -618,7 +666,7 @@ export class CredentialService {
           (l.usesRemaining === undefined || l.usesRemaining > 0),
       );
 
-      if (!hasGrant && !activeLease) {
+      if (!hasProfileAccess && !hasGrant && !activeLease) {
         await this.audit("checkout", opts.credentialId, {
           credentialName: cred.name,
           agentId: opts.agentId,
@@ -817,5 +865,376 @@ export class CredentialService {
       history = history.slice(-opts.limit);
     }
     return history;
+  }
+
+  // =========================================================================
+  // Account CRUD
+  // =========================================================================
+
+  async createAccount(input: AccountCreateInput): Promise<Account> {
+    if (!VALID_ACCOUNT_PROVIDERS.has(input.provider)) {
+      throw new Error(`invalid provider: ${input.provider}`);
+    }
+
+    return locked(this.state, async () => {
+      const store = await readCredentialStore(this.state.deps.storePath);
+      const now = this.now();
+      const id = randomUUID();
+
+      const account: Account = {
+        id,
+        name: input.name,
+        provider: input.provider,
+        icon: input.icon,
+        email: input.email,
+        credentialIds: [],
+        tags: input.tags ?? [],
+        metadata: input.metadata ?? {},
+        createdAtMs: now,
+        updatedAtMs: now,
+      };
+
+      store.accounts.push(account);
+      await writeCredentialStore(this.state.deps.storePath, store);
+
+      this.emit("account.created", account);
+      this.state.deps.log.info(`account created: ${id} — ${input.name}`);
+      return account;
+    });
+  }
+
+  async getAccount(accountId: string): Promise<Account | null> {
+    const store = await readCredentialStore(this.state.deps.storePath);
+    return store.accounts.find((a) => a.id === accountId) ?? null;
+  }
+
+  async listAccounts(filter?: AccountFilter): Promise<Account[]> {
+    const store = await readCredentialStore(this.state.deps.storePath);
+    let accounts = store.accounts;
+    if (filter?.provider) {
+      accounts = accounts.filter((a) => a.provider === filter.provider);
+    }
+    if (filter?.limit && filter.limit > 0) {
+      accounts = accounts.slice(0, filter.limit);
+    }
+    return accounts;
+  }
+
+  async updateAccount(accountId: string, patch: AccountPatch): Promise<Account | null> {
+    return locked(this.state, async () => {
+      const store = await readCredentialStore(this.state.deps.storePath);
+      const idx = store.accounts.findIndex((a) => a.id === accountId);
+      if (idx === -1) {
+        return null;
+      }
+
+      const account = store.accounts[idx]!;
+      if (patch.name !== undefined) {
+        account.name = patch.name;
+      }
+      if (patch.icon !== undefined) {
+        account.icon = patch.icon;
+      }
+      if (patch.email !== undefined) {
+        account.email = patch.email;
+      }
+      if (patch.tags !== undefined) {
+        account.tags = patch.tags;
+      }
+      if (patch.metadata !== undefined) {
+        account.metadata = patch.metadata;
+      }
+      account.updatedAtMs = this.now();
+
+      store.accounts[idx] = account;
+      await writeCredentialStore(this.state.deps.storePath, store);
+
+      this.emit("account.updated", account);
+      return account;
+    });
+  }
+
+  async deleteAccount(accountId: string): Promise<boolean> {
+    return locked(this.state, async () => {
+      const store = await readCredentialStore(this.state.deps.storePath);
+      const idx = store.accounts.findIndex((a) => a.id === accountId);
+      if (idx === -1) {
+        return false;
+      }
+
+      const account = store.accounts[idx]!;
+
+      // Unlink credentials (don't delete them)
+      for (const cred of store.credentials) {
+        if (cred.accountId === accountId) {
+          cred.accountId = undefined;
+          cred.updatedAtMs = this.now();
+        }
+      }
+
+      // Remove account bindings from agent profiles
+      for (const profile of store.agentProfiles) {
+        profile.accountBindings = profile.accountBindings.filter((b) => b.accountId !== accountId);
+      }
+
+      store.accounts.splice(idx, 1);
+      await writeCredentialStore(this.state.deps.storePath, store);
+
+      this.emit("account.deleted", { accountId });
+      this.state.deps.log.info(`account deleted: ${accountId} — ${account.name}`);
+      return true;
+    });
+  }
+
+  async addCredentialToAccount(accountId: string, credentialId: string): Promise<Account | null> {
+    return locked(this.state, async () => {
+      const store = await readCredentialStore(this.state.deps.storePath);
+      const account = store.accounts.find((a) => a.id === accountId);
+      if (!account) {
+        return null;
+      }
+
+      const cred = store.credentials.find((c) => c.id === credentialId);
+      if (!cred) {
+        return null;
+      }
+
+      const now = this.now();
+
+      // Remove from old account if any
+      if (cred.accountId && cred.accountId !== accountId) {
+        const oldAccount = store.accounts.find((a) => a.id === cred.accountId);
+        if (oldAccount) {
+          oldAccount.credentialIds = oldAccount.credentialIds.filter((id) => id !== credentialId);
+          oldAccount.updatedAtMs = now;
+        }
+      }
+
+      // Add to new account
+      if (!account.credentialIds.includes(credentialId)) {
+        account.credentialIds.push(credentialId);
+      }
+      account.updatedAtMs = now;
+      cred.accountId = accountId;
+      cred.updatedAtMs = now;
+
+      await writeCredentialStore(this.state.deps.storePath, store);
+
+      this.emit("account.updated", account);
+      return account;
+    });
+  }
+
+  async removeCredentialFromAccount(
+    accountId: string,
+    credentialId: string,
+  ): Promise<Account | null> {
+    return locked(this.state, async () => {
+      const store = await readCredentialStore(this.state.deps.storePath);
+      const account = store.accounts.find((a) => a.id === accountId);
+      if (!account) {
+        return null;
+      }
+
+      account.credentialIds = account.credentialIds.filter((id) => id !== credentialId);
+      account.updatedAtMs = this.now();
+
+      const cred = store.credentials.find((c) => c.id === credentialId);
+      if (cred && cred.accountId === accountId) {
+        cred.accountId = undefined;
+        cred.updatedAtMs = this.now();
+      }
+
+      await writeCredentialStore(this.state.deps.storePath, store);
+
+      this.emit("account.updated", account);
+      return account;
+    });
+  }
+
+  // =========================================================================
+  // Agent Credential Profiles
+  // =========================================================================
+
+  async getAgentProfile(agentId: string): Promise<AgentCredentialProfile | null> {
+    const store = await readCredentialStore(this.state.deps.storePath);
+    return store.agentProfiles.find((p) => p.agentId === agentId) ?? null;
+  }
+
+  async listAgentProfiles(): Promise<AgentCredentialProfile[]> {
+    const store = await readCredentialStore(this.state.deps.storePath);
+    return store.agentProfiles;
+  }
+
+  async bindAgentToAccount(
+    agentId: string,
+    accountId: string,
+    grantedBy = "user",
+    restrictions?: AgentAccountBinding["restrictions"],
+  ): Promise<AgentCredentialProfile> {
+    return locked(this.state, async () => {
+      const store = await readCredentialStore(this.state.deps.storePath);
+      const now = this.now();
+
+      // Verify account exists
+      const account = store.accounts.find((a) => a.id === accountId);
+      if (!account) {
+        throw new Error(`account not found: ${accountId}`);
+      }
+
+      let profile = store.agentProfiles.find((p) => p.agentId === agentId);
+      if (!profile) {
+        profile = {
+          agentId,
+          accountBindings: [],
+          directGrants: [],
+          createdAtMs: now,
+          updatedAtMs: now,
+        };
+        store.agentProfiles.push(profile);
+      }
+
+      // Idempotent — don't duplicate
+      if (!profile.accountBindings.some((b) => b.accountId === accountId)) {
+        profile.accountBindings.push({
+          accountId,
+          grantedAtMs: now,
+          grantedBy,
+          restrictions,
+        });
+      }
+      profile.updatedAtMs = now;
+
+      await writeCredentialStore(this.state.deps.storePath, store);
+
+      this.emit("agent.profile.updated", profile);
+      return profile;
+    });
+  }
+
+  async unbindAgentFromAccount(
+    agentId: string,
+    accountId: string,
+  ): Promise<AgentCredentialProfile | null> {
+    return locked(this.state, async () => {
+      const store = await readCredentialStore(this.state.deps.storePath);
+      const profile = store.agentProfiles.find((p) => p.agentId === agentId);
+      if (!profile) {
+        return null;
+      }
+
+      profile.accountBindings = profile.accountBindings.filter((b) => b.accountId !== accountId);
+      profile.updatedAtMs = this.now();
+
+      await writeCredentialStore(this.state.deps.storePath, store);
+
+      this.emit("agent.profile.updated", profile);
+      return profile;
+    });
+  }
+
+  async resolveAgentCredentialIds(agentId: string): Promise<string[]> {
+    const store = await readCredentialStore(this.state.deps.storePath);
+    const profile = store.agentProfiles.find((p) => p.agentId === agentId);
+    const credIds = new Set<string>();
+
+    if (profile) {
+      // Credentials from account bindings
+      for (const binding of profile.accountBindings) {
+        const account = store.accounts.find((a) => a.id === binding.accountId);
+        if (account) {
+          for (const credId of account.credentialIds) {
+            // If restrictions specify credentialIds, only include those
+            if (binding.restrictions?.credentialIds) {
+              if (binding.restrictions.credentialIds.includes(credId)) {
+                credIds.add(credId);
+              }
+            } else {
+              credIds.add(credId);
+            }
+          }
+        }
+      }
+
+      // Direct grants
+      for (const credId of profile.directGrants) {
+        credIds.add(credId);
+      }
+    }
+
+    // Also include legacy accessGrants
+    for (const cred of store.credentials) {
+      if (cred.accessGrants.some((g) => g.agentId === agentId)) {
+        credIds.add(cred.id);
+      }
+    }
+
+    return [...credIds];
+  }
+
+  // =========================================================================
+  // Smart Paste convenience
+  // =========================================================================
+
+  async createFromPaste(
+    rawKey: string,
+    overrides?: { name?: string; description?: string; accountId?: string },
+  ): Promise<{ credential: Credential; detection: ReturnType<typeof detectProvider> }> {
+    const detection = detectProvider(rawKey);
+    if (!detection) {
+      throw new Error("could not detect provider from pasted key");
+    }
+
+    const name = overrides?.name ?? detection.suggestedName;
+    const secret =
+      detection.secretKind === "token"
+        ? { kind: "token" as const, token: rawKey.trim() }
+        : { kind: "api_key" as const, key: rawKey.trim() };
+
+    const credential = await this.create({
+      name,
+      category: detection.category,
+      provider: detection.provider,
+      description: overrides?.description,
+      secret,
+      accountId: overrides?.accountId,
+    });
+
+    return { credential, detection };
+  }
+
+  // =========================================================================
+  // Private helpers
+  // =========================================================================
+
+  private checkAgentProfileAccess(
+    store: CredentialStoreFile,
+    agentId: string,
+    credentialId: string,
+    accountId?: string,
+  ): boolean {
+    const profile = store.agentProfiles.find((p) => p.agentId === agentId);
+    if (!profile) {
+      return false;
+    }
+
+    // Check direct grants
+    if (profile.directGrants.includes(credentialId)) {
+      return true;
+    }
+
+    // Check account bindings
+    if (accountId) {
+      const binding = profile.accountBindings.find((b) => b.accountId === accountId);
+      if (binding) {
+        // If restrictions specify credentialIds, check against them
+        if (binding.restrictions?.credentialIds) {
+          return binding.restrictions.credentialIds.includes(credentialId);
+        }
+        return true;
+      }
+    }
+
+    return false;
   }
 }

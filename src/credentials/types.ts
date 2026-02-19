@@ -16,13 +16,46 @@ export const CREDENTIAL_CATEGORIES = [
 
 export type CredentialCategory = (typeof CREDENTIAL_CATEGORIES)[number];
 
-export const SECRET_KINDS = ["api_key", "token", "oauth"] as const;
+export const SECRET_KINDS = ["api_key", "token", "oauth", "ssh_key"] as const;
 
 export type SecretKind = (typeof SECRET_KINDS)[number];
 
 /** Runtime set lookups for O(1) validation. */
 export const VALID_CATEGORIES = new Set<string>(CREDENTIAL_CATEGORIES);
 export const VALID_SECRET_KINDS = new Set<string>(SECRET_KINDS);
+
+// ---------------------------------------------------------------------------
+// Account providers
+// ---------------------------------------------------------------------------
+
+export const ACCOUNT_PROVIDERS = [
+  "anthropic",
+  "openai",
+  "google",
+  "github",
+  "notion",
+  "slack",
+  "discord",
+  "telegram",
+  "whatsapp",
+  "stripe",
+  "aws",
+  "vercel",
+  "groq",
+  "mistral",
+  "xai",
+  "deepseek",
+  "cerebras",
+  "fireworks",
+  "perplexity",
+  "cohere",
+  "linear",
+  "custom",
+] as const;
+
+export type AccountProvider = (typeof ACCOUNT_PROVIDERS)[number];
+
+export const VALID_ACCOUNT_PROVIDERS = new Set<string>(ACCOUNT_PROVIDERS);
 
 // ---------------------------------------------------------------------------
 // Secret variants (runtime only — never stored in plaintext)
@@ -53,7 +86,15 @@ export type OAuthSecret = {
   scopes?: string[];
 };
 
-export type CredentialSecret = ApiKeySecret | TokenSecret | OAuthSecret;
+export type SshKeySecret = {
+  kind: "ssh_key";
+  privateKey: string;
+  publicKey?: string;
+  passphrase?: string;
+  fingerprint?: string;
+};
+
+export type CredentialSecret = ApiKeySecret | TokenSecret | OAuthSecret | SshKeySecret;
 
 // ---------------------------------------------------------------------------
 // Access grants & leases
@@ -123,6 +164,63 @@ export type UsageRecord = {
 };
 
 // ---------------------------------------------------------------------------
+// Accounts — group credentials by service identity
+// ---------------------------------------------------------------------------
+
+export type Account = {
+  id: string;
+  name: string;
+  provider: AccountProvider;
+  icon?: string;
+  email?: string;
+  credentialIds: string[];
+  tags: string[];
+  metadata: Record<string, string>;
+  createdAtMs: number;
+  updatedAtMs: number;
+};
+
+export type AccountCreateInput = {
+  name: string;
+  provider: AccountProvider;
+  icon?: string;
+  email?: string;
+  tags?: string[];
+  metadata?: Record<string, string>;
+};
+
+export type AccountPatch = {
+  name?: string;
+  icon?: string;
+  email?: string;
+  tags?: string[];
+  metadata?: Record<string, string>;
+};
+
+// ---------------------------------------------------------------------------
+// Agent credential profiles — map agents to accounts
+// ---------------------------------------------------------------------------
+
+export type AgentAccountBinding = {
+  accountId: string;
+  grantedAtMs: number;
+  grantedBy: string;
+  restrictions?: {
+    credentialIds?: string[];
+    readOnly?: boolean;
+    maxLeaseTtlMs?: number;
+  };
+};
+
+export type AgentCredentialProfile = {
+  agentId: string;
+  accountBindings: AgentAccountBinding[];
+  directGrants: string[];
+  createdAtMs: number;
+  updatedAtMs: number;
+};
+
+// ---------------------------------------------------------------------------
 // Core Credential record
 // ---------------------------------------------------------------------------
 
@@ -134,6 +232,7 @@ export type Credential = {
   description?: string;
   tags?: string[];
   secretRef: string;
+  /** @deprecated Use agent profiles instead. Preserved for backwards compatibility. */
   accessGrants: AccessGrant[];
   activeLeases: CredentialLease[];
   permissionRules: PermissionRule[];
@@ -145,6 +244,11 @@ export type Credential = {
   updatedAtMs: number;
   enabled: boolean;
   migratedFrom?: string;
+  accountId?: string;
+  detectedProvider?: string;
+  secretKind?: SecretKind;
+  validatedAtMs?: number;
+  expiresAtMs?: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -158,6 +262,7 @@ export type CredentialCreateInput = {
   description?: string;
   tags?: string[];
   secret: CredentialSecret;
+  accountId?: string;
 };
 
 export type CredentialPatch = {
@@ -167,6 +272,7 @@ export type CredentialPatch = {
   description?: string;
   tags?: string[];
   enabled?: boolean;
+  accountId?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -197,11 +303,22 @@ export type EncryptedEnvelope = {
   tag: string;
 };
 
-export type CredentialStoreFile = {
+/** v2 store shape (legacy) */
+export type CredentialStoreFileV2 = {
   version: 2;
   credentials: Credential[];
   secrets: Record<string, EncryptedEnvelope>;
   masterKeyCheck: string;
+};
+
+/** v3 store shape (current) — adds accounts and agent profiles */
+export type CredentialStoreFile = {
+  version: 3;
+  credentials: Credential[];
+  secrets: Record<string, EncryptedEnvelope>;
+  masterKeyCheck: string;
+  accounts: Account[];
+  agentProfiles: AgentCredentialProfile[];
 };
 
 // ---------------------------------------------------------------------------
@@ -213,6 +330,16 @@ export type CredentialFilter = {
   provider?: string;
   enabled?: boolean;
   agentId?: string;
+  accountId?: string;
+  limit?: number;
+};
+
+// ---------------------------------------------------------------------------
+// Account filter
+// ---------------------------------------------------------------------------
+
+export type AccountFilter = {
+  provider?: AccountProvider;
   limit?: number;
 };
 

@@ -52,6 +52,8 @@ export type EnforceContext = {
   browserAction?: string;
   filePath?: string;
   recipient?: string;
+  credentialId?: string;
+  credentialCategory?: string;
 };
 
 type SessionEntry = {
@@ -244,6 +246,18 @@ export class TaskPolicyEnforcer {
     const budgetResult = this.checkBudgetLimits(policy, entry.budget, entry.startedAtMs);
     if (!budgetResult.allowed) {
       return budgetResult;
+    }
+
+    // 8. Check credential restrictions
+    if (ctx.credentialId || ctx.credentialCategory) {
+      const credResult = this.checkCredentialRestrictions(
+        policy,
+        ctx.credentialId,
+        ctx.credentialCategory,
+      );
+      if (!credResult.allowed) {
+        return credResult;
+      }
     }
 
     // Record this tool call
@@ -625,5 +639,54 @@ export class TaskPolicyEnforcer {
       }
     }
     return triggeredRuleIds.length > 0;
+  }
+
+  private checkCredentialRestrictions(
+    policy: TaskPolicy,
+    credentialId?: string,
+    credentialCategory?: string,
+  ): EnforceResult {
+    const credPolicy = policy.credentials;
+    if (!credPolicy) {
+      return { allowed: true, action: "allow", triggeredRules: [] };
+    }
+
+    // Check deny list
+    if (credentialId && credPolicy.deny?.length) {
+      if (credPolicy.deny.includes(credentialId)) {
+        return {
+          allowed: false,
+          action: "block",
+          reason: `Credential ${credentialId} is denied by task policy`,
+          triggeredRules: ["credential:deny"],
+        };
+      }
+    }
+
+    // Check allow list (if set, credential must be in it)
+    if (credentialId && credPolicy.allow?.length) {
+      if (!credPolicy.allow.includes(credentialId)) {
+        return {
+          allowed: false,
+          action: "block",
+          reason: `Credential ${credentialId} is not in the allow list`,
+          triggeredRules: ["credential:allow"],
+        };
+      }
+    }
+
+    // Check category restrictions
+    if (credentialCategory && credPolicy.allowCategories?.length) {
+      if (!credPolicy.allowCategories.includes(credentialCategory)) {
+        return {
+          allowed: false,
+          action: "block",
+          reason: `Credential category "${credentialCategory}" is not allowed`,
+          triggeredRules: ["credential:category"],
+        };
+      }
+    }
+
+    return { allowed: true, action: "allow", triggeredRules: [] };
   }
 }
