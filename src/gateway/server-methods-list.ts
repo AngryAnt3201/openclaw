@@ -134,6 +134,15 @@ const BASE_METHODS = [
   "credential.rule.remove",
   "credential.checkout",
   "credential.import",
+  // Pipeline methods
+  "pipeline.list",
+  "pipeline.get",
+  "pipeline.create",
+  "pipeline.update",
+  "pipeline.delete",
+  "pipeline.activate",
+  "pipeline.deactivate",
+  "node.registry.list",
   "system-presence",
   "system-event",
   "send",
@@ -206,6 +215,8 @@ export const GATEWAY_EVENTS = [
   "credential.lease.expired",
   "credential.checkout",
   "credential.checkout.blocked",
+  // Pipeline events
+  "pipeline",
   // Launcher events
   "launcher.created",
   "launcher.updated",

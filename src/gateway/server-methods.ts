@@ -20,6 +20,7 @@ import { logsHandlers } from "./server-methods/logs.js";
 import { modelsHandlers } from "./server-methods/models.js";
 import { nodeHandlers } from "./server-methods/nodes.js";
 import { notificationHandlers } from "./server-methods/notifications.js";
+import { pipelineHandlers } from "./server-methods/pipeline.js";
 import { pluginsHandlers } from "./server-methods/plugins.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
@@ -309,6 +310,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...deviceRegistryHandlers,
   ...workflowHandlers,
   ...credentialHandlers,
+  ...pipelineHandlers,
   ...fileHandlers,
 };
 

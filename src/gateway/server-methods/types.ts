@@ -7,6 +7,8 @@ import type { DeviceService } from "../../devices/service.js";
 import type { LauncherService } from "../../launcher/service.js";
 import type { createSubsystemLogger } from "../../logging/subsystem.js";
 import type { NotificationService } from "../../notifications/service.js";
+import type { NodeRegistry as PipelineNodeRegistry } from "../../pipeline/node-registry.js";
+import type { PipelineService } from "../../pipeline/service.js";
 import type { TaskService } from "../../tasks/service.js";
 import type { VaultService } from "../../vault/service.js";
 import type { WizardSession } from "../../wizard/session.js";
@@ -51,6 +53,9 @@ export type GatewayRequestContext = {
   workflowService?: WorkflowService;
   workflowEngine?: WorkflowEngine;
   workflowStorePath?: string;
+  pipelineService?: PipelineService;
+  pipelineNodeRegistry?: PipelineNodeRegistry;
+  pipelineStorePath?: string;
   loadGatewayModelCatalog: () => Promise<ModelCatalogEntry[]>;
   getHealthCache: () => HealthSummary | null;
   refreshHealthSnapshot: (opts?: { probe?: boolean }) => Promise<HealthSummary>;

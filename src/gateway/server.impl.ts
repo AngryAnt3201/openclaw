@@ -7,6 +7,7 @@ import type { TaskEvent } from "../tasks/types.js";
 import type { ControlUiRootState } from "./control-ui.js";
 import type { startBrowserControlServerIfEnabled } from "./server-browser.js";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
+import { ensureBuiltInAgents } from "../agents/builtin/index.js";
 import { registerSkillsChangeListener } from "../agents/skills/refresh.js";
 import { initSubagentRegistry } from "../agents/subagent-registry.js";
 import { shouldAutoUpdate } from "../agents/task-auto-updates.js";
@@ -44,6 +45,7 @@ import {
 import { scheduleGatewayUpdateCheck } from "../infra/update-startup.js";
 import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/diagnostic.js";
 import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js";
+import { MaestroNodeBridge } from "../maestro/maestro-node-bridge.js";
 import { runOnboardingWizard } from "../wizard/onboarding.js";
 import { startGatewayConfigReloader } from "./config-reload.js";
 import { ExecApprovalManager } from "./exec-approval-manager.js";
@@ -66,6 +68,7 @@ import { hasConnectedMobileNode } from "./server-mobile-nodes.js";
 import { loadGatewayModelCatalog } from "./server-model-catalog.js";
 import { createNodeSubscriptionManager } from "./server-node-subscriptions.js";
 import { buildGatewayNotificationService } from "./server-notifications.js";
+import { buildGatewayPipelineService } from "./server-pipeline.js";
 import { loadGatewayPlugins } from "./server-plugins.js";
 import { createGatewayReloadHandlers } from "./server-reload-handlers.js";
 import { resolveGatewayRuntimeConfig } from "./server-runtime-config.js";
@@ -246,6 +249,16 @@ export async function startGatewayServer(
     }
   }
 
+  // Ensure built-in agents (e.g. Coder) exist in config before anything reads agents.list.
+  {
+    const preCheck = loadConfig();
+    const { config: withBuiltIns, changed } = ensureBuiltInAgents(preCheck);
+    if (changed) {
+      await writeConfigFile(withBuiltIns);
+      log.info("gateway: injected built-in agents into config");
+    }
+  }
+
   const cfgAtStart = loadConfig();
   const diagnosticsEnabled = isDiagnosticsEnabled(cfgAtStart);
   if (diagnosticsEnabled) {
@@ -401,6 +414,11 @@ export async function startGatewayServer(
   const hasMobileNodeConnected = () => hasConnectedMobileNode(nodeRegistry);
   applyGatewayLaneConcurrency(cfgAtStart);
 
+  // Auto-start the Maestro node bridge so local Maestro sessions are
+  // visible as a virtual node in the gateway.
+  const maestroNodeBridge = new MaestroNodeBridge(nodeRegistry, broadcast, log);
+  maestroNodeBridge.start();
+
   let cronState = buildGatewayCronService({
     cfg: cfgAtStart,
     deps,
@@ -483,6 +501,13 @@ export async function startGatewayServer(
     broadcast,
   });
   const { credentialService, storePath: credentialStorePath } = credentialState;
+
+  const pipelineState = buildGatewayPipelineService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+  });
+  const { pipelineService, pipelineNodeRegistry, storePath: pipelineStorePath } = pipelineState;
 
   const channelManager = createChannelManager({
     loadConfig,
@@ -613,6 +638,9 @@ export async function startGatewayServer(
       workflowService,
       workflowEngine,
       workflowStorePath,
+      pipelineService,
+      pipelineNodeRegistry,
+      pipelineStorePath,
       loadGatewayModelCatalog,
       getHealthCache,
       refreshHealthSnapshot: refreshGatewayHealthSnapshot,
@@ -754,6 +782,7 @@ export async function startGatewayServer(
         skillsRefreshTimer = null;
       }
       skillsChangeUnsub();
+      maestroNodeBridge.stop();
       workflowEngine.stop();
       credentialService.stopLeaseExpiryTimer();
       await vaultState.close();
