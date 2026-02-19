@@ -142,6 +142,8 @@ const BASE_METHODS = [
   "pipeline.delete",
   "pipeline.activate",
   "pipeline.deactivate",
+  "pipeline.run",
+  "pipeline.runs",
   "node.registry.list",
   "system-presence",
   "system-event",
