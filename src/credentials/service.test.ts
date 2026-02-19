@@ -438,4 +438,44 @@ describe("CredentialService", () => {
       expect(credential.name).toBe("My Key");
     });
   });
+
+  describe("edge cases", () => {
+    it("should return credential unchanged when revoking non-existent grant", async () => {
+      const cred = await service.create({
+        name: "R",
+        category: "custom",
+        provider: "test",
+        secret: { kind: "api_key", key: "k" },
+      });
+      const result = await service.revokeAccess(cred.id, "nonexistent-agent");
+      expect(result).not.toBeNull();
+      expect(result!.accessGrants).toHaveLength(0);
+    });
+
+    it("should list with category and enabled filters combined", async () => {
+      await service.create({
+        name: "A",
+        category: "ai_provider",
+        provider: "x",
+        secret: { kind: "api_key", key: "k1" },
+      });
+      const b = await service.create({
+        name: "B",
+        category: "ai_provider",
+        provider: "y",
+        secret: { kind: "api_key", key: "k2" },
+      });
+      await service.create({
+        name: "C",
+        category: "channel_bot",
+        provider: "z",
+        secret: { kind: "token", token: "t" },
+      });
+      await service.disable(b.id);
+
+      const result = await service.list({ category: "ai_provider", enabled: true });
+      expect(result).toHaveLength(1);
+      expect(result[0]!.name).toBe("A");
+    });
+  });
 });
