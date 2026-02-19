@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import type { TaskPolicy } from "./task-policy.js";
-import { TaskPolicyEnforcer, type EnforceContext } from "./task-policy-enforcer.js";
+import { TaskPolicyEnforcer } from "./task-policy-enforcer.js";
 
 let enforcer: TaskPolicyEnforcer;
 
