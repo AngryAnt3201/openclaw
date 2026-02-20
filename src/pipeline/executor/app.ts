@@ -111,7 +111,10 @@ async function pollHealth(context: ExecutorContext, appId: string): Promise<void
   const deadline = Date.now() + HEALTH_POLL_MAX_MS;
   while (Date.now() < deadline) {
     await sleep(HEALTH_POLL_INTERVAL_MS);
-    const h = (await context.callGatewayRpc!("launcher.health", { appId })) as {
+    if (!context.callGatewayRpc) {
+      throw new Error("callGatewayRpc not available");
+    }
+    const h = (await context.callGatewayRpc("launcher.health", { appId })) as {
       healthy: boolean;
     } | null;
     if (h?.healthy) {

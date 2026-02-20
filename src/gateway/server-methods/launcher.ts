@@ -259,6 +259,15 @@ export const launcherHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing data (base64)"));
       return;
     }
+    // Server-side size limit: ~384KB base64 ≈ 256KB decoded
+    if (data.length > 512 * 1024) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "icon too large (max 256KB)"),
+      );
+      return;
+    }
     try {
       const { randomUUID } = await import("node:crypto");
       const { mkdir, writeFile } = await import("node:fs/promises");

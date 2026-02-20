@@ -53,6 +53,14 @@ export async function handleAppProxyRequest(
   const appId = proxyMatch[1];
   const subPath = proxyMatch[2] ?? "/";
 
+  // Reject path traversal attempts
+  if (subPath.includes("..")) {
+    res.statusCode = 400;
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ error: "invalid path" }));
+    return true;
+  }
+
   const port = await deps.getAppPort(appId);
   if (!port) {
     res.statusCode = 404;

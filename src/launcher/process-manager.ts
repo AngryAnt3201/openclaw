@@ -37,11 +37,11 @@ export class AppProcessManager {
       throw new Error(`App "${appId}" is already running`);
     }
 
-    const [cmd, ...args] = opts.runCommand.split(/\s+/);
-    const proc = spawn(cmd, args, {
+    const proc = spawn(opts.runCommand, {
       cwd: opts.workingDir,
       env: { ...process.env, ...opts.envVars, PORT: String(opts.port) },
       stdio: ["ignore", "pipe", "pipe"],
+      shell: true,
     });
 
     const entry: TrackedProcess = {
