@@ -152,8 +152,8 @@ function rewriteHtml(html: string, prefix: string): string {
   // Rewrite url(/) in inline styles
   html = html.replace(/(url\(["']?)(\/(?!\/)[^"')]*)/gi, `$1${prefix}$2`);
 
-  // Rewrite import("/...") and import '/...' in inline scripts
-  html = html.replace(/(import\s*\(?\s*["'])(\/(?!\/)[^"']*)/g, `$1${prefix}$2`);
+  // Rewrite import("/..."), import '/...', and from "/..." in inline scripts
+  html = html.replace(/((?:import|from)\s*\(?\s*["'])(\/(?!\/)[^"']*)/g, `$1${prefix}$2`);
 
   // Rewrite fetch("/...") in inline scripts
   html = html.replace(/(fetch\s*\(\s*["'])(\/(?!\/)[^"']*)/g, `$1${prefix}$2`);
