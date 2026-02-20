@@ -13,7 +13,7 @@ export const TRIGGER_NODE_TYPES = ["cron", "webhook", "task_event", "manual"] as
 
 export type TriggerNodeType = (typeof TRIGGER_NODE_TYPES)[number];
 
-export const PROCESSING_NODE_TYPES = ["agent", "condition", "approval", "loop"] as const;
+export const PROCESSING_NODE_TYPES = ["agent", "app", "condition", "approval", "loop"] as const;
 
 export type ProcessingNodeType = (typeof PROCESSING_NODE_TYPES)[number];
 
@@ -81,6 +81,15 @@ export type AgentNodeConfig = {
   timeout?: number;
 };
 
+export type AppNodeConfig = {
+  kind: "app";
+  appId: string;
+  prompt: string;
+  sessionTarget: "main" | "isolated";
+  lifecycle: "keep-alive" | "ephemeral";
+  timeout?: number;
+};
+
 export type ConditionConfig = {
   kind: "condition";
   expression: string;
@@ -137,6 +146,7 @@ export type NodeConfig =
   | TaskEventTriggerConfig
   | ManualTriggerConfig
   | AgentNodeConfig
+  | AppNodeConfig
   | ConditionConfig
   | ApprovalConfig
   | LoopConfig

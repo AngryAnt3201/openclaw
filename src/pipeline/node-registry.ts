@@ -34,7 +34,7 @@ export class NodeRegistry {
     return [...this.defs.values()].filter((d) => d.category === category);
   }
 
-  /** Register all 11 built-in node types. */
+  /** Register all 12 built-in node types. */
   registerBuiltins(): void {
     for (const def of BUILTIN_NODE_DEFINITIONS) {
       this.register(def);
@@ -47,10 +47,10 @@ export class NodeRegistry {
 // ===========================================================================
 
 /**
- * The 11 built-in node definitions, grouped by category.
+ * The 12 built-in node definitions, grouped by category.
  *
  * Trigger nodes (4): cron, webhook, task_event, manual
- * Processing nodes (4): agent, condition, approval, loop
+ * Processing nodes (5): agent, app, condition, approval, loop
  * Action nodes (3): notify, github_action, output
  */
 export const BUILTIN_NODE_DEFINITIONS: readonly NodeDefinition[] = [
@@ -146,6 +146,37 @@ export const BUILTIN_NODE_DEFINITIONS: readonly NodeDefinition[] = [
         type: "select",
         options: ["off", "minimal", "medium", "high"],
         defaultValue: "off",
+      },
+      { key: "timeout", label: "Timeout (s)", type: "number", defaultValue: 300 },
+    ],
+    ports: [
+      { id: "in", label: "Input", type: "input" },
+      { id: "success", label: "Success", type: "output" },
+      { id: "failure", label: "Failure", type: "output" },
+    ],
+  },
+  {
+    type: "app",
+    category: "processing",
+    label: "App",
+    description: "Start a remote app and direct an agent to interact with it.",
+    icon: "app-window",
+    configFields: [
+      { key: "appId", label: "App", type: "string", required: true },
+      { key: "prompt", label: "Prompt", type: "code", required: true },
+      {
+        key: "sessionTarget",
+        label: "Session Target",
+        type: "select",
+        options: ["isolated", "main"],
+        defaultValue: "isolated",
+      },
+      {
+        key: "lifecycle",
+        label: "Lifecycle",
+        type: "select",
+        options: ["keep-alive", "ephemeral"],
+        defaultValue: "keep-alive",
       },
       { key: "timeout", label: "Timeout (s)", type: "number", defaultValue: 300 },
     ],

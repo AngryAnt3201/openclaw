@@ -5,6 +5,11 @@
 export type AppCategory = "native" | "dev-server" | "web-embed" | "custom" | "service" | "script";
 export type LaunchStatus = "stopped" | "starting" | "running" | "error";
 
+export type AppIcon =
+  | { type: "emoji"; emoji: string }
+  | { type: "upload"; fileId: string }
+  | { type: "auto"; bundleId?: string };
+
 // ---------------------------------------------------------------------------
 // LaunchableApp – full entity (superset of frontend LaunchableApp)
 // ---------------------------------------------------------------------------
