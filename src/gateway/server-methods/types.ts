@@ -4,6 +4,7 @@ import type { HealthSummary } from "../../commands/health.js";
 import type { CredentialService } from "../../credentials/service.js";
 import type { CronService } from "../../cron/service.js";
 import type { DeviceService } from "../../devices/service.js";
+import type { AppProcessManager } from "../../launcher/process-manager.js";
 import type { LauncherService } from "../../launcher/service.js";
 import type { createSubsystemLogger } from "../../logging/subsystem.js";
 import type { NotificationService } from "../../notifications/service.js";
@@ -44,6 +45,7 @@ export type GatewayRequestContext = {
   notificationStorePath?: string;
   launcherService: LauncherService;
   launcherStorePath: string;
+  processManager?: AppProcessManager;
   deviceService?: DeviceService;
   deviceStorePath?: string;
   credentialService?: CredentialService;
@@ -103,7 +105,7 @@ export type GatewayRequestContext = {
   wizardSessions: Map<string, WizardSession>;
   findRunningWizard: () => string | null;
   purgeWizardSession: (id: string) => void;
-  getRuntimeSnapshot: () => ChannelRuntimeSnapshot;
+  getRuntimeSnapshot: () => Promise<ChannelRuntimeSnapshot>;
   startChannel: (
     channel: import("../../channels/plugins/types.js").ChannelId,
     accountId?: string,

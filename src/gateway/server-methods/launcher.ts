@@ -162,4 +162,91 @@ export const launcherHandlers: GatewayRequestHandlers = {
     const apps = await context.launcherService.getDiscoveredApps();
     respond(true, { apps }, undefined);
   },
+
+  // -------------------------------------------------------------------------
+  // launcher.start — start a remote app via process manager
+  // -------------------------------------------------------------------------
+  "launcher.start": async ({ params, respond, context }) => {
+    const appId = requireString(params, "appId") ?? requireString(params, "id");
+    if (!appId) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing appId"));
+      return;
+    }
+    const app = await context.launcherService.get(appId);
+    if (!app) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, `app not found: ${appId}`));
+      return;
+    }
+    if (!app.run_command || !app.working_dir) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "app has no run_command or working_dir"),
+      );
+      return;
+    }
+    if (!context.processManager) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, "process manager not available"),
+      );
+      return;
+    }
+    try {
+      const result = await context.processManager.start(appId, {
+        runCommand: app.run_command,
+        workingDir: app.working_dir,
+        port: app.port ?? 3000,
+        envVars: app.env_vars ?? undefined,
+        healthCheckUrl: app.health_check_url ?? undefined,
+      });
+      await context.launcherService.update(appId, { status: "starting" });
+      const proxyUrl = `http://localhost:18789/app-proxy/${appId}/`;
+      respond(true, { ...result, proxyUrl }, undefined);
+    } catch (err) {
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, String(err)));
+    }
+  },
+
+  // -------------------------------------------------------------------------
+  // launcher.stop — stop a remote app
+  // -------------------------------------------------------------------------
+  "launcher.stop": async ({ params, respond, context }) => {
+    const appId = requireString(params, "appId") ?? requireString(params, "id");
+    if (!appId) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing appId"));
+      return;
+    }
+    if (!context.processManager) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, "process manager not available"),
+      );
+      return;
+    }
+    const stopped = context.processManager.stop(appId);
+    if (stopped) {
+      await context.launcherService.update(appId, { status: "stopped" });
+    }
+    respond(true, { stopped, status: stopped ? "stopped" : "not_running" }, undefined);
+  },
+
+  // -------------------------------------------------------------------------
+  // launcher.health — check app health
+  // -------------------------------------------------------------------------
+  "launcher.health": async ({ params, respond, context }) => {
+    const appId = requireString(params, "appId") ?? requireString(params, "id");
+    if (!appId) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing appId"));
+      return;
+    }
+    if (!context.processManager) {
+      respond(true, { healthy: false, reason: "process manager not available" }, undefined);
+      return;
+    }
+    const health = context.processManager.health(appId);
+    respond(true, health ?? { healthy: false, reason: "not tracked" }, undefined);
+  },
 };
