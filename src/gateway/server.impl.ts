@@ -348,6 +348,11 @@ export async function startGatewayServer(
   const { wizardSessions, findRunningWizard, purgeWizardSession } = createWizardSessionTracker();
 
   const deps = createDefaultDeps();
+  // Mutable holder so the deferred getAppPort callback can reference the
+  // launcher service before its `let` declaration (avoids TDZ issues).
+  const launcherRef: { service: import("../launcher/service.js").LauncherService | null } = {
+    service: null,
+  };
   let canvasHostServer: CanvasHostServer | null = null;
   const gatewayTls = await loadGatewayTlsRuntime(cfgAtStart.gateway?.tls, log.child("tls"));
   if (cfgAtStart.gateway?.tls?.enabled && !gatewayTls.enabled) {
@@ -393,6 +398,16 @@ export async function startGatewayServer(
     log,
     logHooks,
     logPlugins,
+    getAppPort: async (appId: string) => {
+      // Deferred: launcherRef is populated after runtime state init but
+      // will be available by the time any HTTP request arrives.
+      const svc = launcherRef.service;
+      if (!svc) {
+        return null;
+      }
+      const app = await svc.get(appId);
+      return app?.port ?? null;
+    },
   });
   let bonjourStop: (() => Promise<void>) | null = null;
   const nodeRegistry = new NodeRegistry();
@@ -481,6 +496,7 @@ export async function startGatewayServer(
     broadcast,
   });
   let { launcherService, storePath: launcherStorePath } = launcherState;
+  launcherRef.service = launcherService;
   const processManager = new AppProcessManager();
 
   const deviceState = buildGatewayDeviceService({
