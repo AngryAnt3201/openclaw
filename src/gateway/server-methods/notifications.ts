@@ -232,4 +232,21 @@ export const notificationHandlers: GatewayRequestHandlers = {
     const preferences = await context.notificationService.updatePreferences(patch);
     respond(true, preferences, undefined);
   },
+
+  // -------------------------------------------------------------------------
+  // notification.channels.list
+  // -------------------------------------------------------------------------
+  "notification.channels.list": async ({ respond, context }) => {
+    if (!context.notificationService) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "notifications not enabled"),
+      );
+      return;
+    }
+    const preferences = await context.notificationService.getPreferences();
+    const channels = preferences.defaultChannels ?? [];
+    respond(true, { channels }, undefined);
+  },
 };
