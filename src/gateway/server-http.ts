@@ -43,6 +43,7 @@ import { getBearerToken, getHeader } from "./http-utils.js";
 import { resolveGatewayClientIp } from "./net.js";
 import { handleOpenAiHttpRequest } from "./openai-http.js";
 import { handleOpenResponsesHttpRequest } from "./openresponses-http.js";
+import { handleAppProxyRequest } from "./server-app-proxy.js";
 import { handleToolsInvokeHttpRequest } from "./tools-invoke-http.js";
 
 type SubsystemLogger = ReturnType<typeof createSubsystemLogger>;
@@ -284,6 +285,7 @@ export function createGatewayHttpServer(opts: {
   openResponsesConfig?: import("../config/types.gateway.js").GatewayHttpResponsesConfig;
   handleHooksRequest: HooksRequestHandler;
   handlePluginRequest?: HooksRequestHandler;
+  getAppPort?: (appId: string) => Promise<number | null>;
   resolvedAuth: ResolvedGatewayAuth;
   tlsOptions?: TlsOptions;
 }): HttpServer {
@@ -332,6 +334,12 @@ export function createGatewayHttpServer(opts: {
         return;
       }
       if (handlePluginRequest && (await handlePluginRequest(req, res))) {
+        return;
+      }
+      if (
+        opts.getAppPort &&
+        (await handleAppProxyRequest(req, res, { getAppPort: opts.getAppPort }))
+      ) {
         return;
       }
       if (openResponsesEnabled) {

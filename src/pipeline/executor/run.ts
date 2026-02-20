@@ -17,6 +17,7 @@ import { PipelineEngine } from "../engine.js";
 import { VALID_TRIGGER_NODE_TYPES } from "../types.js";
 import { executeNotifyNode, executeGithubNode, executeOutputNode } from "./action.js";
 import { executeAgentNode } from "./agent.js";
+import { executeAppNode } from "./app.js";
 import { executeConditionNode } from "./condition.js";
 
 // ---------------------------------------------------------------------------
@@ -54,6 +55,7 @@ export type RunEventCallback = (event: RunEvent) => void;
 
 const NODE_EXECUTORS: Record<string, NodeExecutorFn> = {
   agent: executeAgentNode,
+  app: executeAppNode,
   condition: executeConditionNode,
   notify: executeNotifyNode,
   github_action: executeGithubNode,
