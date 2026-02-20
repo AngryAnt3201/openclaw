@@ -176,6 +176,7 @@ export async function createGatewayRuntimeState(params: {
       canvasHost,
       clients,
       resolvedAuth: params.resolvedAuth,
+      getAppPort: params.getAppPort,
     });
   }
 

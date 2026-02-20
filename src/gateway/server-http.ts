@@ -423,10 +423,45 @@ export function attachGatewayUpgradeHandler(opts: {
   canvasHost: CanvasHostHandler | null;
   clients: Set<GatewayWsClient>;
   resolvedAuth: ResolvedGatewayAuth;
+  getAppPort?: (appId: string) => Promise<number | null>;
 }) {
   const { httpServer, wss, canvasHost, clients, resolvedAuth } = opts;
   httpServer.on("upgrade", (req, socket, head) => {
     void (async () => {
+      // Proxy WebSocket upgrades for /app-proxy/{appId}/... (e.g. Vite HMR)
+      if (opts.getAppPort) {
+        const url = new URL(req.url ?? "/", "http://localhost");
+        const proxyMatch = url.pathname.match(/^\/app-proxy\/([^/]+)(\/.*)?$/);
+        if (proxyMatch) {
+          const appId = proxyMatch[1];
+          const subPath = proxyMatch[2] ?? "/";
+          const port = await opts.getAppPort(appId);
+          if (port) {
+            const { createConnection } = await import("node:net");
+            const upstream = createConnection({ host: "127.0.0.1", port }, () => {
+              // Forward the original HTTP upgrade request to the upstream server
+              const reqLine = `${req.method} ${subPath}${url.search} HTTP/1.1\r\n`;
+              const headers = Object.entries(req.headers)
+                .filter(([k]) => k !== "host")
+                .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+                .join("\r\n");
+              upstream.write(`${reqLine}host: 127.0.0.1:${port}\r\n${headers}\r\n\r\n`);
+              if (head.length > 0) {
+                upstream.write(head);
+              }
+              socket.pipe(upstream);
+              upstream.pipe(socket);
+            });
+            upstream.on("error", () => socket.destroy());
+            socket.on("error", () => upstream.destroy());
+            return;
+          }
+          socket.write("HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n");
+          socket.destroy();
+          return;
+        }
+      }
+
       if (canvasHost) {
         const url = new URL(req.url ?? "/", "http://localhost");
         if (url.pathname === CANVAS_WS_PATH) {
