@@ -45,5 +45,21 @@ export function buildGatewayLauncherService(params: {
     },
   });
 
+  // On gateway startup, no app processes are running (process manager is fresh).
+  // Reset any stale "starting"/"running" statuses to "stopped".
+  launcherService.list({}).then(
+    (apps) => {
+      for (const app of apps) {
+        if (app.status === "starting" || app.status === "running") {
+          launcherService
+            .update(app.id, { status: "stopped" })
+            .then(() => launcherLogger.info(`reset stale status for "${app.name}" → stopped`))
+            .catch(() => {});
+        }
+      }
+    },
+    () => {},
+  );
+
   return { launcherService, storePath };
 }
