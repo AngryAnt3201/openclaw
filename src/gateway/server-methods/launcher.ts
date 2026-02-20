@@ -249,4 +249,30 @@ export const launcherHandlers: GatewayRequestHandlers = {
     const health = context.processManager.health(appId);
     respond(true, health ?? { healthy: false, reason: "not tracked" }, undefined);
   },
+
+  // -------------------------------------------------------------------------
+  // launcher.icon.upload — save uploaded icon file
+  // -------------------------------------------------------------------------
+  "launcher.icon.upload": async ({ params, respond }) => {
+    const data = params.data as string | undefined;
+    if (!data) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing data (base64)"));
+      return;
+    }
+    try {
+      const { randomUUID } = await import("node:crypto");
+      const { mkdir, writeFile } = await import("node:fs/promises");
+      const { join } = await import("node:path");
+      const { homedir } = await import("node:os");
+      const iconsDir = join(homedir(), ".openclaw", "icons");
+      await mkdir(iconsDir, { recursive: true });
+      const fileId = randomUUID();
+      const filePath = join(iconsDir, `${fileId}.png`);
+      const buffer = Buffer.from(data, "base64");
+      await writeFile(filePath, buffer);
+      respond(true, { fileId }, undefined);
+    } catch (err) {
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, String(err)));
+    }
+  },
 };
