@@ -201,7 +201,7 @@ export const launcherHandlers: GatewayRequestHandlers = {
         envVars: app.env_vars ?? undefined,
         healthCheckUrl: app.health_check_url ?? undefined,
       });
-      await context.launcherService.update(appId, { status: "starting" });
+      await context.launcherService.update(appId, { status: result.status });
       const proxyUrl = `http://localhost:18789/app-proxy/${appId}/`;
       respond(true, { ...result, proxyUrl }, undefined);
     } catch (err) {
