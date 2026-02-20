@@ -43,6 +43,7 @@ import {
   setSkillsRemoteRegistry,
 } from "../infra/skills-remote.js";
 import { scheduleGatewayUpdateCheck } from "../infra/update-startup.js";
+import { AppProcessManager } from "../launcher/process-manager.js";
 import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/diagnostic.js";
 import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js";
 import { MaestroNodeBridge } from "../maestro/maestro-node-bridge.js";
@@ -480,6 +481,7 @@ export async function startGatewayServer(
     broadcast,
   });
   let { launcherService, storePath: launcherStorePath } = launcherState;
+  const processManager = new AppProcessManager();
 
   const deviceState = buildGatewayDeviceService({
     cfg: cfgAtStart,
@@ -502,6 +504,41 @@ export async function startGatewayServer(
   });
   const { credentialService, storePath: credentialStorePath } = credentialState;
 
+  // Run V2 channel token migration (creates credential accounts for plaintext tokens)
+  try {
+    const { migrateChannelTokensV2 } = await import("../credentials/migration.js");
+    const migrationResult = await migrateChannelTokensV2({
+      service: credentialService,
+      cfg: cfgAtStart,
+      log: { info: log.info.bind(log), warn: log.warn.bind(log) },
+    });
+    if (migrationResult.mappings.length > 0) {
+      // Write credentialAccountId back to config
+      let updatedCfg = loadConfig();
+      for (const mapping of migrationResult.mappings) {
+        const channels = (updatedCfg.channels ?? {}) as Record<string, Record<string, unknown>>;
+        const section = channels[mapping.channel];
+        if (!section) {
+          continue;
+        }
+        if (mapping.accountKey === "default") {
+          section.credentialAccountId = mapping.credentialAccountId;
+        } else {
+          const accounts = section.accounts as Record<string, Record<string, unknown>> | undefined;
+          if (accounts?.[mapping.accountKey]) {
+            accounts[mapping.accountKey]!.credentialAccountId = mapping.credentialAccountId;
+          }
+        }
+      }
+      writeConfigFile(updatedCfg);
+      log.info("wrote credentialAccountId mappings to config");
+    }
+  } catch (err) {
+    log.warn(
+      `channel token migration V2 failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   const pipelineState = buildGatewayPipelineService({
     cfg: cfgAtStart,
     deps,
@@ -513,6 +550,7 @@ export async function startGatewayServer(
     loadConfig,
     channelLogs,
     channelRuntimeEnvs,
+    credentialService,
   });
   const { getRuntimeSnapshot, startChannels, startChannel, stopChannel, markChannelLoggedOut } =
     channelManager;
@@ -629,6 +667,7 @@ export async function startGatewayServer(
       notificationStorePath,
       launcherService,
       launcherStorePath,
+      processManager,
       deviceService,
       deviceStorePath,
       credentialService,
@@ -786,6 +825,7 @@ export async function startGatewayServer(
       workflowEngine.stop();
       credentialService.stopLeaseExpiryTimer();
       await vaultState.close();
+      processManager.shutdownAll();
       await close(opts);
     },
   };
