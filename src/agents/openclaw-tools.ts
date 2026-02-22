@@ -27,9 +27,10 @@ import { createTaskTool } from "./tools/task-tool.js";
 import { createTtsTool } from "./tools/tts-tool.js";
 import { createVaultTool } from "./tools/vault-tool.js";
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
+import { createWidgetTool } from "./tools/widget-tool.js";
 import { createWorkflowTool } from "./tools/workflow-tool.js";
 
-export function createOpenClawTools(options?: {
+export async function createOpenClawTools(options?: {
   sandboxBrowserBridgeUrl?: string;
   allowHostBrowserControl?: boolean;
   agentSessionKey?: string;
@@ -67,7 +68,7 @@ export function createOpenClawTools(options?: {
   requireExplicitMessageTarget?: boolean;
   /** If true, omit the message tool from the tool list. */
   disableMessageTool?: boolean;
-}): AnyAgentTool[] {
+}): Promise<AnyAgentTool[]> {
   const imageTool = options?.agentDir?.trim()
     ? createImageTool({
         config: options?.config,
@@ -86,7 +87,7 @@ export function createOpenClawTools(options?: {
   });
   const messageTool = options?.disableMessageTool
     ? null
-    : createMessageTool({
+    : await createMessageTool({
         agentAccountId: options?.agentAccountId,
         agentSessionKey: options?.agentSessionKey,
         config: options?.config,
@@ -180,6 +181,9 @@ export function createOpenClawTools(options?: {
       agentSessionKey: options?.agentSessionKey,
     }),
     createCredentialTool({
+      agentSessionKey: options?.agentSessionKey,
+    }),
+    createWidgetTool({
       agentSessionKey: options?.agentSessionKey,
     }),
   ];
