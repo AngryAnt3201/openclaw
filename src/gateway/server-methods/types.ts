@@ -4,6 +4,7 @@ import type { HealthSummary } from "../../commands/health.js";
 import type { CredentialService } from "../../credentials/service.js";
 import type { CronService } from "../../cron/service.js";
 import type { DeviceService } from "../../devices/service.js";
+import type { AppPortProxy } from "../../launcher/port-proxy.js";
 import type { AppProcessManager } from "../../launcher/process-manager.js";
 import type { LauncherService } from "../../launcher/service.js";
 import type { createSubsystemLogger } from "../../logging/subsystem.js";
@@ -12,6 +13,7 @@ import type { NodeRegistry as PipelineNodeRegistry } from "../../pipeline/node-r
 import type { PipelineService } from "../../pipeline/service.js";
 import type { TaskService } from "../../tasks/service.js";
 import type { VaultService } from "../../vault/service.js";
+import type { WidgetService } from "../../widgets/service.js";
 import type { WizardSession } from "../../wizard/session.js";
 import type { WorkflowEngine } from "../../workflow/engine.js";
 import type { WorkflowService } from "../../workflow/service.js";
@@ -46,6 +48,8 @@ export type GatewayRequestContext = {
   launcherService: LauncherService;
   launcherStorePath: string;
   processManager?: AppProcessManager;
+  portProxy?: AppPortProxy;
+  externalBindIp?: string | null;
   deviceService?: DeviceService;
   deviceStorePath?: string;
   credentialService?: CredentialService;
@@ -58,6 +62,8 @@ export type GatewayRequestContext = {
   pipelineService?: PipelineService;
   pipelineNodeRegistry?: PipelineNodeRegistry;
   pipelineStorePath?: string;
+  widgetService?: WidgetService;
+  widgetStorePath?: string;
   loadGatewayModelCatalog: () => Promise<ModelCatalogEntry[]>;
   getHealthCache: () => HealthSummary | null;
   refreshHealthSnapshot: (opts?: { probe?: boolean }) => Promise<HealthSummary>;

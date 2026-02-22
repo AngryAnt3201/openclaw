@@ -43,6 +43,7 @@ import {
   setSkillsRemoteRegistry,
 } from "../infra/skills-remote.js";
 import { scheduleGatewayUpdateCheck } from "../infra/update-startup.js";
+import { AppPortProxy, resolveExternalBindIp } from "../launcher/port-proxy.js";
 import { AppProcessManager } from "../launcher/process-manager.js";
 import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/diagnostic.js";
 import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js";
@@ -80,6 +81,7 @@ import { startGatewaySidecars } from "./server-startup.js";
 import { startGatewayTailscaleExposure } from "./server-tailscale.js";
 import { buildGatewayTaskService } from "./server-tasks.js";
 import { buildGatewayVaultService } from "./server-vault.js";
+import { buildGatewayWidgetService } from "./server-widgets.js";
 import { createWizardSessionTracker } from "./server-wizard-sessions.js";
 import { buildGatewayWorkflowService } from "./server-workflow.js";
 import { attachGatewayWsHandlers } from "./server-ws-runtime.js";
@@ -348,11 +350,6 @@ export async function startGatewayServer(
   const { wizardSessions, findRunningWizard, purgeWizardSession } = createWizardSessionTracker();
 
   const deps = createDefaultDeps();
-  // Mutable holder so the deferred getAppPort callback can reference the
-  // launcher service before its `let` declaration (avoids TDZ issues).
-  const launcherRef: { service: import("../launcher/service.js").LauncherService | null } = {
-    service: null,
-  };
   let canvasHostServer: CanvasHostServer | null = null;
   const gatewayTls = await loadGatewayTlsRuntime(cfgAtStart.gateway?.tls, log.child("tls"));
   if (cfgAtStart.gateway?.tls?.enabled && !gatewayTls.enabled) {
@@ -398,16 +395,6 @@ export async function startGatewayServer(
     log,
     logHooks,
     logPlugins,
-    getAppPort: async (appId: string) => {
-      // Deferred: launcherRef is populated after runtime state init but
-      // will be available by the time any HTTP request arrives.
-      const svc = launcherRef.service;
-      if (!svc) {
-        return null;
-      }
-      const app = await svc.get(appId);
-      return app?.port ?? null;
-    },
   });
   let bonjourStop: (() => Promise<void>) | null = null;
   const nodeRegistry = new NodeRegistry();
@@ -496,8 +483,9 @@ export async function startGatewayServer(
     broadcast,
   });
   let { launcherService, storePath: launcherStorePath } = launcherState;
-  launcherRef.service = launcherService;
   const processManager = new AppProcessManager();
+  const portProxy = new AppPortProxy();
+  const externalBindIp = resolveExternalBindIp(bindHost);
 
   const deviceState = buildGatewayDeviceService({
     cfg: cfgAtStart,
@@ -561,6 +549,13 @@ export async function startGatewayServer(
     broadcast,
   });
   const { pipelineService, pipelineNodeRegistry, storePath: pipelineStorePath } = pipelineState;
+
+  const widgetState = buildGatewayWidgetService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+  });
+  const { widgetService, storePath: widgetStorePath } = widgetState;
 
   const channelManager = createChannelManager({
     loadConfig,
@@ -684,6 +679,8 @@ export async function startGatewayServer(
       launcherService,
       launcherStorePath,
       processManager,
+      portProxy,
+      externalBindIp,
       deviceService,
       deviceStorePath,
       credentialService,
@@ -696,6 +693,8 @@ export async function startGatewayServer(
       pipelineService,
       pipelineNodeRegistry,
       pipelineStorePath,
+      widgetService,
+      widgetStorePath,
       loadGatewayModelCatalog,
       getHealthCache,
       refreshHealthSnapshot: refreshGatewayHealthSnapshot,
@@ -841,6 +840,7 @@ export async function startGatewayServer(
       workflowEngine.stop();
       credentialService.stopLeaseExpiryTimer();
       await vaultState.close();
+      portProxy.destroyAll();
       processManager.shutdownAll();
       await close(opts);
     },

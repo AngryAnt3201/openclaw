@@ -36,6 +36,7 @@ import { usageHandlers } from "./server-methods/usage.js";
 import { vaultHandlers } from "./server-methods/vault.js";
 import { voicewakeHandlers } from "./server-methods/voicewake.js";
 import { webHandlers } from "./server-methods/web.js";
+import { widgetHandlers } from "./server-methods/widgets.js";
 import { wizardHandlers } from "./server-methods/wizard.js";
 import { workflowHandlers } from "./server-methods/workflow.js";
 
@@ -315,6 +316,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...accountHandlers,
   ...agentProfileHandlers,
   ...pipelineHandlers,
+  ...widgetHandlers,
   ...fileHandlers,
 };
 
