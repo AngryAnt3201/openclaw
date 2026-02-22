@@ -232,18 +232,15 @@ export type WidgetInstancePatch = {
 // ---------------------------------------------------------------------------
 
 export type WidgetRegistryFile = {
-  version: 1;
-  definitions: Record<string, WidgetDefinition>;
+  definitions: WidgetDefinition[];
 };
 
 export type WidgetInstancesFile = {
-  version: 1;
-  instances: Record<string, WidgetInstance>;
+  instances: WidgetInstance[];
 };
 
 export type DataSourcesFile = {
-  version: 1;
-  sources: Record<string, DataSource>;
+  sources: DataSource[];
 };
 
 // ---------------------------------------------------------------------------
@@ -251,15 +248,15 @@ export type DataSourcesFile = {
 // ---------------------------------------------------------------------------
 
 export const WIDGET_EVENT_TYPES = [
-  "widget:registered",
-  "widget:unregistered",
-  "widget:spawned",
-  "widget:destroyed",
-  "widget:updated",
-  "widget:moved",
-  "widget:resized",
-  "widget:data",
-  "datasource:updated",
+  "widget.definition.created",
+  "widget.definition.deleted",
+  "widget.instance.spawned",
+  "widget.instance.dismissed",
+  "widget.instance.updated",
+  "widget.data.pushed",
+  "widget.stream.created",
+  "widget.stream.pushed",
+  "widget.stream.deleted",
 ] as const;
 
 export type WidgetEventType = (typeof WIDGET_EVENT_TYPES)[number];
