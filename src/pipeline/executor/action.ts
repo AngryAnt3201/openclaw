@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
-// Pipeline Executor – Action Nodes (notify, github_action, output)
+// Pipeline Executor – Action Nodes (notify, output)
 // ---------------------------------------------------------------------------
 
-import type { GithubActionConfig, NotifyConfig, OutputConfig, PipelineNode } from "../types.js";
+import type { NotifyConfig, OutputConfig, PipelineNode } from "../types.js";
 import type { ExecutorContext, NodeExecutionResult, NodeExecutorFn } from "./types.js";
 
 // ===========================================================================
@@ -60,81 +60,6 @@ export const executeNotifyNode: NodeExecutorFn = async (
     };
   } catch (err) {
     context.log?.error("Pipeline notify node failed:", err);
-    return {
-      status: "failure",
-      error: err instanceof Error ? err.message : String(err),
-      durationMs: Date.now() - startMs,
-    };
-  }
-};
-
-// ===========================================================================
-// GitHub Action Node
-// ===========================================================================
-
-/** Maps pipeline github_action actions to gateway RPC methods. */
-const GITHUB_ACTION_RPC_MAP: Record<string, string> = {
-  create_issue: "issue.create",
-  create_pr: "pr.create",
-  comment: "pr.comment",
-  label: "issue.label",
-  merge: "pr.merge",
-};
-
-export const executeGithubNode: NodeExecutorFn = async (
-  node: PipelineNode,
-  input: unknown,
-  context: ExecutorContext,
-): Promise<NodeExecutionResult> => {
-  const startMs = Date.now();
-  const config = node.config as GithubActionConfig;
-
-  if (!config.action) {
-    return {
-      status: "failure",
-      error: "GitHub action node requires an action",
-      durationMs: Date.now() - startMs,
-    };
-  }
-
-  if (!context.callGatewayRpc) {
-    return {
-      status: "failure",
-      error: "callGatewayRpc not available in executor context",
-      durationMs: Date.now() - startMs,
-    };
-  }
-
-  const rpcMethod = GITHUB_ACTION_RPC_MAP[config.action];
-  if (!rpcMethod) {
-    return {
-      status: "failure",
-      error: `Unknown GitHub action: ${config.action}`,
-      durationMs: Date.now() - startMs,
-    };
-  }
-
-  try {
-    // Merge upstream input into params when available.
-    const params = {
-      ...config.params,
-      ...(config.repo ? { repo: config.repo } : {}),
-    };
-
-    // If the upstream node produced output, make it available in params.
-    if (input !== undefined && input !== null) {
-      (params as Record<string, unknown>).__pipelineInput = input;
-    }
-
-    const result = await context.callGatewayRpc(rpcMethod, params);
-
-    return {
-      status: "success",
-      output: result,
-      durationMs: Date.now() - startMs,
-    };
-  } catch (err) {
-    context.log?.error("Pipeline GitHub node failed:", err);
     return {
       status: "failure",
       error: err instanceof Error ? err.message : String(err),

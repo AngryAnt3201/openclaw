@@ -34,7 +34,7 @@ export class NodeRegistry {
     return [...this.defs.values()].filter((d) => d.category === category);
   }
 
-  /** Register all 12 built-in node types. */
+  /** Register all 11 built-in node types. */
   registerBuiltins(): void {
     for (const def of BUILTIN_NODE_DEFINITIONS) {
       this.register(def);
@@ -47,11 +47,11 @@ export class NodeRegistry {
 // ===========================================================================
 
 /**
- * The 12 built-in node definitions, grouped by category.
+ * The 11 built-in node definitions, grouped by category.
  *
  * Trigger nodes (4): cron, webhook, task_event, manual
  * Processing nodes (5): agent, app, condition, approval, loop
- * Action nodes (3): notify, github_action, output
+ * Action nodes (2): notify, output
  */
 export const BUILTIN_NODE_DEFINITIONS: readonly NodeDefinition[] = [
   // -------------------------------------------------------------------------
@@ -267,27 +267,6 @@ export const BUILTIN_NODE_DEFINITIONS: readonly NodeDefinition[] = [
         options: ["low", "medium", "high", "critical"],
         defaultValue: "medium",
       },
-    ],
-    ports: [
-      { id: "in", label: "Input", type: "input" },
-      { id: "out", label: "Output", type: "output" },
-    ],
-  },
-  {
-    type: "github_action",
-    category: "action",
-    label: "GitHub Action",
-    description: "Perform a GitHub operation such as creating a PR, issue, or comment.",
-    icon: "github",
-    configFields: [
-      {
-        key: "action",
-        label: "Action",
-        type: "select",
-        required: true,
-        options: ["create_pr", "merge", "comment", "create_issue", "label"],
-      },
-      { key: "params", label: "Params", type: "code" },
     ],
     ports: [
       { id: "in", label: "Input", type: "input" },

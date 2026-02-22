@@ -128,9 +128,9 @@ describe("NodeRegistry", () => {
       expect(processing.length).toBeGreaterThanOrEqual(4);
     });
 
-    it("provides at least 3 action nodes", () => {
+    it("provides at least 2 action nodes", () => {
       const actions = registry.listByCategory("action");
-      expect(actions.length).toBeGreaterThanOrEqual(3);
+      expect(actions.length).toBeGreaterThanOrEqual(2);
     });
 
     it("registers exactly 11 built-in types", () => {
@@ -185,10 +185,10 @@ describe("NodeRegistry", () => {
         .toSorted();
       expect(types).toEqual([
         "agent",
+        "app",
         "approval",
         "condition",
         "cron",
-        "github_action",
         "loop",
         "manual",
         "notify",

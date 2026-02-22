@@ -29,11 +29,6 @@ vi.mock("./action.js", () => ({
     output: { notified: true },
     durationMs: 20,
   }),
-  executeGithubNode: vi.fn().mockResolvedValue({
-    status: "success",
-    output: { github: "ok" },
-    durationMs: 30,
-  }),
   executeOutputNode: vi.fn().mockResolvedValue({
     status: "success",
     output: { formatted: "done" },
@@ -42,7 +37,7 @@ vi.mock("./action.js", () => ({
 }));
 
 import type { ExecutorContext } from "./types.js";
-import { executeNotifyNode, executeGithubNode, executeOutputNode } from "./action.js";
+import { executeNotifyNode, executeOutputNode } from "./action.js";
 import { executeAgentNode } from "./agent.js";
 import { executeConditionNode } from "./condition.js";
 import { executePipeline } from "./run.js";
@@ -50,7 +45,6 @@ import { executePipeline } from "./run.js";
 const mockAgent = vi.mocked(executeAgentNode);
 const mockCondition = vi.mocked(executeConditionNode);
 const mockNotify = vi.mocked(executeNotifyNode);
-const mockGithub = vi.mocked(executeGithubNode);
 const mockOutput = vi.mocked(executeOutputNode);
 
 // ---------------------------------------------------------------------------
@@ -156,11 +150,6 @@ beforeEach(() => {
     status: "success",
     output: { notified: true },
     durationMs: 20,
-  });
-  mockGithub.mockResolvedValue({
-    status: "success",
-    output: { github: "ok" },
-    durationMs: 30,
   });
   mockOutput.mockResolvedValue({
     status: "success",
@@ -637,7 +626,6 @@ describe("Edge cases", () => {
     expect(mockCondition).not.toHaveBeenCalled();
     expect(mockNotify).not.toHaveBeenCalled();
     expect(mockOutput).not.toHaveBeenCalled();
-    expect(mockGithub).not.toHaveBeenCalled();
 
     // No nodeResults since triggers are silently skipped via continue.
     expect(result.nodeResults).toHaveLength(0);

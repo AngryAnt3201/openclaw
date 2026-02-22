@@ -124,15 +124,17 @@ const prReviewNodes: PipelineNode[] = [
   },
   {
     id: "pr-comment",
-    type: "github_action",
+    type: "agent",
     label: "Post Review Comment",
     position: { x: 640, y: 200 },
     config: {
-      kind: "github_action",
-      action: "comment",
-      params: {
-        body: "{{output}}",
-      },
+      kind: "agent",
+      prompt:
+        "Post the code review as a comment on the pull request using the github tool's comment action.",
+      skills: ["coding"],
+      credentials: [],
+      sessionTarget: "isolated",
+      timeout: 60,
     },
     state: idleState(),
   },
@@ -290,17 +292,17 @@ const issueAutomationNodes: PipelineNode[] = [
   },
   {
     id: "issue-pr",
-    type: "github_action",
+    type: "agent",
     label: "Create PR",
     position: { x: 640, y: 200 },
     config: {
-      kind: "github_action",
-      action: "create_pr",
-      params: {
-        title: "{{output.title}}",
-        body: "{{output.body}}",
-        draft: false,
-      },
+      kind: "agent",
+      prompt:
+        "Create a pull request using the github tool's create_pr action with the generated title and description.",
+      skills: ["coding"],
+      credentials: [],
+      sessionTarget: "isolated",
+      timeout: 120,
     },
     state: idleState(),
   },

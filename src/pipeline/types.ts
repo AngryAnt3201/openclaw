@@ -17,7 +17,7 @@ export const PROCESSING_NODE_TYPES = ["agent", "app", "condition", "approval", "
 
 export type ProcessingNodeType = (typeof PROCESSING_NODE_TYPES)[number];
 
-export const ACTION_NODE_TYPES = ["notify", "github_action", "output"] as const;
+export const ACTION_NODE_TYPES = ["notify", "output"] as const;
 
 export type ActionNodeType = (typeof ACTION_NODE_TYPES)[number];
 
@@ -122,13 +122,6 @@ export type NotifyConfig = {
   priority?: "critical" | "high" | "medium" | "low";
 };
 
-export type GithubActionConfig = {
-  kind: "github_action";
-  action: "create_issue" | "create_pr" | "comment" | "label" | "merge";
-  repo?: string;
-  params: Record<string, unknown>;
-};
-
 export type OutputConfig = {
   kind: "output";
   format: "json" | "markdown" | "text";
@@ -151,7 +144,6 @@ export type NodeConfig =
   | ApprovalConfig
   | LoopConfig
   | NotifyConfig
-  | GithubActionConfig
   | OutputConfig;
 
 // ===========================================================================

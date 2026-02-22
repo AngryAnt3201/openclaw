@@ -6,6 +6,6 @@ export type { ExecutorContext, NodeExecutionResult, NodeExecutorFn } from "./typ
 
 export { executeAgentNode } from "./agent.js";
 export { executeConditionNode } from "./condition.js";
-export { executeNotifyNode, executeGithubNode, executeOutputNode } from "./action.js";
+export { executeNotifyNode, executeOutputNode } from "./action.js";
 export type { TriggerRegistrationContext } from "./trigger.js";
 export { registerPipelineTriggers, unregisterPipelineTriggers } from "./trigger.js";

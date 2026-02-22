@@ -11,7 +11,6 @@ import type {
   CronTriggerConfig,
   ConditionConfig,
   NotifyConfig,
-  GithubActionConfig,
   OutputConfig,
   NodeDefinition,
   NodeConfigField,
@@ -77,17 +76,17 @@ describe("Pipeline Core Types", () => {
 
     it("should expose processing node types", () => {
       expect(PROCESSING_NODE_TYPES).toContain("agent");
+      expect(PROCESSING_NODE_TYPES).toContain("app");
       expect(PROCESSING_NODE_TYPES).toContain("condition");
       expect(PROCESSING_NODE_TYPES).toContain("approval");
       expect(PROCESSING_NODE_TYPES).toContain("loop");
-      expect(PROCESSING_NODE_TYPES).toHaveLength(4);
+      expect(PROCESSING_NODE_TYPES).toHaveLength(5);
     });
 
     it("should expose action node types", () => {
       expect(ACTION_NODE_TYPES).toContain("notify");
-      expect(ACTION_NODE_TYPES).toContain("github_action");
       expect(ACTION_NODE_TYPES).toContain("output");
-      expect(ACTION_NODE_TYPES).toHaveLength(3);
+      expect(ACTION_NODE_TYPES).toHaveLength(2);
     });
 
     it("should expose node categories", () => {
@@ -350,17 +349,6 @@ describe("Pipeline Core Types", () => {
       };
       expect(config.kind).toBe("notify");
       expect(config.channels).toHaveLength(2);
-    });
-
-    it("should construct GithubActionConfig", () => {
-      const config: GithubActionConfig = {
-        kind: "github_action",
-        action: "create_pr",
-        repo: "owner/repo",
-        params: { title: "Auto PR", body: "Generated" },
-      };
-      expect(config.kind).toBe("github_action");
-      expect(config.action).toBe("create_pr");
     });
 
     it("should construct OutputConfig", () => {
