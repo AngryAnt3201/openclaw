@@ -359,7 +359,7 @@ export async function setupChannels(
     }
   };
 
-  const resolveDisabledHint = (channel: ChannelChoice): string | undefined => {
+  const resolveDisabledHint = async (channel: ChannelChoice): Promise<string | undefined> => {
     const plugin = getChannelPlugin(channel);
     if (!plugin) {
       if (next.plugins?.entries?.[channel]?.enabled === false) {
@@ -371,7 +371,7 @@ export async function setupChannels(
       return undefined;
     }
     const accountId = resolveChannelDefaultAccountId({ plugin, cfg: next });
-    const account = plugin.config.resolveAccount(next, accountId);
+    const account = await plugin.config.resolveAccount(next, accountId);
     let enabled: boolean | undefined;
     if (plugin.config.isEnabled) {
       enabled = plugin.config.isEnabled(account, next);
@@ -386,22 +386,24 @@ export async function setupChannels(
     return enabled === false ? "disabled" : undefined;
   };
 
-  const buildSelectionOptions = (
+  const buildSelectionOptions = async (
     entries: Array<{
       id: ChannelChoice;
       meta: { id: string; label: string; selectionLabel?: string };
     }>,
   ) =>
-    entries.map((entry) => {
-      const status = statusByChannel.get(entry.id);
-      const disabledHint = resolveDisabledHint(entry.id);
-      const hint = [status?.selectionHint, disabledHint].filter(Boolean).join(" · ") || undefined;
-      return {
-        value: entry.meta.id,
-        label: entry.meta.selectionLabel ?? entry.meta.label,
-        ...(hint ? { hint } : {}),
-      };
-    });
+    Promise.all(
+      entries.map(async (entry) => {
+        const status = statusByChannel.get(entry.id);
+        const disabledHint = await resolveDisabledHint(entry.id);
+        const hint = [status?.selectionHint, disabledHint].filter(Boolean).join(" · ") || undefined;
+        return {
+          value: entry.meta.id,
+          label: entry.meta.selectionLabel ?? entry.meta.label,
+          ...(hint ? { hint } : {}),
+        };
+      }),
+    );
 
   const getChannelEntries = () => {
     const core = listChatChannels();
@@ -612,7 +614,7 @@ export async function setupChannels(
     const choice = (await prompter.select({
       message: "Select channel (QuickStart)",
       options: [
-        ...buildSelectionOptions(entries),
+        ...(await buildSelectionOptions(entries)),
         {
           value: "__skip__",
           label: "Skip for now",
@@ -632,7 +634,7 @@ export async function setupChannels(
       const choice = (await prompter.select({
         message: "Select a channel",
         options: [
-          ...buildSelectionOptions(entries),
+          ...(await buildSelectionOptions(entries)),
           {
             value: doneValue,
             label: "Finished",

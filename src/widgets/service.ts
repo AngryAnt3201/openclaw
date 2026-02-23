@@ -29,6 +29,7 @@ import {
   writeDataSources,
 } from "./store.js";
 import { DEFAULT_WIDGET_SIZES } from "./types.js";
+import { BUILTIN_WIDGET_DEFINITIONS } from "./widget-defaults.js";
 
 // ---------------------------------------------------------------------------
 // Dependencies (injected at construction)
@@ -90,6 +91,30 @@ export class WidgetService {
 
   constructor(deps: WidgetServiceDeps) {
     this.state = createServiceState(deps);
+  }
+
+  /**
+   * Seed built-in widget definitions into the registry if not already present.
+   * Called once on gateway startup.
+   */
+  async seedBuiltins(): Promise<void> {
+    return locked(this.state, async () => {
+      const registry = await readWidgetRegistry(this.file("registry.json"));
+      const existing = new Set(registry.definitions.map((d) => d.id));
+      let added = 0;
+
+      for (const def of BUILTIN_WIDGET_DEFINITIONS) {
+        if (!existing.has(def.id)) {
+          registry.definitions.push(def);
+          added++;
+        }
+      }
+
+      if (added > 0) {
+        await writeWidgetRegistry(this.file("registry.json"), registry);
+        this.state.deps.log.info(`seeded ${added} built-in widget definitions`);
+      }
+    });
   }
 
   private now(): number {

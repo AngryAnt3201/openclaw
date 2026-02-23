@@ -94,9 +94,14 @@ export type SlackAccountConfig = {
   configWrites?: boolean;
   /** If false, do not start this Slack account. Default: true. */
   enabled?: boolean;
+  /** @deprecated Use credentialAccountId instead. */
   botToken?: string;
+  /** @deprecated Use credentialAccountId instead. */
   appToken?: string;
+  /** @deprecated Use credentialAccountId instead. */
   userToken?: string;
+  /** Credential manager account ID for token resolution. */
+  credentialAccountId?: string;
   /** If true, restrict user token to read operations only. Default: true. */
   userTokenReadOnly?: boolean;
   /** Allow bot-authored messages to trigger replies (default: false). */

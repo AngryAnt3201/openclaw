@@ -132,7 +132,7 @@ export async function runReplyAgent(params: {
     ((sessionCtx.Surface ?? sessionCtx.Provider)?.toLowerCase() as
       | OriginatingChannelType
       | undefined);
-  const replyToMode = resolveReplyToMode(
+  const replyToMode = await resolveReplyToMode(
     followupRun.run.config,
     replyToChannel,
     sessionCtx.AccountId,

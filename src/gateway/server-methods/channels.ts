@@ -42,7 +42,7 @@ export async function logoutChannelAccount(params: {
     params.plugin.config.defaultAccountId?.(params.cfg) ||
     params.plugin.config.listAccountIds(params.cfg)[0] ||
     DEFAULT_ACCOUNT_ID;
-  const account = params.plugin.config.resolveAccount(params.cfg, resolvedAccountId);
+  const account = await params.plugin.config.resolveAccount(params.cfg, resolvedAccountId);
   await params.context.stopChannel(params.channelId, resolvedAccountId);
   const result = await params.plugin.gateway?.logoutAccount?.({
     cfg: params.cfg,
@@ -83,7 +83,7 @@ export const channelsHandlers: GatewayRequestHandlers = {
     const timeoutMsRaw = (params as { timeoutMs?: unknown }).timeoutMs;
     const timeoutMs = typeof timeoutMsRaw === "number" ? Math.max(1000, timeoutMsRaw) : 10_000;
     const cfg = loadConfig();
-    const runtime = context.getRuntimeSnapshot();
+    const runtime = await context.getRuntimeSnapshot();
     const plugins = listChannelPlugins();
     const pluginMap = new Map<ChannelId, ChannelPlugin>(
       plugins.map((plugin) => [plugin.id, plugin]),
@@ -130,7 +130,7 @@ export const channelsHandlers: GatewayRequestHandlers = {
       const accounts: ChannelAccountSnapshot[] = [];
       const resolvedAccounts: Record<string, unknown> = {};
       for (const accountId of accountIds) {
-        const account = plugin.config.resolveAccount(cfg, accountId);
+        const account = await plugin.config.resolveAccount(cfg, accountId);
         const enabled = isAccountEnabled(plugin, account);
         resolvedAccounts[accountId] = account;
         let probeResult: unknown;
@@ -212,7 +212,8 @@ export const channelsHandlers: GatewayRequestHandlers = {
       const { accounts, defaultAccountId, defaultAccount, resolvedAccounts } =
         await buildChannelAccounts(plugin.id);
       const fallbackAccount =
-        resolvedAccounts[defaultAccountId] ?? plugin.config.resolveAccount(cfg, defaultAccountId);
+        resolvedAccounts[defaultAccountId] ??
+        (await plugin.config.resolveAccount(cfg, defaultAccountId));
       const summary = plugin.status?.buildChannelSummary
         ? await plugin.status.buildChannelSummary({
             account: fallbackAccount,

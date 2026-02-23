@@ -46,8 +46,9 @@ export const executeNotifyNode: NodeExecutorFn = async (
     const message = interpolateTemplate(config.template, input);
 
     const result = await context.callGatewayRpc("notification.create", {
+      type: "custom",
       title: `Pipeline: ${node.label}`,
-      message,
+      body: message,
       channels: config.channels,
       priority: config.priority ?? "medium",
       source: "pipeline",

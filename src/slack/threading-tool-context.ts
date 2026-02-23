@@ -5,13 +5,13 @@ import type {
 import type { OpenClawConfig } from "../config/config.js";
 import { resolveSlackAccount, resolveSlackReplyToMode } from "./accounts.js";
 
-export function buildSlackThreadingToolContext(params: {
+export async function buildSlackThreadingToolContext(params: {
   cfg: OpenClawConfig;
   accountId?: string | null;
   context: ChannelThreadingContext;
   hasRepliedRef?: { value: boolean };
-}): ChannelThreadingToolContext {
-  const account = resolveSlackAccount({
+}): Promise<ChannelThreadingToolContext> {
+  const account = await resolveSlackAccount({
     cfg: params.cfg,
     accountId: params.accountId,
   });

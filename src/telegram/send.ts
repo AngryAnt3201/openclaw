@@ -235,7 +235,7 @@ export async function sendMessageTelegram(
   opts: TelegramSendOpts = {},
 ): Promise<TelegramSendResult> {
   const cfg = loadConfig();
-  const account = resolveTelegramAccount({
+  const account = await resolveTelegramAccount({
     cfg,
     accountId: opts.accountId,
   });
@@ -598,7 +598,7 @@ export async function reactMessageTelegram(
   opts: TelegramReactionOpts = {},
 ): Promise<{ ok: true }> {
   const cfg = loadConfig();
-  const account = resolveTelegramAccount({
+  const account = await resolveTelegramAccount({
     cfg,
     accountId: opts.accountId,
   });
@@ -651,7 +651,7 @@ export async function deleteMessageTelegram(
   opts: TelegramDeleteOpts = {},
 ): Promise<{ ok: true }> {
   const cfg = loadConfig();
-  const account = resolveTelegramAccount({
+  const account = await resolveTelegramAccount({
     cfg,
     accountId: opts.accountId,
   });
@@ -700,7 +700,7 @@ export async function editMessageTelegram(
   opts: TelegramEditOpts = {},
 ): Promise<{ ok: true; messageId: string; chatId: string }> {
   const cfg = opts.cfg ?? loadConfig();
-  const account = resolveTelegramAccount({
+  const account = await resolveTelegramAccount({
     cfg,
     accountId: opts.accountId,
   });
@@ -817,7 +817,7 @@ export async function sendStickerTelegram(
   }
 
   const cfg = loadConfig();
-  const account = resolveTelegramAccount({
+  const account = await resolveTelegramAccount({
     cfg,
     accountId: opts.accountId,
   });

@@ -17,67 +17,67 @@ describe("resolveTelegramReactionLevel", () => {
     }
   });
 
-  it("defaults to minimal level when reactionLevel is not set", () => {
+  it("defaults to minimal level when reactionLevel is not set", async () => {
     const cfg: OpenClawConfig = {
       channels: { telegram: {} },
     };
 
-    const result = resolveTelegramReactionLevel({ cfg });
+    const result = await resolveTelegramReactionLevel({ cfg });
     expect(result.level).toBe("minimal");
     expect(result.ackEnabled).toBe(false);
     expect(result.agentReactionsEnabled).toBe(true);
     expect(result.agentReactionGuidance).toBe("minimal");
   });
 
-  it("returns off level with no reactions enabled", () => {
+  it("returns off level with no reactions enabled", async () => {
     const cfg: OpenClawConfig = {
       channels: { telegram: { reactionLevel: "off" } },
     };
 
-    const result = resolveTelegramReactionLevel({ cfg });
+    const result = await resolveTelegramReactionLevel({ cfg });
     expect(result.level).toBe("off");
     expect(result.ackEnabled).toBe(false);
     expect(result.agentReactionsEnabled).toBe(false);
     expect(result.agentReactionGuidance).toBeUndefined();
   });
 
-  it("returns ack level with only ackEnabled", () => {
+  it("returns ack level with only ackEnabled", async () => {
     const cfg: OpenClawConfig = {
       channels: { telegram: { reactionLevel: "ack" } },
     };
 
-    const result = resolveTelegramReactionLevel({ cfg });
+    const result = await resolveTelegramReactionLevel({ cfg });
     expect(result.level).toBe("ack");
     expect(result.ackEnabled).toBe(true);
     expect(result.agentReactionsEnabled).toBe(false);
     expect(result.agentReactionGuidance).toBeUndefined();
   });
 
-  it("returns minimal level with agent reactions enabled and minimal guidance", () => {
+  it("returns minimal level with agent reactions enabled and minimal guidance", async () => {
     const cfg: OpenClawConfig = {
       channels: { telegram: { reactionLevel: "minimal" } },
     };
 
-    const result = resolveTelegramReactionLevel({ cfg });
+    const result = await resolveTelegramReactionLevel({ cfg });
     expect(result.level).toBe("minimal");
     expect(result.ackEnabled).toBe(false);
     expect(result.agentReactionsEnabled).toBe(true);
     expect(result.agentReactionGuidance).toBe("minimal");
   });
 
-  it("returns extensive level with agent reactions enabled and extensive guidance", () => {
+  it("returns extensive level with agent reactions enabled and extensive guidance", async () => {
     const cfg: OpenClawConfig = {
       channels: { telegram: { reactionLevel: "extensive" } },
     };
 
-    const result = resolveTelegramReactionLevel({ cfg });
+    const result = await resolveTelegramReactionLevel({ cfg });
     expect(result.level).toBe("extensive");
     expect(result.ackEnabled).toBe(false);
     expect(result.agentReactionsEnabled).toBe(true);
     expect(result.agentReactionGuidance).toBe("extensive");
   });
 
-  it("resolves reaction level from a specific account", () => {
+  it("resolves reaction level from a specific account", async () => {
     const cfg: OpenClawConfig = {
       channels: {
         telegram: {
@@ -89,14 +89,14 @@ describe("resolveTelegramReactionLevel", () => {
       },
     };
 
-    const result = resolveTelegramReactionLevel({ cfg, accountId: "work" });
+    const result = await resolveTelegramReactionLevel({ cfg, accountId: "work" });
     expect(result.level).toBe("extensive");
     expect(result.ackEnabled).toBe(false);
     expect(result.agentReactionsEnabled).toBe(true);
     expect(result.agentReactionGuidance).toBe("extensive");
   });
 
-  it("falls back to global level when account has no reactionLevel", () => {
+  it("falls back to global level when account has no reactionLevel", async () => {
     const cfg: OpenClawConfig = {
       channels: {
         telegram: {
@@ -108,7 +108,7 @@ describe("resolveTelegramReactionLevel", () => {
       },
     };
 
-    const result = resolveTelegramReactionLevel({ cfg, accountId: "work" });
+    const result = await resolveTelegramReactionLevel({ cfg, accountId: "work" });
     expect(result.level).toBe("minimal");
     expect(result.agentReactionsEnabled).toBe(true);
     expect(result.agentReactionGuidance).toBe("minimal");

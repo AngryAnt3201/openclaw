@@ -16,11 +16,11 @@ export type ResolvedReactionLevel = {
 /**
  * Resolve the effective reaction level and its implications.
  */
-export function resolveTelegramReactionLevel(params: {
+export async function resolveTelegramReactionLevel(params: {
   cfg: OpenClawConfig;
   accountId?: string;
-}): ResolvedReactionLevel {
-  const account = resolveTelegramAccount({
+}): Promise<ResolvedReactionLevel> {
+  const account = await resolveTelegramAccount({
     cfg: params.cfg,
     accountId: params.accountId,
   });

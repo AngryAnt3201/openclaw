@@ -41,28 +41,31 @@ function resolveInlineButtonsScopeFromCapabilities(
   return DEFAULT_INLINE_BUTTONS_SCOPE;
 }
 
-export function resolveTelegramInlineButtonsScope(params: {
+export async function resolveTelegramInlineButtonsScope(params: {
   cfg: OpenClawConfig;
   accountId?: string | null;
-}): TelegramInlineButtonsScope {
-  const account = resolveTelegramAccount({ cfg: params.cfg, accountId: params.accountId });
+}): Promise<TelegramInlineButtonsScope> {
+  const account = await resolveTelegramAccount({ cfg: params.cfg, accountId: params.accountId });
   return resolveInlineButtonsScopeFromCapabilities(account.config.capabilities);
 }
 
-export function isTelegramInlineButtonsEnabled(params: {
+export async function isTelegramInlineButtonsEnabled(params: {
   cfg: OpenClawConfig;
   accountId?: string | null;
-}): boolean {
+}): Promise<boolean> {
   if (params.accountId) {
-    return resolveTelegramInlineButtonsScope(params) !== "off";
+    return (await resolveTelegramInlineButtonsScope(params)) !== "off";
   }
   const accountIds = listTelegramAccountIds(params.cfg);
   if (accountIds.length === 0) {
-    return resolveTelegramInlineButtonsScope(params) !== "off";
+    return (await resolveTelegramInlineButtonsScope(params)) !== "off";
   }
-  return accountIds.some(
-    (accountId) => resolveTelegramInlineButtonsScope({ cfg: params.cfg, accountId }) !== "off",
+  const results = await Promise.all(
+    accountIds.map((accountId) =>
+      resolveTelegramInlineButtonsScope({ cfg: params.cfg, accountId }),
+    ),
   );
+  return results.some((scope) => scope !== "off");
 }
 
 export function resolveTelegramTargetChatType(target: string): "direct" | "group" | "unknown" {

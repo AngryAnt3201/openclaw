@@ -104,7 +104,7 @@ export async function monitorTelegramProvider(opts: MonitorTelegramOpts = {}) {
 
   try {
     const cfg = opts.config ?? loadConfig();
-    const account = resolveTelegramAccount({
+    const account = await resolveTelegramAccount({
       cfg,
       accountId: opts.accountId,
     });
@@ -138,7 +138,7 @@ export async function monitorTelegramProvider(opts: MonitorTelegramOpts = {}) {
       }
     };
 
-    const bot = createTelegramBot({
+    const bot = await createTelegramBot({
       token,
       runtime: opts.runtime,
       proxyFetch,

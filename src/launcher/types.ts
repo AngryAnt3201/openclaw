@@ -50,6 +50,9 @@ export type LaunchableApp = {
   tags: string[];
   color: string | null;
 
+  // Active proxy URL (set when running via port proxy, cleared on stop)
+  proxy_url: string | null;
+
   // Timestamps
   createdAtMs: number;
   updatedAtMs: number;
@@ -132,6 +135,7 @@ export type LaunchableAppPatch = {
 
   tags?: string[];
   color?: string | null;
+  proxy_url?: string | null;
 };
 
 // ---------------------------------------------------------------------------

@@ -101,16 +101,16 @@ export function resolveAgentDeliveryPlan(params: {
   };
 }
 
-export function resolveAgentOutboundTarget(params: {
+export async function resolveAgentOutboundTarget(params: {
   cfg: OpenClawConfig;
   plan: AgentDeliveryPlan;
   targetMode?: ChannelOutboundTargetMode;
   validateExplicitTarget?: boolean;
-}): {
+}): Promise<{
   resolvedTarget: OutboundTargetResolution | null;
   resolvedTo?: string;
   targetMode: ChannelOutboundTargetMode;
-} {
+}> {
   const targetMode =
     params.targetMode ??
     params.plan.deliveryTargetMode ??
@@ -129,7 +129,7 @@ export function resolveAgentOutboundTarget(params: {
       targetMode,
     };
   }
-  const resolvedTarget = resolveOutboundTarget({
+  const resolvedTarget = await resolveOutboundTarget({
     channel: params.plan.resolvedChannel,
     to: params.plan.resolvedTo,
     cfg: params.cfg,

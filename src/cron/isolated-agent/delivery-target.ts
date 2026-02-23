@@ -89,7 +89,7 @@ export async function resolveDeliveryTarget(
     };
   }
 
-  const docked = resolveOutboundTarget({
+  const docked = await resolveOutboundTarget({
     channel,
     to: toCandidate,
     cfg,

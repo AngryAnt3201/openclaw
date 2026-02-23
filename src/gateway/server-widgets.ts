@@ -33,5 +33,10 @@ export function buildGatewayWidgetService(params: {
     },
   });
 
+  // Seed built-in definitions into the registry on startup (no-op if present)
+  widgetService.seedBuiltins().catch((err) => {
+    widgetLogger.error(`failed to seed built-in widget definitions: ${err}`);
+  });
+
   return { widgetService, storePath };
 }

@@ -139,7 +139,7 @@ export async function noteSecurityWarnings(cfg: OpenClawConfig) {
       cfg,
       accountIds,
     });
-    const account = plugin.config.resolveAccount(cfg, defaultAccountId);
+    const account = await plugin.config.resolveAccount(cfg, defaultAccountId);
     const enabled = plugin.config.isEnabled ? plugin.config.isEnabled(account, cfg) : true;
     if (!enabled) {
       continue;

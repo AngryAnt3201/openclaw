@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { runCredentialMigration } from "./migration.js";
+import { runCredentialMigration, migrateChannelTokensV2 } from "./migration.js";
 import { CredentialService } from "./service.js";
 
 let tmpDir: string;
@@ -160,5 +160,153 @@ describe("Credential Migration", () => {
       .then(() => true)
       .catch(() => false);
     expect(bakExists).toBe(true);
+  });
+});
+
+describe("V2 Channel Token Migration", () => {
+  it("should create account + credential for discord token", async () => {
+    const cfg = {
+      channels: {
+        discord: { token: "discord-bot-token-123" },
+      },
+    } as any;
+
+    const result = await migrateChannelTokensV2({
+      service,
+      cfg,
+      log: { info: vi.fn(), warn: vi.fn() },
+    });
+
+    expect(result.migrated).toBe(1);
+    expect(result.mappings).toHaveLength(1);
+    expect(result.mappings[0]!.channel).toBe("discord");
+    expect(result.mappings[0]!.accountKey).toBe("default");
+
+    const accounts = await service.listAccounts();
+    expect(accounts).toHaveLength(1);
+    expect(accounts[0]!.provider).toBe("discord");
+    expect(accounts[0]!.name).toBe("Discord Bot");
+    expect(accounts[0]!.credentialIds).toHaveLength(1);
+
+    const creds = await service.list();
+    expect(creds).toHaveLength(1);
+    expect(creds[0]!.category).toBe("channel_bot");
+  });
+
+  it("should create multi-token credentials for slack", async () => {
+    const cfg = {
+      channels: {
+        slack: { botToken: "xoxb-bot", appToken: "xapp-app" },
+      },
+    } as any;
+
+    const result = await migrateChannelTokensV2({
+      service,
+      cfg,
+      log: { info: vi.fn(), warn: vi.fn() },
+    });
+
+    expect(result.migrated).toBe(1);
+    const accounts = await service.listAccounts();
+    expect(accounts[0]!.credentialIds).toHaveLength(2);
+    expect(accounts[0]!.metadata.botTokenCredentialId).toBeDefined();
+    expect(accounts[0]!.metadata.appTokenCredentialId).toBeDefined();
+  });
+
+  it("should read telegram token from tokenFile", async () => {
+    const tokenFilePath = path.join(tmpDir, "telegram-token.txt");
+    await fs.writeFile(tokenFilePath, "file-based-bot-token\n");
+
+    const cfg = {
+      channels: {
+        telegram: { tokenFile: tokenFilePath },
+      },
+    } as any;
+
+    const result = await migrateChannelTokensV2({
+      service,
+      cfg,
+      log: { info: vi.fn(), warn: vi.fn() },
+    });
+
+    expect(result.migrated).toBe(1);
+    expect(result.mappings[0]!.channel).toBe("telegram");
+    const creds = await service.list();
+    expect(creds).toHaveLength(1);
+  });
+
+  it("should skip accounts with credentialAccountId already set", async () => {
+    const cfg = {
+      channels: {
+        discord: { token: "discord-token", credentialAccountId: "existing-id" },
+      },
+    } as any;
+
+    const result = await migrateChannelTokensV2({
+      service,
+      cfg,
+      log: { info: vi.fn(), warn: vi.fn() },
+    });
+
+    expect(result.migrated).toBe(0);
+    expect(result.mappings).toHaveLength(0);
+  });
+
+  it("should be idempotent (second run creates no duplicates)", async () => {
+    const cfg = {
+      channels: {
+        discord: { token: "discord-token" },
+      },
+    } as any;
+
+    const r1 = await migrateChannelTokensV2({
+      service,
+      cfg,
+      log: { info: vi.fn(), warn: vi.fn() },
+    });
+    expect(r1.migrated).toBe(1);
+
+    // Second run with credentialAccountId set
+    const cfgAfter = {
+      channels: {
+        discord: {
+          token: "discord-token",
+          credentialAccountId: r1.mappings[0]!.credentialAccountId,
+        },
+      },
+    } as any;
+
+    const r2 = await migrateChannelTokensV2({
+      service,
+      cfg: cfgAfter,
+      log: { info: vi.fn(), warn: vi.fn() },
+    });
+    expect(r2.migrated).toBe(0);
+  });
+
+  it("should handle multi-account channels", async () => {
+    const cfg = {
+      channels: {
+        discord: {
+          accounts: {
+            main: { token: "main-token" },
+            alt: { token: "alt-token" },
+          },
+        },
+      },
+    } as any;
+
+    const result = await migrateChannelTokensV2({
+      service,
+      cfg,
+      log: { info: vi.fn(), warn: vi.fn() },
+    });
+
+    expect(result.migrated).toBe(2);
+    expect(result.mappings).toHaveLength(2);
+    expect(result.mappings.map((m) => m.accountKey).toSorted()).toEqual(["alt", "main"]);
+
+    const accounts = await service.listAccounts();
+    expect(accounts).toHaveLength(2);
   });
 });

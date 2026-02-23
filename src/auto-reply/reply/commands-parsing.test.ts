@@ -7,7 +7,11 @@ import { parseConfigCommand } from "./config-commands.js";
 import { parseDebugCommand } from "./debug-commands.js";
 import { parseInlineDirectives } from "./directive-handling.js";
 
-function buildParams(commandBody: string, cfg: OpenClawConfig, ctxOverrides?: Partial<MsgContext>) {
+async function buildParams(
+  commandBody: string,
+  cfg: OpenClawConfig,
+  ctxOverrides?: Partial<MsgContext>,
+) {
   const ctx = {
     Body: commandBody,
     CommandBody: commandBody,
@@ -18,7 +22,7 @@ function buildParams(commandBody: string, cfg: OpenClawConfig, ctxOverrides?: Pa
     ...ctxOverrides,
   } as MsgContext;
 
-  const command = buildCommandContext({
+  const command = await buildCommandContext({
     ctx,
     cfg,
     isGroup: false,
@@ -116,7 +120,7 @@ describe("handleCommands /config configWrites gating", () => {
       commands: { config: true, text: true },
       channels: { whatsapp: { allowFrom: ["*"], configWrites: false } },
     } as OpenClawConfig;
-    const params = buildParams('/config set messages.ackReaction=":)"', cfg);
+    const params = await buildParams('/config set messages.ackReaction=":)"', cfg);
     const result = await handleCommands(params);
     expect(result.shouldContinue).toBe(false);
     expect(result.reply?.text).toContain("Config writes are disabled");

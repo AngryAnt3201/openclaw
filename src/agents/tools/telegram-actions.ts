@@ -79,7 +79,7 @@ export async function handleTelegramAction(
 
   if (action === "react") {
     // Check reaction level first
-    const reactionLevelInfo = resolveTelegramReactionLevel({
+    const reactionLevelInfo = await resolveTelegramReactionLevel({
       cfg,
       accountId: accountId ?? undefined,
     });
@@ -103,7 +103,7 @@ export async function handleTelegramAction(
     const { emoji, remove, isEmpty } = readReactionParams(params, {
       removeErrorMessage: "Emoji is required to remove a Telegram reaction.",
     });
-    const token = resolveTelegramToken(cfg, { accountId }).token;
+    const token = (await resolveTelegramToken(cfg, { accountId })).token;
     if (!token) {
       throw new Error(
         "Telegram bot token missing. Set TELEGRAM_BOT_TOKEN or channels.telegram.botToken.",
@@ -134,7 +134,7 @@ export async function handleTelegramAction(
       }) ?? "";
     const buttons = readTelegramButtons(params);
     if (buttons) {
-      const inlineButtonsScope = resolveTelegramInlineButtonsScope({
+      const inlineButtonsScope = await resolveTelegramInlineButtonsScope({
         cfg,
         accountId: accountId ?? undefined,
       });
@@ -168,7 +168,7 @@ export async function handleTelegramAction(
       integer: true,
     });
     const quoteText = readStringParam(params, "quoteText");
-    const token = resolveTelegramToken(cfg, { accountId }).token;
+    const token = (await resolveTelegramToken(cfg, { accountId })).token;
     if (!token) {
       throw new Error(
         "Telegram bot token missing. Set TELEGRAM_BOT_TOKEN or channels.telegram.botToken.",
@@ -203,7 +203,7 @@ export async function handleTelegramAction(
       required: true,
       integer: true,
     });
-    const token = resolveTelegramToken(cfg, { accountId }).token;
+    const token = (await resolveTelegramToken(cfg, { accountId })).token;
     if (!token) {
       throw new Error(
         "Telegram bot token missing. Set TELEGRAM_BOT_TOKEN or channels.telegram.botToken.",
@@ -233,7 +233,7 @@ export async function handleTelegramAction(
     });
     const buttons = readTelegramButtons(params);
     if (buttons) {
-      const inlineButtonsScope = resolveTelegramInlineButtonsScope({
+      const inlineButtonsScope = await resolveTelegramInlineButtonsScope({
         cfg,
         accountId: accountId ?? undefined,
       });
@@ -243,7 +243,7 @@ export async function handleTelegramAction(
         );
       }
     }
-    const token = resolveTelegramToken(cfg, { accountId }).token;
+    const token = (await resolveTelegramToken(cfg, { accountId })).token;
     if (!token) {
       throw new Error(
         "Telegram bot token missing. Set TELEGRAM_BOT_TOKEN or channels.telegram.botToken.",
@@ -275,7 +275,7 @@ export async function handleTelegramAction(
     const messageThreadId = readNumberParam(params, "messageThreadId", {
       integer: true,
     });
-    const token = resolveTelegramToken(cfg, { accountId }).token;
+    const token = (await resolveTelegramToken(cfg, { accountId })).token;
     if (!token) {
       throw new Error(
         "Telegram bot token missing. Set TELEGRAM_BOT_TOKEN or channels.telegram.botToken.",

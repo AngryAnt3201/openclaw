@@ -99,7 +99,7 @@ describe("createOpenClawCodingTools safeBins", () => {
       },
     };
 
-    const tools = createOpenClawCodingTools({
+    const tools = await createOpenClawCodingTools({
       config: cfg,
       sessionKey: "agent:main:main",
       workspaceDir: tmpDir,

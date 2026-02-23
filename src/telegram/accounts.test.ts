@@ -3,7 +3,7 @@ import type { OpenClawConfig } from "../config/config.js";
 import { resolveTelegramAccount } from "./accounts.js";
 
 describe("resolveTelegramAccount", () => {
-  it("falls back to the first configured account when accountId is omitted", () => {
+  it("falls back to the first configured account when accountId is omitted", async () => {
     const prevTelegramToken = process.env.TELEGRAM_BOT_TOKEN;
     process.env.TELEGRAM_BOT_TOKEN = "";
     try {
@@ -13,7 +13,7 @@ describe("resolveTelegramAccount", () => {
         },
       };
 
-      const account = resolveTelegramAccount({ cfg });
+      const account = await resolveTelegramAccount({ cfg });
       expect(account.accountId).toBe("work");
       expect(account.token).toBe("tok-work");
       expect(account.tokenSource).toBe("config");
@@ -26,7 +26,7 @@ describe("resolveTelegramAccount", () => {
     }
   });
 
-  it("uses TELEGRAM_BOT_TOKEN when default account config is missing", () => {
+  it("uses TELEGRAM_BOT_TOKEN when default account config is missing", async () => {
     const prevTelegramToken = process.env.TELEGRAM_BOT_TOKEN;
     process.env.TELEGRAM_BOT_TOKEN = "tok-env";
     try {
@@ -36,7 +36,7 @@ describe("resolveTelegramAccount", () => {
         },
       };
 
-      const account = resolveTelegramAccount({ cfg });
+      const account = await resolveTelegramAccount({ cfg });
       expect(account.accountId).toBe("default");
       expect(account.token).toBe("tok-env");
       expect(account.tokenSource).toBe("env");
@@ -49,7 +49,7 @@ describe("resolveTelegramAccount", () => {
     }
   });
 
-  it("prefers default config token over TELEGRAM_BOT_TOKEN", () => {
+  it("prefers default config token over TELEGRAM_BOT_TOKEN", async () => {
     const prevTelegramToken = process.env.TELEGRAM_BOT_TOKEN;
     process.env.TELEGRAM_BOT_TOKEN = "tok-env";
     try {
@@ -59,7 +59,7 @@ describe("resolveTelegramAccount", () => {
         },
       };
 
-      const account = resolveTelegramAccount({ cfg });
+      const account = await resolveTelegramAccount({ cfg });
       expect(account.accountId).toBe("default");
       expect(account.token).toBe("tok-config");
       expect(account.tokenSource).toBe("config");
@@ -72,7 +72,7 @@ describe("resolveTelegramAccount", () => {
     }
   });
 
-  it("does not fall back when accountId is explicitly provided", () => {
+  it("does not fall back when accountId is explicitly provided", async () => {
     const prevTelegramToken = process.env.TELEGRAM_BOT_TOKEN;
     process.env.TELEGRAM_BOT_TOKEN = "";
     try {
@@ -82,7 +82,7 @@ describe("resolveTelegramAccount", () => {
         },
       };
 
-      const account = resolveTelegramAccount({ cfg, accountId: "default" });
+      const account = await resolveTelegramAccount({ cfg, accountId: "default" });
       expect(account.accountId).toBe("default");
       expect(account.tokenSource).toBe("none");
       expect(account.token).toBe("");

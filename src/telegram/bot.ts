@@ -109,7 +109,7 @@ export function getTelegramSequentialKey(ctx: {
   return "telegram:unknown";
 }
 
-export function createTelegramBot(opts: TelegramBotOptions) {
+export async function createTelegramBot(opts: TelegramBotOptions) {
   const runtime: RuntimeEnv = opts.runtime ?? {
     log: console.log,
     error: console.error,
@@ -118,7 +118,7 @@ export function createTelegramBot(opts: TelegramBotOptions) {
     },
   };
   const cfg = opts.config ?? loadConfig();
-  const account = resolveTelegramAccount({
+  const account = await resolveTelegramAccount({
     cfg,
     accountId: opts.accountId,
   });

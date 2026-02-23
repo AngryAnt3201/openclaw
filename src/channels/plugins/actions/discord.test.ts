@@ -35,7 +35,7 @@ describe("discord message actions", () => {
   it("lists channel and upload actions by default", async () => {
     const cfg = { channels: { discord: { token: "d0" } } } as OpenClawConfig;
     const discordMessageActions = await loadDiscordMessageActions();
-    const actions = discordMessageActions.listActions?.({ cfg }) ?? [];
+    const actions = (await discordMessageActions.listActions?.({ cfg })) ?? [];
 
     expect(actions).toContain("emoji-upload");
     expect(actions).toContain("sticker-upload");
@@ -47,7 +47,7 @@ describe("discord message actions", () => {
       channels: { discord: { token: "d0", actions: { channels: false } } },
     } as OpenClawConfig;
     const discordMessageActions = await loadDiscordMessageActions();
-    const actions = discordMessageActions.listActions?.({ cfg }) ?? [];
+    const actions = (await discordMessageActions.listActions?.({ cfg })) ?? [];
 
     expect(actions).not.toContain("channel-create");
   });

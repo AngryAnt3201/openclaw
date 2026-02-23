@@ -53,6 +53,16 @@ export type GatewayAgentRow = {
     avatar?: string;
     avatarUrl?: string;
   };
+  /** Resolved model string (e.g. "anthropic/claude-sonnet-4-5"). */
+  model?: string;
+  /** `true` when this agent is a non-deletable built-in (e.g. Coder). */
+  builtIn?: boolean;
+  /** Short UI description from built-in definition. */
+  description?: string;
+  /** Emoji icon from built-in definition. */
+  icon?: string;
+  /** Theme colour key from built-in definition. */
+  color?: string;
 };
 
 export type SessionPreviewItem = {

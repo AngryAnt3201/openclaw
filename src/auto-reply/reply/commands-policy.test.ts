@@ -55,7 +55,11 @@ vi.mock("../../agents/model-catalog.js", () => ({
   ]),
 }));
 
-function buildParams(commandBody: string, cfg: OpenClawConfig, ctxOverrides?: Partial<MsgContext>) {
+async function buildParams(
+  commandBody: string,
+  cfg: OpenClawConfig,
+  ctxOverrides?: Partial<MsgContext>,
+) {
   const ctx = {
     Body: commandBody,
     CommandBody: commandBody,
@@ -66,7 +70,7 @@ function buildParams(commandBody: string, cfg: OpenClawConfig, ctxOverrides?: Pa
     ...ctxOverrides,
   } as MsgContext;
 
-  const command = buildCommandContext({
+  const command = await buildCommandContext({
     ctx,
     cfg,
     isGroup: false,
@@ -101,7 +105,7 @@ describe("handleCommands /allowlist", () => {
       commands: { text: true },
       channels: { telegram: { allowFrom: ["123", "@Alice"] } },
     } as OpenClawConfig;
-    const params = buildParams("/allowlist list dm", cfg);
+    const params = await buildParams("/allowlist list dm", cfg);
     const result = await handleCommands(params);
 
     expect(result.shouldContinue).toBe(false);
@@ -130,7 +134,7 @@ describe("handleCommands /allowlist", () => {
       commands: { text: true, config: true },
       channels: { telegram: { allowFrom: ["123"] } },
     } as OpenClawConfig;
-    const params = buildParams("/allowlist add dm 789", cfg);
+    const params = await buildParams("/allowlist add dm 789", cfg);
     const result = await handleCommands(params);
 
     expect(result.shouldContinue).toBe(false);
@@ -154,7 +158,7 @@ describe("/models command", () => {
   } as unknown as OpenClawConfig;
 
   it.each(["discord", "whatsapp"])("lists providers on %s (text)", async (surface) => {
-    const params = buildParams("/models", cfg, { Provider: surface, Surface: surface });
+    const params = await buildParams("/models", cfg, { Provider: surface, Surface: surface });
     const result = await handleCommands(params);
     expect(result.shouldContinue).toBe(false);
     expect(result.reply?.text).toContain("Providers:");
@@ -163,7 +167,7 @@ describe("/models command", () => {
   });
 
   it("lists providers on telegram (buttons)", async () => {
-    const params = buildParams("/models", cfg, { Provider: "telegram", Surface: "telegram" });
+    const params = await buildParams("/models", cfg, { Provider: "telegram", Surface: "telegram" });
     const result = await handleCommands(params);
     expect(result.shouldContinue).toBe(false);
     expect(result.reply?.text).toBe("Select a provider:");
@@ -175,7 +179,7 @@ describe("/models command", () => {
 
   it("lists provider models with pagination hints", async () => {
     // Use discord surface for text-based output tests
-    const params = buildParams("/models anthropic", cfg, { Surface: "discord" });
+    const params = await buildParams("/models anthropic", cfg, { Surface: "discord" });
     const result = await handleCommands(params);
     expect(result.shouldContinue).toBe(false);
     expect(result.reply?.text).toContain("Models (anthropic)");
@@ -187,7 +191,7 @@ describe("/models command", () => {
 
   it("ignores page argument when all flag is present", async () => {
     // Use discord surface for text-based output tests
-    const params = buildParams("/models anthropic 3 all", cfg, { Surface: "discord" });
+    const params = await buildParams("/models anthropic 3 all", cfg, { Surface: "discord" });
     const result = await handleCommands(params);
     expect(result.shouldContinue).toBe(false);
     expect(result.reply?.text).toContain("Models (anthropic)");
@@ -198,7 +202,7 @@ describe("/models command", () => {
 
   it("errors on out-of-range pages", async () => {
     // Use discord surface for text-based output tests
-    const params = buildParams("/models anthropic 4", cfg, { Surface: "discord" });
+    const params = await buildParams("/models anthropic 4", cfg, { Surface: "discord" });
     const result = await handleCommands(params);
     expect(result.shouldContinue).toBe(false);
     expect(result.reply?.text).toContain("Page out of range");
@@ -206,7 +210,7 @@ describe("/models command", () => {
   });
 
   it("handles unknown providers", async () => {
-    const params = buildParams("/models not-a-provider", cfg);
+    const params = await buildParams("/models not-a-provider", cfg);
     const result = await handleCommands(params);
     expect(result.shouldContinue).toBe(false);
     expect(result.reply?.text).toContain("Unknown provider");
@@ -229,13 +233,13 @@ describe("/models command", () => {
 
     // Use discord surface for text-based output tests
     const providerList = await handleCommands(
-      buildParams("/models", customCfg, { Surface: "discord" }),
+      await buildParams("/models", customCfg, { Surface: "discord" }),
     );
     expect(providerList.reply?.text).toContain("localai");
     expect(providerList.reply?.text).toContain("visionpro");
 
     const result = await handleCommands(
-      buildParams("/models localai", customCfg, { Surface: "discord" }),
+      await buildParams("/models localai", customCfg, { Surface: "discord" }),
     );
     expect(result.shouldContinue).toBe(false);
     expect(result.reply?.text).toContain("Models (localai)");

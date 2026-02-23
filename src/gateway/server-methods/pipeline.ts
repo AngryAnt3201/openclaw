@@ -2,11 +2,14 @@
 // Gateway RPC handlers for pipeline.* and node.registry.* methods
 // ---------------------------------------------------------------------------
 
+import { randomUUID } from "node:crypto";
 import type { PipelineCreate, PipelinePatch } from "../../pipeline/types.js";
 import type { GatewayRequestHandlers } from "./types.js";
 import { requestHeartbeatNow } from "../../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../../infra/system-events.js";
 import { loadPipelineRuns } from "../../pipeline/run-log.js";
+import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../../utils/message-channel.js";
+import { callGateway } from "../call.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 
 export const pipelineHandlers: GatewayRequestHandlers = {
@@ -235,37 +238,51 @@ export const pipelineHandlers: GatewayRequestHandlers = {
         }
       },
       requestHeartbeatNow: (opts) => requestHeartbeatNow(opts as { reason?: string }),
-      callGatewayRpc: async (method: string, rpcParams: unknown) => {
-        // Self-call into gateway handlers using a promise-based pattern.
-        return new Promise((resolve, reject) => {
-          const handler = pipelineHandlers[method];
-          if (!handler) {
-            reject(new Error(`Unknown RPC method: ${method}`));
-            return;
-          }
-          const fakeRespond: import("./types.js").RespondFn = (ok, payload, error) => {
-            if (ok) {
-              resolve(payload);
-            } else {
-              reject(new Error(error?.message ?? "RPC call failed"));
-            }
+      runIsolatedAgentJob: async (jobParams) => {
+        const timeoutMs = ((jobParams.timeoutSeconds as number) ?? 300) * 1000;
+        const agentSessionKey = `pipeline:${id}:${run.id}:${randomUUID().slice(0, 8)}`;
+        try {
+          const result = await callGateway<Record<string, unknown>>({
+            method: "agent",
+            params: {
+              message: jobParams.message as string,
+              sessionKey: agentSessionKey,
+              idempotencyKey: randomUUID(),
+              deliver: false,
+              label: `Pipeline: ${pipeline.name}`,
+            },
+            expectFinal: true,
+            timeoutMs,
+            clientName: GATEWAY_CLIENT_NAMES.GATEWAY_CLIENT,
+            clientDisplayName: "pipeline-executor",
+            mode: GATEWAY_CLIENT_MODES.BACKEND,
+          });
+          context.logGateway?.info?.(
+            `[pipeline:agent] result keys=${Object.keys(result).join(",")}, status=${result.status}`,
+          );
+          // Spread result first so our status/sessionKey aren't overwritten
+          // by the agent's "accepted"/"completed" status field.
+          return { ...result, status: "ok", sessionKey: agentSessionKey };
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          context.logGateway?.error?.(`[pipeline:agent] error: ${errMsg}`);
+          return {
+            status: "error",
+            sessionKey: agentSessionKey,
+            error: errMsg,
           };
-          Promise.resolve(
-            handler({
-              req: {
-                type: "req",
-                id: "internal",
-                method,
-                params: rpcParams as Record<string, unknown>,
-              },
-              params: (rpcParams ?? {}) as Record<string, unknown>,
-              client: null,
-              isWebchatConnect: () => false,
-              respond: fakeRespond,
-              context,
-            }),
-          ).catch(reject);
+        }
+      },
+      callGatewayRpc: async (method: string, rpcParams: unknown) => {
+        const result = await callGateway<unknown>({
+          method,
+          params: rpcParams,
+          timeoutMs: 30_000,
+          clientName: GATEWAY_CLIENT_NAMES.GATEWAY_CLIENT,
+          clientDisplayName: "pipeline-executor",
+          mode: GATEWAY_CLIENT_MODES.BACKEND,
         });
+        return result;
       },
       log: {
         info: (...args: unknown[]) =>

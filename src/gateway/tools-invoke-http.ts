@@ -200,7 +200,7 @@ export async function handleToolsInvokeHttpRequest(
     providerProfilePolicy,
     providerProfileAlsoAllow,
   );
-  const groupPolicy = resolveGroupToolPolicy({
+  const groupPolicy = await resolveGroupToolPolicy({
     config: cfg,
     sessionKey,
     messageProvider: messageChannel ?? undefined,
@@ -211,7 +211,7 @@ export async function handleToolsInvokeHttpRequest(
     : undefined;
 
   // Build tool list (core + plugin tools).
-  const allTools = createOpenClawTools({
+  const allTools = await createOpenClawTools({
     agentSessionKey: sessionKey,
     agentChannel: messageChannel ?? undefined,
     agentAccountId: accountId,

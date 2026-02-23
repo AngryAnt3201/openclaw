@@ -34,7 +34,7 @@ export class NodeRegistry {
     return [...this.defs.values()].filter((d) => d.category === category);
   }
 
-  /** Register all 11 built-in node types. */
+  /** Register all 12 built-in node types. */
   registerBuiltins(): void {
     for (const def of BUILTIN_NODE_DEFINITIONS) {
       this.register(def);
@@ -47,10 +47,10 @@ export class NodeRegistry {
 // ===========================================================================
 
 /**
- * The 11 built-in node definitions, grouped by category.
+ * The 12 built-in node definitions, grouped by category.
  *
  * Trigger nodes (4): cron, webhook, task_event, manual
- * Processing nodes (5): agent, app, condition, approval, loop
+ * Processing nodes (6): agent, app, condition, approval, loop, code
  * Action nodes (2): notify, output
  */
 export const BUILTIN_NODE_DEFINITIONS: readonly NodeDefinition[] = [
@@ -239,6 +239,30 @@ export const BUILTIN_NODE_DEFINITIONS: readonly NodeDefinition[] = [
       { id: "in", label: "Input", type: "input" },
       { id: "body", label: "Body", type: "output" },
       { id: "done", label: "Done", type: "output" },
+    ],
+  },
+  {
+    type: "code",
+    category: "processing",
+    label: "Code",
+    description: "Agent writes and executes code in any language with pipeline variables.",
+    icon: "terminal",
+    configFields: [
+      { key: "description", label: "What should this code do?", type: "code", required: true },
+      {
+        key: "language",
+        label: "Preferred Language",
+        type: "select",
+        options: ["auto", "javascript", "typescript", "python", "bash", "ruby", "go"],
+        defaultValue: "auto",
+      },
+      { key: "maxRetries", label: "Max Retries", type: "number", defaultValue: 3 },
+      { key: "timeout", label: "Timeout (s)", type: "number", defaultValue: 120 },
+    ],
+    ports: [
+      { id: "in", label: "Input", type: "input" },
+      { id: "success", label: "Success", type: "output" },
+      { id: "failure", label: "Failure", type: "output" },
     ],
   },
 

@@ -234,7 +234,7 @@ async function promptSlackAllowFrom(params: {
     params.accountId && normalizeAccountId(params.accountId)
       ? (normalizeAccountId(params.accountId) ?? DEFAULT_ACCOUNT_ID)
       : resolveDefaultSlackAccountId(params.cfg);
-  const resolved = resolveSlackAccount({ cfg: params.cfg, accountId });
+  const resolved = await resolveSlackAccount({ cfg: params.cfg, accountId });
   const token = resolved.config.userToken ?? resolved.config.botToken ?? "";
   const existing = params.cfg.channels?.slack?.dm?.allowFrom ?? [];
   await params.prompter.note(
@@ -323,10 +323,13 @@ const dmPolicy: ChannelOnboardingDmPolicy = {
 export const slackOnboardingAdapter: ChannelOnboardingAdapter = {
   channel,
   getStatus: async ({ cfg }) => {
-    const configured = listSlackAccountIds(cfg).some((accountId) => {
-      const account = resolveSlackAccount({ cfg, accountId });
-      return Boolean(account.botToken && account.appToken);
-    });
+    const results = await Promise.all(
+      listSlackAccountIds(cfg).map(async (accountId) => {
+        const account = await resolveSlackAccount({ cfg, accountId });
+        return Boolean(account.botToken && account.appToken);
+      }),
+    );
+    const configured = results.some(Boolean);
     return {
       channel,
       configured,
@@ -351,7 +354,7 @@ export const slackOnboardingAdapter: ChannelOnboardingAdapter = {
     }
 
     let next = cfg;
-    const resolvedAccount = resolveSlackAccount({
+    const resolvedAccount = await resolveSlackAccount({
       cfg: next,
       accountId: slackAccountId,
     });
@@ -489,7 +492,7 @@ export const slackOnboardingAdapter: ChannelOnboardingAdapter = {
         next = setSlackGroupPolicy(next, slackAccountId, accessConfig.policy);
       } else {
         let keys = accessConfig.entries;
-        const accountWithTokens = resolveSlackAccount({
+        const accountWithTokens = await resolveSlackAccount({
           cfg: next,
           accountId: slackAccountId,
         });

@@ -14,6 +14,7 @@ export type GatewayNotificationState = {
   notificationService: NotificationService;
   storePath: string;
   triggers: ReturnType<typeof createNotificationTriggers>;
+  channelTargets: Record<string, string>;
 };
 
 export function buildGatewayNotificationService(params: {
@@ -74,5 +75,5 @@ export function buildGatewayNotificationService(params: {
     },
   });
 
-  return { notificationService, storePath, triggers };
+  return { notificationService, storePath, triggers, channelTargets };
 }

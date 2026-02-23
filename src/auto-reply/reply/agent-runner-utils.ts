@@ -14,11 +14,11 @@ const BUN_FETCH_SOCKET_ERROR_RE = /socket connection was closed unexpectedly/i;
 /**
  * Build provider-specific threading context for tool auto-injection.
  */
-export function buildThreadingToolContext(params: {
+export async function buildThreadingToolContext(params: {
   sessionCtx: TemplateContext;
   config: OpenClawConfig | undefined;
   hasRepliedRef: { value: boolean } | undefined;
-}): ChannelThreadingToolContext {
+}): Promise<ChannelThreadingToolContext> {
   const { sessionCtx, config, hasRepliedRef } = params;
   if (!config) {
     return {};
@@ -38,7 +38,7 @@ export function buildThreadingToolContext(params: {
     };
   }
   const context =
-    dock.threading.buildToolContext({
+    (await dock.threading.buildToolContext({
       cfg: config,
       accountId: sessionCtx.AccountId,
       context: {
@@ -51,7 +51,7 @@ export function buildThreadingToolContext(params: {
         MessageThreadId: sessionCtx.MessageThreadId,
       },
       hasRepliedRef,
-    }) ?? {};
+    })) ?? {};
   return {
     ...context,
     currentChannelProvider: provider!, // guaranteed non-null since dock exists

@@ -14,7 +14,7 @@ import { resolveSlackWebClientOptions } from "../client.js";
 import { normalizeSlackWebhookPath, registerSlackHttpHandler } from "../http/index.js";
 import { resolveSlackChannelAllowlist } from "../resolve-channels.js";
 import { resolveSlackUserAllowlist } from "../resolve-users.js";
-import { resolveSlackAppToken, resolveSlackBotToken } from "../token.js";
+import { normalizeSlackToken } from "../token.js";
 import { normalizeAllowList } from "./allow-list.js";
 import { resolveSlackSlashCommandConfig } from "./commands.js";
 import { createSlackMonitorContext } from "./context.js";
@@ -42,7 +42,7 @@ function parseApiAppIdFromAppToken(raw?: string) {
 export async function monitorSlackProvider(opts: MonitorSlackOpts = {}) {
   const cfg = opts.config ?? loadConfig();
 
-  let account = resolveSlackAccount({
+  let account = await resolveSlackAccount({
     cfg,
     accountId: opts.accountId,
   });
@@ -61,8 +61,8 @@ export async function monitorSlackProvider(opts: MonitorSlackOpts = {}) {
   const slackMode = opts.mode ?? account.config.mode ?? "socket";
   const slackWebhookPath = normalizeSlackWebhookPath(account.config.webhookPath);
   const signingSecret = account.config.signingSecret?.trim();
-  const botToken = resolveSlackBotToken(opts.botToken ?? account.botToken);
-  const appToken = resolveSlackAppToken(opts.appToken ?? account.appToken);
+  const botToken = normalizeSlackToken(opts.botToken ?? account.botToken);
+  const appToken = normalizeSlackToken(opts.appToken ?? account.appToken);
   if (!botToken || (slackMode !== "http" && !appToken)) {
     const missing =
       slackMode === "http"

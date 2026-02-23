@@ -37,9 +37,9 @@ function resolveRest(token: string, rest?: RequestClient) {
   return rest ?? new RequestClient(token);
 }
 
-function resolveDiscordRest(opts: DiscordClientOpts) {
+async function resolveDiscordRest(opts: DiscordClientOpts) {
   const cfg = loadConfig();
-  const account = resolveDiscordAccount({ cfg, accountId: opts.accountId });
+  const account = await resolveDiscordAccount({ cfg, accountId: opts.accountId });
   const token = resolveToken({
     explicit: opts.token,
     accountId: account.accountId,
@@ -88,7 +88,7 @@ export async function fetchChannelPermissionsDiscord(
   channelId: string,
   opts: DiscordReactOpts = {},
 ): Promise<DiscordPermissionsSummary> {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   const channel = (await rest.get(Routes.channel(channelId))) as APIChannel;
   const channelType = "type" in channel ? channel.type : undefined;
   const guildId = "guild_id" in channel ? channel.guild_id : undefined;

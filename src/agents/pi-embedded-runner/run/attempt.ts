@@ -211,7 +211,7 @@ export async function runEmbeddedAttempt(
     const modelHasVision = params.model.input?.includes("image") ?? false;
     const toolsRaw = params.disableTools
       ? []
-      : createOpenClawCodingTools({
+      : await createOpenClawCodingTools({
           exec: {
             ...params.execOverrides,
             elevated: params.bashElevated,
@@ -260,7 +260,7 @@ export async function runEmbeddedAttempt(
         }) ?? [])
       : undefined;
     if (runtimeChannel === "telegram" && params.config) {
-      const inlineButtonsScope = resolveTelegramInlineButtonsScope({
+      const inlineButtonsScope = await resolveTelegramInlineButtonsScope({
         cfg: params.config,
         accountId: params.agentAccountId ?? undefined,
       });
@@ -277,10 +277,10 @@ export async function runEmbeddedAttempt(
     }
     const reactionGuidance =
       runtimeChannel && params.config
-        ? (() => {
+        ? await (async () => {
             if (runtimeChannel === "telegram") {
-              const resolved = resolveTelegramReactionLevel({
-                cfg: params.config,
+              const resolved = await resolveTelegramReactionLevel({
+                cfg: params.config!,
                 accountId: params.agentAccountId ?? undefined,
               });
               const level = resolved.agentReactionGuidance;
@@ -288,7 +288,7 @@ export async function runEmbeddedAttempt(
             }
             if (runtimeChannel === "signal") {
               const resolved = resolveSignalReactionLevel({
-                cfg: params.config,
+                cfg: params.config!,
                 accountId: params.agentAccountId ?? undefined,
               });
               const level = resolved.agentReactionGuidance;
@@ -305,7 +305,7 @@ export async function runEmbeddedAttempt(
     const reasoningTagHint = isReasoningTagProvider(params.provider);
     // Resolve channel-specific message actions for system prompt
     const channelActions = runtimeChannel
-      ? listChannelSupportedActions({
+      ? await listChannelSupportedActions({
           cfg: params.config,
           channel: runtimeChannel,
         })

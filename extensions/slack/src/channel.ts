@@ -62,7 +62,7 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount> = {
     normalizeAllowEntry: (entry) => entry.replace(/^(slack|user):/i, ""),
     notifyApproval: async ({ id }) => {
       const cfg = getSlackRuntime().config.loadConfig();
-      const account = resolveSlackAccount({
+      const account = await resolveSlackAccount({
         cfg,
         accountId: DEFAULT_ACCOUNT_ID,
       });
@@ -99,7 +99,7 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount> = {
   configSchema: buildChannelConfigSchema(SlackConfigSchema),
   config: {
     listAccountIds: (cfg) => listSlackAccountIds(cfg),
-    resolveAccount: (cfg, accountId) => resolveSlackAccount({ cfg, accountId }),
+    resolveAccount: async (cfg, accountId) => resolveSlackAccount({ cfg, accountId }),
     defaultAccountId: (cfg) => resolveDefaultSlackAccountId(cfg),
     setAccountEnabled: ({ cfg, accountId, enabled }) =>
       setAccountEnabledInConfigSection({
@@ -125,8 +125,10 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount> = {
       botTokenSource: account.botTokenSource,
       appTokenSource: account.appTokenSource,
     }),
-    resolveAllowFrom: ({ cfg, accountId }) =>
-      (resolveSlackAccount({ cfg, accountId }).dm?.allowFrom ?? []).map((entry) => String(entry)),
+    resolveAllowFrom: async ({ cfg, accountId }) =>
+      ((await resolveSlackAccount({ cfg, accountId })).dm?.allowFrom ?? []).map((entry) =>
+        String(entry),
+      ),
     formatAllowFrom: ({ allowFrom }) =>
       allowFrom
         .map((entry) => String(entry).trim())
@@ -175,8 +177,8 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount> = {
     resolveToolPolicy: resolveSlackGroupToolPolicy,
   },
   threading: {
-    resolveReplyToMode: ({ cfg, accountId, chatType }) =>
-      resolveSlackReplyToMode(resolveSlackAccount({ cfg, accountId }), chatType),
+    resolveReplyToMode: async ({ cfg, accountId, chatType }) =>
+      resolveSlackReplyToMode(await resolveSlackAccount({ cfg, accountId }), chatType),
     allowTagsWhenOff: true,
     buildToolContext: (params) => buildSlackThreadingToolContext(params),
   },
@@ -197,7 +199,7 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount> = {
   },
   resolver: {
     resolveTargets: async ({ cfg, accountId, inputs, kind }) => {
-      const account = resolveSlackAccount({ cfg, accountId });
+      const account = await resolveSlackAccount({ cfg, accountId });
       const token = account.config.userToken?.trim() || account.botToken?.trim();
       if (!token) {
         return inputs.map((input) => ({
@@ -233,8 +235,8 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount> = {
     },
   },
   actions: {
-    listActions: ({ cfg }) => {
-      const accounts = listEnabledSlackAccounts(cfg).filter(
+    listActions: async ({ cfg }) => {
+      const accounts = (await listEnabledSlackAccounts(cfg)).filter(
         (account) => account.botTokenSource !== "none",
       );
       if (accounts.length === 0) {
@@ -512,7 +514,7 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount> = {
     textChunkLimit: 4000,
     sendText: async ({ to, text, accountId, deps, replyToId, cfg }) => {
       const send = deps?.sendSlack ?? getSlackRuntime().channel.slack.sendMessageSlack;
-      const account = resolveSlackAccount({ cfg, accountId });
+      const account = await resolveSlackAccount({ cfg, accountId });
       const token = getTokenForOperation(account, "write");
       const botToken = account.botToken?.trim();
       const tokenOverride = token && token !== botToken ? token : undefined;
@@ -525,7 +527,7 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount> = {
     },
     sendMedia: async ({ to, text, mediaUrl, accountId, deps, replyToId, cfg }) => {
       const send = deps?.sendSlack ?? getSlackRuntime().channel.slack.sendMessageSlack;
-      const account = resolveSlackAccount({ cfg, accountId });
+      const account = await resolveSlackAccount({ cfg, accountId });
       const token = getTokenForOperation(account, "write");
       const botToken = account.botToken?.trim();
       const tokenOverride = token && token !== botToken ? token : undefined;

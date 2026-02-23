@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { GatewayWsClient } from "./server/ws-types.js";
 
+export type VirtualInvokeHandler = (command: string, params: unknown) => Promise<NodeInvokeResult>;
+
 export type NodeSession = {
   nodeId: string;
   connId: string;
-  client: GatewayWsClient;
+  client?: GatewayWsClient;
   displayName?: string;
   platform?: string;
   version?: string;
@@ -39,6 +41,7 @@ export class NodeRegistry {
   private nodesById = new Map<string, NodeSession>();
   private nodesByConn = new Map<string, string>();
   private pendingInvokes = new Map<string, PendingInvoke>();
+  private virtualHandlers = new Map<string, VirtualInvokeHandler>();
 
   register(client: GatewayWsClient, opts: { remoteIp?: string | undefined }) {
     const connect = client.connect;
@@ -96,6 +99,44 @@ export class NodeRegistry {
     return nodeId;
   }
 
+  registerVirtual(
+    nodeId: string,
+    handler: VirtualInvokeHandler,
+    opts: {
+      displayName?: string;
+      platform?: string;
+      caps?: string[];
+      commands?: string[];
+    } = {},
+  ): NodeSession {
+    const session: NodeSession = {
+      nodeId,
+      connId: `virtual:${nodeId}`,
+      displayName: opts.displayName,
+      platform: opts.platform,
+      caps: opts.caps ?? [],
+      commands: opts.commands ?? [],
+      connectedAtMs: Date.now(),
+    };
+    this.nodesById.set(nodeId, session);
+    this.virtualHandlers.set(nodeId, handler);
+    return session;
+  }
+
+  unregisterVirtual(nodeId: string): boolean {
+    const had = this.nodesById.delete(nodeId);
+    this.virtualHandlers.delete(nodeId);
+    for (const [id, pending] of this.pendingInvokes.entries()) {
+      if (pending.nodeId !== nodeId) {
+        continue;
+      }
+      clearTimeout(pending.timer);
+      pending.reject(new Error(`node disconnected (${pending.command})`));
+      this.pendingInvokes.delete(id);
+    }
+    return had;
+  }
+
   listConnected(): NodeSession[] {
     return [...this.nodesById.values()];
   }
@@ -118,6 +159,13 @@ export class NodeRegistry {
         error: { code: "NOT_CONNECTED", message: "node not connected" },
       };
     }
+
+    // Virtual nodes are handled locally — no WS roundtrip needed
+    const virtualHandler = this.virtualHandlers.get(params.nodeId);
+    if (virtualHandler) {
+      return virtualHandler(params.command, params.params);
+    }
+
     const requestId = randomUUID();
     const payload = {
       id: requestId,
@@ -189,6 +237,9 @@ export class NodeRegistry {
   }
 
   private sendEventInternal(node: NodeSession, event: string, payload: unknown): boolean {
+    if (!node.client) {
+      return false;
+    }
     try {
       node.client.socket.send(
         JSON.stringify({

@@ -1,5 +1,6 @@
 import type { OpenClawConfig } from "../config/config.js";
 import type { TelegramAccountConfig } from "../config/types.js";
+import type { CredentialService } from "../credentials/service.js";
 import { isTruthyEnvValue } from "../infra/env.js";
 import { listBoundAccountIds, resolveDefaultAgentBoundAccountId } from "../routing/bindings.js";
 import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../routing/session-key.js";
@@ -16,8 +17,10 @@ export type ResolvedTelegramAccount = {
   enabled: boolean;
   name?: string;
   token: string;
-  tokenSource: "env" | "tokenFile" | "config" | "none";
+  tokenSource: "env" | "tokenFile" | "config" | "credential" | "none";
   config: TelegramAccountConfig;
+  credentialId?: string;
+  credentialAccountId?: string;
 };
 
 function listConfiguredAccountIds(cfg: OpenClawConfig): string[] {
@@ -82,18 +85,23 @@ function mergeTelegramAccountConfig(cfg: OpenClawConfig, accountId: string): Tel
   return { ...base, ...account };
 }
 
-export function resolveTelegramAccount(params: {
+export async function resolveTelegramAccount(params: {
   cfg: OpenClawConfig;
   accountId?: string | null;
-}): ResolvedTelegramAccount {
+  credentialService?: CredentialService;
+}): Promise<ResolvedTelegramAccount> {
   const hasExplicitAccountId = Boolean(params.accountId?.trim());
   const baseEnabled = params.cfg.channels?.telegram?.enabled !== false;
 
-  const resolve = (accountId: string) => {
+  const resolve = async (accountId: string): Promise<ResolvedTelegramAccount> => {
     const merged = mergeTelegramAccountConfig(params.cfg, accountId);
     const accountEnabled = merged.enabled !== false;
     const enabled = baseEnabled && accountEnabled;
-    const tokenResolution = resolveTelegramToken(params.cfg, { accountId });
+    const tokenResolution = await resolveTelegramToken(params.cfg, {
+      accountId,
+      credentialService: params.credentialService,
+      credentialAccountId: merged.credentialAccountId,
+    });
     debugAccounts("resolve", {
       accountId,
       enabled,
@@ -106,11 +114,13 @@ export function resolveTelegramAccount(params: {
       token: tokenResolution.token,
       tokenSource: tokenResolution.source,
       config: merged,
-    } satisfies ResolvedTelegramAccount;
+      credentialId: tokenResolution.credentialId,
+      credentialAccountId: tokenResolution.credentialAccountId,
+    };
   };
 
   const normalized = normalizeAccountId(params.accountId);
-  const primary = resolve(normalized);
+  const primary = await resolve(normalized);
   if (hasExplicitAccountId) {
     return primary;
   }
@@ -125,15 +135,20 @@ export function resolveTelegramAccount(params: {
   if (fallbackId === primary.accountId) {
     return primary;
   }
-  const fallback = resolve(fallbackId);
+  const fallback = await resolve(fallbackId);
   if (fallback.tokenSource === "none") {
     return primary;
   }
   return fallback;
 }
 
-export function listEnabledTelegramAccounts(cfg: OpenClawConfig): ResolvedTelegramAccount[] {
-  return listTelegramAccountIds(cfg)
-    .map((accountId) => resolveTelegramAccount({ cfg, accountId }))
-    .filter((account) => account.enabled);
+export async function listEnabledTelegramAccounts(
+  cfg: OpenClawConfig,
+  credentialService?: CredentialService,
+): Promise<ResolvedTelegramAccount[]> {
+  const ids = listTelegramAccountIds(cfg);
+  const accounts = await Promise.all(
+    ids.map((accountId) => resolveTelegramAccount({ cfg, accountId, credentialService })),
+  );
+  return accounts.filter((account) => account.enabled);
 }

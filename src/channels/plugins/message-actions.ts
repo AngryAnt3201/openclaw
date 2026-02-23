@@ -3,10 +3,12 @@ import type { OpenClawConfig } from "../../config/config.js";
 import type { ChannelMessageActionContext, ChannelMessageActionName } from "./types.js";
 import { getChannelPlugin, listChannelPlugins } from "./index.js";
 
-export function listChannelMessageActions(cfg: OpenClawConfig): ChannelMessageActionName[] {
+export async function listChannelMessageActions(
+  cfg: OpenClawConfig,
+): Promise<ChannelMessageActionName[]> {
   const actions = new Set<ChannelMessageActionName>(["send", "broadcast"]);
   for (const plugin of listChannelPlugins()) {
-    const list = plugin.actions?.listActions?.({ cfg });
+    const list = await plugin.actions?.listActions?.({ cfg });
     if (!list) {
       continue;
     }
@@ -17,9 +19,9 @@ export function listChannelMessageActions(cfg: OpenClawConfig): ChannelMessageAc
   return Array.from(actions);
 }
 
-export function supportsChannelMessageButtons(cfg: OpenClawConfig): boolean {
+export async function supportsChannelMessageButtons(cfg: OpenClawConfig): Promise<boolean> {
   for (const plugin of listChannelPlugins()) {
-    if (plugin.actions?.supportsButtons?.({ cfg })) {
+    if (await plugin.actions?.supportsButtons?.({ cfg })) {
       return true;
     }
   }

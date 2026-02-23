@@ -2,6 +2,7 @@ import { CURRENT_SESSION_VERSION, SessionManager } from "@mariozechner/pi-coding
 import fs from "node:fs";
 import path from "node:path";
 import type { MsgContext } from "../../auto-reply/templating.js";
+import type { AppReference } from "../../tasks/types.js";
 import type { GatewayRequestContext, GatewayRequestHandlers } from "./types.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import { resolveThinkingDefault } from "../../agents/model-selection.js";
@@ -9,6 +10,7 @@ import { resolveAgentTimeoutMs } from "../../agents/timeout.js";
 import { dispatchInboundMessage } from "../../auto-reply/dispatch.js";
 import { createReplyDispatcher } from "../../auto-reply/reply/reply-dispatcher.js";
 import { createReplyPrefixOptions } from "../../channels/reply-prefix.js";
+import { getAgentRunContext } from "../../infra/agent-events.js";
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
 import { INTERNAL_MESSAGE_CHANNEL } from "../../utils/message-channel.js";
 import {
@@ -161,6 +163,55 @@ function nextChatSeq(context: { agentRunSeq: Map<string, number> }, runId: strin
   const next = (context.agentRunSeq.get(runId) ?? 0) + 1;
   context.agentRunSeq.set(runId, next);
   return next;
+}
+
+/**
+ * Extract inline `refs` JSON from agent response text.
+ * Agents can embed refs as a fenced JSON block (```json ... ```) at the end
+ * of their response containing a `{ "refs": [...] }` object. This function
+ * extracts and validates the refs, returning the cleaned text and parsed refs.
+ */
+function extractInlineRefs(text: string): { cleanedText: string; refs: AppReference[] } {
+  // Match a trailing fenced code block — capture everything inside the fence.
+  // Use greedy capture for the body since we want the LAST closing ``` fence.
+  const match = /\n*```(?:json)?\s*\n([\s\S]+?)\n```\s*$/.exec(text);
+  if (!match) {
+    return { cleanedText: text, refs: [] };
+  }
+  const body = match[1].trim();
+  // Quick check: must look like a JSON object containing "refs"
+  if (!body.startsWith("{") || !body.includes('"refs"')) {
+    return { cleanedText: text, refs: [] };
+  }
+  try {
+    const parsed = JSON.parse(body);
+    if (!Array.isArray(parsed.refs)) {
+      return { cleanedText: text, refs: [] };
+    }
+    // Basic shape validation: each ref needs appSlug, label, action
+    const validRefs: AppReference[] = [];
+    for (const ref of parsed.refs) {
+      if (
+        typeof ref === "object" &&
+        ref !== null &&
+        typeof ref.appSlug === "string" &&
+        typeof ref.label === "string" &&
+        typeof ref.action === "object" &&
+        ref.action !== null &&
+        typeof ref.action.type === "string"
+      ) {
+        validRefs.push(ref as AppReference);
+      }
+    }
+    if (validRefs.length === 0) {
+      return { cleanedText: text, refs: [] };
+    }
+    // Strip the JSON block from the text
+    const cleanedText = text.slice(0, match.index).trimEnd();
+    return { cleanedText, refs: validRefs };
+  } catch {
+    return { cleanedText: text, refs: [] };
+  }
 }
 
 function broadcastChatFinal(params: {
@@ -544,11 +595,27 @@ export const chatHandlers: GatewayRequestHandlers = {
       })
         .then(() => {
           // Build the final message from reply parts (works for both agent and non-agent runs)
-          const combinedReply = finalReplyParts
+          let combinedReply = finalReplyParts
             .map((part) => part.trim())
             .filter(Boolean)
             .join("\n\n")
             .trim();
+
+          // Extract inline refs from the response text (agent-generated refs)
+          let inlineRefs: AppReference[] = [];
+          if (combinedReply) {
+            const extracted = extractInlineRefs(combinedReply);
+            if (extracted.refs.length > 0) {
+              combinedReply = extracted.cleanedText;
+              inlineRefs = extracted.refs;
+            }
+          }
+
+          // Merge refs: task context refs (from agent run) + inline refs (from response text)
+          const runContext = getAgentRunContext(clientRunId);
+          const taskContextRefs = runContext?.refs ?? [];
+          const allRefs = [...taskContextRefs, ...inlineRefs];
+
           let message: Record<string, unknown> | undefined;
           if (combinedReply) {
             const { storePath: latestStorePath, entry: latestEntry } = loadSessionEntry(sessionKey);
@@ -585,6 +652,7 @@ export const chatHandlers: GatewayRequestHandlers = {
               runId: clientRunId,
               sessionKey: rawSessionKey,
               message,
+              refs: allRefs.length > 0 ? allRefs : undefined,
             });
           }
           context.dedupe.set(`chat:${clientRunId}`, {

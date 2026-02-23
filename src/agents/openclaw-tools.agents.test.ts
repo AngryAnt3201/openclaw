@@ -30,9 +30,11 @@ describe("agents_list", () => {
   });
 
   it("defaults to the requester agent only", async () => {
-    const tool = createOpenClawTools({
-      agentSessionKey: "main",
-    }).find((candidate) => candidate.name === "agents_list");
+    const tool = (
+      await createOpenClawTools({
+        agentSessionKey: "main",
+      })
+    ).find((candidate) => candidate.name === "agents_list");
     if (!tool) {
       throw new Error("missing agents_list tool");
     }
@@ -69,9 +71,11 @@ describe("agents_list", () => {
       },
     };
 
-    const tool = createOpenClawTools({
-      agentSessionKey: "main",
-    }).find((candidate) => candidate.name === "agents_list");
+    const tool = (
+      await createOpenClawTools({
+        agentSessionKey: "main",
+      })
+    ).find((candidate) => candidate.name === "agents_list");
     if (!tool) {
       throw new Error("missing agents_list tool");
     }
@@ -111,9 +115,11 @@ describe("agents_list", () => {
       },
     };
 
-    const tool = createOpenClawTools({
-      agentSessionKey: "main",
-    }).find((candidate) => candidate.name === "agents_list");
+    const tool = (
+      await createOpenClawTools({
+        agentSessionKey: "main",
+      })
+    ).find((candidate) => candidate.name === "agents_list");
     if (!tool) {
       throw new Error("missing agents_list tool");
     }
@@ -148,9 +154,11 @@ describe("agents_list", () => {
       },
     };
 
-    const tool = createOpenClawTools({
-      agentSessionKey: "main",
-    }).find((candidate) => candidate.name === "agents_list");
+    const tool = (
+      await createOpenClawTools({
+        agentSessionKey: "main",
+      })
+    ).find((candidate) => candidate.name === "agents_list");
     if (!tool) {
       throw new Error("missing agents_list tool");
     }

@@ -1,25 +1,31 @@
 import fs from "node:fs";
 import type { OpenClawConfig } from "../config/config.js";
 import type { TelegramAccountConfig } from "../config/types.telegram.js";
+import type { CredentialService } from "../credentials/service.js";
+import { resolveChannelToken } from "../credentials/channel-token-resolver.js";
 import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../routing/session-key.js";
 
-export type TelegramTokenSource = "env" | "tokenFile" | "config" | "none";
+export type TelegramTokenSource = "env" | "tokenFile" | "config" | "credential" | "none";
 
 export type TelegramTokenResolution = {
   token: string;
   source: TelegramTokenSource;
+  credentialId?: string;
+  credentialAccountId?: string;
 };
 
 type ResolveTelegramTokenOpts = {
   envToken?: string | null;
   accountId?: string | null;
   logMissingFile?: (message: string) => void;
+  credentialService?: CredentialService;
+  credentialAccountId?: string | null;
 };
 
-export function resolveTelegramToken(
+export async function resolveTelegramToken(
   cfg?: OpenClawConfig,
   opts: ResolveTelegramTokenOpts = {},
-): TelegramTokenResolution {
+): Promise<TelegramTokenResolution> {
   const accountId = normalizeAccountId(opts.accountId);
   const telegramCfg = cfg?.channels?.telegram;
 
@@ -43,6 +49,28 @@ export function resolveTelegramToken(
   const accountCfg = resolveAccountCfg(
     accountId !== DEFAULT_ACCOUNT_ID ? accountId : DEFAULT_ACCOUNT_ID,
   );
+
+  // Credential-backed resolution
+  const credAcctId = opts.credentialAccountId ?? accountCfg?.credentialAccountId;
+  if (opts.credentialService && credAcctId) {
+    const result = await resolveChannelToken({
+      credentialService: opts.credentialService,
+      credentialAccountId: credAcctId,
+      provider: "telegram",
+      envFallbackVar: "TELEGRAM_BOT_TOKEN",
+      allowEnvFallback: accountId === DEFAULT_ACCOUNT_ID,
+    });
+    if (result.source !== "none") {
+      return {
+        token: result.token,
+        source: result.source,
+        credentialId: result.credentialId,
+        credentialAccountId: result.accountId,
+      };
+    }
+  }
+
+  // Legacy resolution — tokenFile
   const accountTokenFile = accountCfg?.tokenFile?.trim();
   if (accountTokenFile) {
     if (!fs.existsSync(accountTokenFile)) {

@@ -171,7 +171,7 @@ describe("createTelegramBot", () => {
     replySpy.mockReset();
     replySpy.mockResolvedValue({ text: "a".repeat(4500) });
 
-    createTelegramBot({ token: "tok" });
+    await createTelegramBot({ token: "tok" });
     const handler = getOnHandler("message") as (ctx: Record<string, unknown>) => Promise<void>;
     await handler({
       message: {
@@ -199,7 +199,7 @@ describe("createTelegramBot", () => {
       replyToId: "101",
     });
 
-    createTelegramBot({ token: "tok", replyToMode: "first" });
+    await createTelegramBot({ token: "tok", replyToMode: "first" });
     const handler = getOnHandler("message") as (ctx: Record<string, unknown>) => Promise<void>;
     await handler({
       message: {
@@ -232,7 +232,7 @@ describe("createTelegramBot", () => {
       messages: { responsePrefix: "PFX" },
     });
 
-    createTelegramBot({ token: "tok" });
+    await createTelegramBot({ token: "tok" });
     const handler = getOnHandler("message") as (ctx: Record<string, unknown>) => Promise<void>;
     await handler({
       message: {
@@ -257,7 +257,7 @@ describe("createTelegramBot", () => {
       replyToId: "101",
     });
 
-    createTelegramBot({ token: "tok", replyToMode: "all" });
+    await createTelegramBot({ token: "tok", replyToMode: "all" });
     const handler = getOnHandler("message") as (ctx: Record<string, unknown>) => Promise<void>;
     await handler({
       message: {
@@ -289,7 +289,7 @@ describe("createTelegramBot", () => {
       },
     });
 
-    createTelegramBot({ token: "tok" });
+    await createTelegramBot({ token: "tok" });
     const handler = getOnHandler("message") as (ctx: Record<string, unknown>) => Promise<void>;
 
     await handler({
@@ -314,7 +314,7 @@ describe("createTelegramBot", () => {
       },
     });
 
-    createTelegramBot({ token: "tok" });
+    await createTelegramBot({ token: "tok" });
     const handler = getOnHandler("message") as (ctx: Record<string, unknown>) => Promise<void>;
 
     await handler({
@@ -361,7 +361,7 @@ describe("createTelegramBot", () => {
       session: { store: storePath },
     });
 
-    createTelegramBot({ token: "tok" });
+    await createTelegramBot({ token: "tok" });
     const handler = getOnHandler("message") as (ctx: Record<string, unknown>) => Promise<void>;
 
     await handler({

@@ -28,11 +28,11 @@ function extractGroupId(raw: string | undefined | null): string | undefined {
   return trimmed;
 }
 
-export function resolveGroupRequireMention(params: {
+export async function resolveGroupRequireMention(params: {
   cfg: OpenClawConfig;
   ctx: TemplateContext;
   groupResolution?: GroupKeyResolution;
-}): boolean {
+}): Promise<boolean> {
   const { cfg, ctx, groupResolution } = params;
   const rawChannel = groupResolution?.channel ?? ctx.Provider?.trim();
   const channel = normalizeChannelId(rawChannel);
@@ -42,7 +42,7 @@ export function resolveGroupRequireMention(params: {
   const groupId = groupResolution?.id ?? extractGroupId(ctx.From);
   const groupChannel = ctx.GroupChannel?.trim() ?? ctx.GroupSubject?.trim();
   const groupSpace = ctx.GroupSpace?.trim();
-  const requireMention = getChannelDock(channel)?.groups?.resolveRequireMention?.({
+  const requireMention = await getChannelDock(channel)?.groups?.resolveRequireMention?.({
     cfg,
     groupId,
     groupChannel,

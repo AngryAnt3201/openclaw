@@ -5,12 +5,12 @@ import { normalizeEmojiName, resolveDiscordRest } from "./send.shared.js";
 import { DISCORD_MAX_EMOJI_BYTES, DISCORD_MAX_STICKER_BYTES } from "./send.types.js";
 
 export async function listGuildEmojisDiscord(guildId: string, opts: DiscordReactOpts = {}) {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   return await rest.get(Routes.guildEmojis(guildId));
 }
 
 export async function uploadEmojiDiscord(payload: DiscordEmojiUpload, opts: DiscordReactOpts = {}) {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   const media = await loadWebMediaRaw(payload.mediaUrl, DISCORD_MAX_EMOJI_BYTES);
   const contentType = media.contentType?.toLowerCase();
   if (
@@ -34,7 +34,7 @@ export async function uploadStickerDiscord(
   payload: DiscordStickerUpload,
   opts: DiscordReactOpts = {},
 ) {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   const media = await loadWebMediaRaw(payload.mediaUrl, DISCORD_MAX_STICKER_BYTES);
   const contentType = media.contentType?.toLowerCase();
   if (!contentType || !["image/png", "image/apng", "application/json"].includes(contentType)) {

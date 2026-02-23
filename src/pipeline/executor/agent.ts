@@ -112,13 +112,22 @@ async function executeIsolatedSession(
     previousOutput: input,
   });
 
-  const status = result.status === "ok" ? "success" : "failure";
+  const isOk = result.status === "ok";
+  const status = isOk ? "success" : "failure";
+
+  // Extract error from multiple possible fields — gateway responses vary.
+  const error = !isOk
+    ? ((typeof result.error === "string" ? result.error : undefined) ??
+      (typeof result.message === "string" ? result.message : undefined) ??
+      `Agent returned status: ${String(result.status ?? "unknown")}`)
+    : undefined;
 
   return {
     status,
     output: result,
-    error: typeof result.error === "string" ? result.error : undefined,
+    error,
     durationMs: Date.now() - startMs,
+    sessionKey: typeof result.sessionKey === "string" ? result.sessionKey : undefined,
   };
 }
 

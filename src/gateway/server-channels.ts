@@ -50,10 +50,11 @@ type ChannelManagerOptions = {
   loadConfig: () => OpenClawConfig;
   channelLogs: Record<ChannelId, SubsystemLogger>;
   channelRuntimeEnvs: Record<ChannelId, RuntimeEnv>;
+  credentialService?: import("../credentials/service.js").CredentialService;
 };
 
 export type ChannelManager = {
-  getRuntimeSnapshot: () => ChannelRuntimeSnapshot;
+  getRuntimeSnapshot: () => Promise<ChannelRuntimeSnapshot>;
   startChannels: () => Promise<void>;
   startChannel: (channel: ChannelId, accountId?: string) => Promise<void>;
   stopChannel: (channel: ChannelId, accountId?: string) => Promise<void>;
@@ -62,7 +63,7 @@ export type ChannelManager = {
 
 // Channel docking: lifecycle hooks (`plugin.gateway`) flow through this manager.
 export function createChannelManager(opts: ChannelManagerOptions): ChannelManager {
-  const { loadConfig, channelLogs, channelRuntimeEnvs } = opts;
+  const { loadConfig, channelLogs, channelRuntimeEnvs, credentialService } = opts;
 
   const channelStores = new Map<ChannelId, ChannelRuntimeStore>();
 
@@ -112,7 +113,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
         if (store.tasks.has(id)) {
           return;
         }
-        const account = plugin.config.resolveAccount(cfg, id);
+        const account = await plugin.config.resolveAccount(cfg, id);
         const enabled = plugin.config.isEnabled
           ? plugin.config.isEnabled(account, cfg)
           : isAccountEnabled(account);
@@ -157,6 +158,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
           log,
           getStatus: () => getRuntime(channelId, id),
           setStatus: (next) => setRuntime(channelId, id, next),
+          credentialService,
         });
         const tracked = Promise.resolve(task)
           .catch((err) => {
@@ -201,7 +203,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
         }
         abort?.abort();
         if (plugin?.gateway?.stopAccount) {
-          const account = plugin.config.resolveAccount(cfg, id);
+          const account = await plugin.config.resolveAccount(cfg, id);
           await plugin.gateway.stopAccount({
             cfg,
             accountId: id,
@@ -259,7 +261,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
     setRuntime(channelId, resolvedId, next);
   };
 
-  const getRuntimeSnapshot = (): ChannelRuntimeSnapshot => {
+  const getRuntimeSnapshot = async (): Promise<ChannelRuntimeSnapshot> => {
     const cfg = loadConfig();
     const channels: ChannelRuntimeSnapshot["channels"] = {};
     const channelAccounts: ChannelRuntimeSnapshot["channelAccounts"] = {};
@@ -273,7 +275,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
       });
       const accounts: Record<string, ChannelAccountSnapshot> = {};
       for (const id of accountIds) {
-        const account = plugin.config.resolveAccount(cfg, id);
+        const account = await plugin.config.resolveAccount(cfg, id);
         const enabled = plugin.config.isEnabled
           ? plugin.config.isEnabled(account, cfg)
           : isAccountEnabled(account);

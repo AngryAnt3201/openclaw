@@ -8,8 +8,15 @@
 import { existsSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import type { OpenClawConfig } from "../config/config.js";
 import type { CredentialService } from "./service.js";
-import type { CredentialCategory, CredentialCreateInput, CredentialSecret } from "./types.js";
+import type {
+  AccountProvider,
+  CredentialCategory,
+  CredentialCreateInput,
+  CredentialSecret,
+} from "./types.js";
+import { bindSystemAgentToAccount } from "./system-agent.js";
 
 // ---------------------------------------------------------------------------
 // Source types (from legacy system)
@@ -318,4 +325,210 @@ export async function runCredentialMigration(params: {
   }
 
   return { totalMigrated };
+}
+
+// ---------------------------------------------------------------------------
+// V2 Migration: Channel tokens → Credential accounts + credentialAccountId
+// ---------------------------------------------------------------------------
+// Creates Account + Credential entities for each channel that has plaintext
+// tokens but no credentialAccountId set. Writes credentialAccountId back to
+// the mapping so the caller can update the config file.
+// ---------------------------------------------------------------------------
+
+type ChannelTokenSpec = {
+  channel: string;
+  provider: AccountProvider;
+  label: string;
+  /** Keys to extract from account config. Each becomes a separate credential. */
+  tokenKeys: Array<{
+    configKey: string;
+    metadataKey: string;
+    credentialName: string;
+  }>;
+  /** Optional: read from a file path instead of inline value. */
+  tokenFileKey?: string;
+};
+
+const CHANNEL_TOKEN_SPECS: ChannelTokenSpec[] = [
+  {
+    channel: "discord",
+    provider: "discord",
+    label: "Discord Bot",
+    tokenKeys: [
+      { configKey: "token", metadataKey: "tokenCredentialId", credentialName: "Discord Bot Token" },
+    ],
+  },
+  {
+    channel: "telegram",
+    provider: "telegram",
+    label: "Telegram Bot",
+    tokenKeys: [
+      {
+        configKey: "botToken",
+        metadataKey: "botTokenCredentialId",
+        credentialName: "Telegram Bot Token",
+      },
+    ],
+    tokenFileKey: "tokenFile",
+  },
+  {
+    channel: "slack",
+    provider: "slack",
+    label: "Slack Bot",
+    tokenKeys: [
+      {
+        configKey: "botToken",
+        metadataKey: "botTokenCredentialId",
+        credentialName: "Slack Bot Token",
+      },
+      {
+        configKey: "appToken",
+        metadataKey: "appTokenCredentialId",
+        credentialName: "Slack App Token",
+      },
+      {
+        configKey: "userToken",
+        metadataKey: "userTokenCredentialId",
+        credentialName: "Slack User Token",
+      },
+    ],
+  },
+];
+
+export type ChannelMigrationMapping = {
+  channel: string;
+  accountKey: string;
+  credentialAccountId: string;
+};
+
+export type ChannelMigrationResult = {
+  migrated: number;
+  mappings: ChannelMigrationMapping[];
+};
+
+async function readTokenFromFile(filePath: string): Promise<string | null> {
+  try {
+    const content = await fs.readFile(filePath, "utf-8");
+    return content.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveAccountConfigs(
+  cfg: OpenClawConfig,
+  channel: string,
+): Array<{ accountKey: string; config: Record<string, unknown> }> {
+  const channels = cfg.channels as Record<string, unknown> | undefined;
+  if (!channels) {
+    return [];
+  }
+  const channelSection = channels[channel] as Record<string, unknown> | undefined;
+  if (!channelSection) {
+    return [];
+  }
+
+  // Check for accounts map (multi-account)
+  const accounts = channelSection.accounts as Record<string, Record<string, unknown>> | undefined;
+  if (accounts && typeof accounts === "object") {
+    return Object.entries(accounts).map(([key, config]) => ({ accountKey: key, config }));
+  }
+
+  // Single-account (top-level config is the account)
+  return [{ accountKey: "default", config: channelSection }];
+}
+
+export async function migrateChannelTokensV2(params: {
+  service: CredentialService;
+  cfg: OpenClawConfig;
+  log: { info: (msg: string) => void; warn: (msg: string) => void };
+}): Promise<ChannelMigrationResult> {
+  const { service, cfg, log } = params;
+  const mappings: ChannelMigrationMapping[] = [];
+  let migrated = 0;
+
+  for (const spec of CHANNEL_TOKEN_SPECS) {
+    const accountConfigs = resolveAccountConfigs(cfg, spec.channel);
+    for (const { accountKey, config } of accountConfigs) {
+      // Skip if credentialAccountId already set
+      if (typeof config.credentialAccountId === "string" && config.credentialAccountId.trim()) {
+        continue;
+      }
+
+      // Collect tokens from config
+      const tokenValues = new Map<string, string>();
+      for (const tk of spec.tokenKeys) {
+        const value = config[tk.configKey];
+        if (typeof value === "string" && value.trim()) {
+          tokenValues.set(tk.metadataKey, value.trim());
+        }
+      }
+
+      // Try tokenFile fallback (telegram)
+      if (tokenValues.size === 0 && spec.tokenFileKey) {
+        const filePath = config[spec.tokenFileKey];
+        if (typeof filePath === "string" && filePath.trim()) {
+          const token = await readTokenFromFile(filePath.trim());
+          if (token) {
+            tokenValues.set(spec.tokenKeys[0]!.metadataKey, token);
+          }
+        }
+      }
+
+      if (tokenValues.size === 0) {
+        continue;
+      }
+
+      // Create Account
+      const accountLabel = accountKey === "default" ? spec.label : `${spec.label} (${accountKey})`;
+      const account = await service.createAccount({
+        name: accountLabel,
+        provider: spec.provider,
+        tags: ["migrated-v2", "channel"],
+      });
+
+      // Create Credentials and link to account
+      const metadata: Record<string, string> = {};
+      for (const tk of spec.tokenKeys) {
+        const token = tokenValues.get(tk.metadataKey);
+        if (!token) {
+          continue;
+        }
+
+        const credential = await service.create({
+          name: tk.credentialName,
+          category: "channel_bot",
+          provider: spec.provider,
+          description: `Migrated from channels.${spec.channel}.${tk.configKey}`,
+          tags: ["migrated-v2", "channel"],
+          secret: { kind: "token", token },
+        });
+
+        await service.addCredentialToAccount(account.id, credential.id);
+        metadata[tk.metadataKey] = credential.id;
+      }
+
+      // Update account metadata with credential ID mapping
+      if (Object.keys(metadata).length > 0) {
+        await service.updateAccount(account.id, { metadata });
+      }
+
+      // Bind system agent
+      await bindSystemAgentToAccount(service, account.id);
+
+      mappings.push({
+        channel: spec.channel,
+        accountKey,
+        credentialAccountId: account.id,
+      });
+      migrated++;
+      log.info(`migrated ${spec.channel}/${accountKey} → account ${account.id}`);
+    }
+  }
+
+  if (migrated > 0) {
+    log.info(`channel token migration V2 complete: ${migrated} account(s) created`);
+  }
+
+  return { migrated, mappings };
 }

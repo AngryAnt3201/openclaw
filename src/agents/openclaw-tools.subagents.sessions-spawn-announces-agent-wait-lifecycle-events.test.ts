@@ -100,10 +100,12 @@ describe("openclaw-tools: subagents", () => {
       return {};
     });
 
-    const tool = createOpenClawTools({
-      agentSessionKey: "discord:group:req",
-      agentChannel: "discord",
-    }).find((candidate) => candidate.name === "sessions_spawn");
+    const tool = (
+      await createOpenClawTools({
+        agentSessionKey: "discord:group:req",
+        agentChannel: "discord",
+      })
+    ).find((candidate) => candidate.name === "sessions_spawn");
     if (!tool) {
       throw new Error("missing sessions_spawn tool");
     }

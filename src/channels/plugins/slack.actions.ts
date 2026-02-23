@@ -11,8 +11,8 @@ import { resolveSlackChannelId } from "../../slack/targets.js";
 
 export function createSlackActions(providerId: string): ChannelMessageActionAdapter {
   return {
-    listActions: ({ cfg }) => {
-      const accounts = listEnabledSlackAccounts(cfg).filter(
+    listActions: async ({ cfg }) => {
+      const accounts = (await listEnabledSlackAccounts(cfg)).filter(
         (account) => account.botTokenSource !== "none",
       );
       if (accounts.length === 0) {

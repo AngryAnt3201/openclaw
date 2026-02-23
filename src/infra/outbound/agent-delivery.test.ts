@@ -33,7 +33,7 @@ describe("agent delivery helpers", () => {
     expect(plan.deliveryTargetMode).toBe("implicit");
   });
 
-  it("resolves fallback targets when no explicit destination is provided", () => {
+  it("resolves fallback targets when no explicit destination is provided", async () => {
     const plan = resolveAgentDeliveryPlan({
       sessionEntry: {
         deliveryContext: { channel: "whatsapp" },
@@ -44,7 +44,7 @@ describe("agent delivery helpers", () => {
       wantsDelivery: true,
     });
 
-    const resolved = resolveAgentOutboundTarget({
+    const resolved = await resolveAgentOutboundTarget({
       cfg: {} as OpenClawConfig,
       plan,
       targetMode: "implicit",
@@ -55,7 +55,7 @@ describe("agent delivery helpers", () => {
     expect(resolved.resolvedTo).toBe("+1999");
   });
 
-  it("skips outbound target resolution when explicit target validation is disabled", () => {
+  it("skips outbound target resolution when explicit target validation is disabled", async () => {
     const plan = resolveAgentDeliveryPlan({
       sessionEntry: {
         deliveryContext: { channel: "whatsapp", to: "+1555" },
@@ -67,7 +67,7 @@ describe("agent delivery helpers", () => {
     });
 
     mocks.resolveOutboundTarget.mockClear();
-    const resolved = resolveAgentOutboundTarget({
+    const resolved = await resolveAgentOutboundTarget({
       cfg: {} as OpenClawConfig,
       plan,
       targetMode: "explicit",

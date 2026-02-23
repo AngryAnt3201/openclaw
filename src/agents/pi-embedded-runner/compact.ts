@@ -217,7 +217,7 @@ export async function compactEmbeddedPiSessionDirect(
       warn: makeBootstrapWarn({ sessionLabel, warn: (message) => log.warn(message) }),
     });
     const runAbortController = new AbortController();
-    const toolsRaw = createOpenClawCodingTools({
+    const toolsRaw = await createOpenClawCodingTools({
       exec: {
         ...resolveExecToolDefaults(params.config),
         elevated: params.bashElevated,
@@ -251,7 +251,7 @@ export async function compactEmbeddedPiSessionDirect(
         }) ?? [])
       : undefined;
     if (runtimeChannel === "telegram" && params.config) {
-      const inlineButtonsScope = resolveTelegramInlineButtonsScope({
+      const inlineButtonsScope = await resolveTelegramInlineButtonsScope({
         cfg: params.config,
         accountId: params.agentAccountId ?? undefined,
       });
@@ -268,10 +268,10 @@ export async function compactEmbeddedPiSessionDirect(
     }
     const reactionGuidance =
       runtimeChannel && params.config
-        ? (() => {
+        ? await (async () => {
             if (runtimeChannel === "telegram") {
-              const resolved = resolveTelegramReactionLevel({
-                cfg: params.config,
+              const resolved = await resolveTelegramReactionLevel({
+                cfg: params.config!,
                 accountId: params.agentAccountId ?? undefined,
               });
               const level = resolved.agentReactionGuidance;
@@ -279,7 +279,7 @@ export async function compactEmbeddedPiSessionDirect(
             }
             if (runtimeChannel === "signal") {
               const resolved = resolveSignalReactionLevel({
-                cfg: params.config,
+                cfg: params.config!,
                 accountId: params.agentAccountId ?? undefined,
               });
               const level = resolved.agentReactionGuidance;
@@ -290,7 +290,7 @@ export async function compactEmbeddedPiSessionDirect(
         : undefined;
     // Resolve channel-specific message actions for system prompt
     const channelActions = runtimeChannel
-      ? listChannelSupportedActions({
+      ? await listChannelSupportedActions({
           cfg: params.config,
           channel: runtimeChannel,
         })

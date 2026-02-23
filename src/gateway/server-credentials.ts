@@ -8,6 +8,7 @@ import { LEASE_EXPIRY_INTERVAL_MS } from "../credentials/constants.js";
 import { resolveMasterKey } from "../credentials/encryption.js";
 import { CredentialService } from "../credentials/service.js";
 import { resolveCredentialStorePath } from "../credentials/store.js";
+import { ensureSystemAgentProfile } from "../credentials/system-agent.js";
 import { getChildLogger } from "../logging.js";
 
 export type GatewayCredentialState = {
@@ -44,6 +45,15 @@ export async function buildGatewayCredentialService(params: {
   } catch (err) {
     log.error(
       `credential service init failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  // Ensure system agent profile exists for channel token checkout
+  try {
+    await ensureSystemAgentProfile(credentialService);
+  } catch (err) {
+    log.warn(
+      `system agent profile setup failed: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 

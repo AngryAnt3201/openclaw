@@ -4,7 +4,7 @@ import { logVerbose } from "../globals.js";
 import { resolveSlackAccount } from "./accounts.js";
 import { createSlackWebClient } from "./client.js";
 import { sendMessageSlack } from "./send.js";
-import { resolveSlackBotToken } from "./token.js";
+import { normalizeSlackToken } from "./token.js";
 
 export type SlackActionClientOpts = {
   accountId?: string;
@@ -31,10 +31,10 @@ export type SlackPin = {
   file?: { id?: string; name?: string };
 };
 
-function resolveToken(explicit?: string, accountId?: string) {
+async function resolveToken(explicit?: string, accountId?: string) {
   const cfg = loadConfig();
-  const account = resolveSlackAccount({ cfg, accountId });
-  const token = resolveSlackBotToken(explicit ?? account.botToken ?? undefined);
+  const account = await resolveSlackAccount({ cfg, accountId });
+  const token = normalizeSlackToken(explicit ?? account.botToken ?? undefined);
   if (!token) {
     logVerbose(
       `slack actions: missing bot token for account=${account.accountId} explicit=${Boolean(
@@ -55,7 +55,7 @@ function normalizeEmoji(raw: string) {
 }
 
 async function getClient(opts: SlackActionClientOpts = {}) {
-  const token = resolveToken(opts.token, opts.accountId);
+  const token = await resolveToken(opts.token, opts.accountId);
   return opts.client ?? createSlackWebClient(token);
 }
 

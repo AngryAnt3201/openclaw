@@ -352,13 +352,13 @@ async function resolveChannelReports(params: {
           : [resolveChannelDefaultAccountId({ plugin, cfg, accountIds: ids })];
       })();
   const reports: ChannelCapabilitiesReport[] = [];
-  const listedActions = plugin.actions?.listActions?.({ cfg }) ?? [];
+  const listedActions = (await plugin.actions?.listActions?.({ cfg })) ?? [];
   const actions = Array.from(
     new Set<string>(["send", "broadcast", ...listedActions.map((action) => String(action))]),
   );
 
   for (const accountId of accountIds) {
-    const resolvedAccount = plugin.config.resolveAccount(cfg, accountId);
+    const resolvedAccount = await plugin.config.resolveAccount(cfg, accountId);
     const configured = plugin.config.isConfigured
       ? await plugin.config.isConfigured(resolvedAccount, cfg)
       : Boolean(resolvedAccount);

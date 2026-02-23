@@ -80,7 +80,8 @@ describe("Pipeline Core Types", () => {
       expect(PROCESSING_NODE_TYPES).toContain("condition");
       expect(PROCESSING_NODE_TYPES).toContain("approval");
       expect(PROCESSING_NODE_TYPES).toContain("loop");
-      expect(PROCESSING_NODE_TYPES).toHaveLength(5);
+      expect(PROCESSING_NODE_TYPES).toContain("code");
+      expect(PROCESSING_NODE_TYPES).toHaveLength(6);
     });
 
     it("should expose action node types", () => {

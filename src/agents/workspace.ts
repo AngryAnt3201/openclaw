@@ -5,6 +5,9 @@ import { resolveRequiredHomeDir } from "../infra/home-dir.js";
 import { runCommandWithTimeout } from "../process/exec.js";
 import { isSubagentSessionKey } from "../routing/session-key.js";
 import { resolveUserPath } from "../utils.js";
+import { CODER_SOUL_CONTENT } from "./builtin/coder-soul.js";
+import { getBuiltInAgentConfig, isBuiltInAgent } from "./builtin/index.js";
+import { MIRANDA_SOUL_CONTENT } from "./builtin/miranda-soul.js";
 import { resolveWorkspaceTemplateDir } from "./workspace-templates.js";
 
 export function resolveDefaultAgentWorkspaceDir(
@@ -290,6 +293,29 @@ export async function loadWorkspaceBootstrapFiles(dir: string): Promise<Workspac
     }
   }
   return result;
+}
+
+// ── Built-in agent SOUL bootstrap ────────────────────────────────────────
+
+const BUILTIN_SOUL_CONTENT: Record<string, string> = {
+  miranda: MIRANDA_SOUL_CONTENT,
+  coder: CODER_SOUL_CONTENT,
+};
+
+/**
+ * For built-in agents, ensure their SOUL.md exists in the workspace.
+ * Does NOT overwrite an existing file (user edits are preserved).
+ */
+export async function ensureBuiltInAgentSoul(agentId: string, workspaceDir: string): Promise<void> {
+  if (!isBuiltInAgent(agentId)) {
+    return;
+  }
+  const soulContent = BUILTIN_SOUL_CONTENT[agentId];
+  if (!soulContent) {
+    return;
+  }
+  const soulPath = path.join(workspaceDir, DEFAULT_SOUL_FILENAME);
+  await writeFileIfMissing(soulPath, soulContent);
 }
 
 const SUBAGENT_BOOTSTRAP_ALLOWLIST = new Set([DEFAULT_AGENTS_FILENAME, DEFAULT_TOOLS_FILENAME]);

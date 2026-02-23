@@ -30,7 +30,7 @@ async function isPluginConfigured(plugin: ChannelPlugin, cfg: OpenClawConfig): P
   }
 
   for (const accountId of accountIds) {
-    const account = plugin.config.resolveAccount(cfg, accountId);
+    const account = await plugin.config.resolveAccount(cfg, accountId);
     const enabled = plugin.config.isEnabled
       ? plugin.config.isEnabled(account, cfg)
       : isAccountEnabled(account);

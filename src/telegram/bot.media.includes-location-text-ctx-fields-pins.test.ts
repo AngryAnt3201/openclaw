@@ -105,7 +105,7 @@ describe("telegram inbound media", () => {
       onSpy.mockReset();
       replySpy.mockReset();
 
-      createTelegramBot({ token: "tok" });
+      await createTelegramBot({ token: "tok" });
       const handler = onSpy.mock.calls.find((call) => call[0] === "message")?.[1] as (
         ctx: Record<string, unknown>,
       ) => Promise<void>;
@@ -149,7 +149,7 @@ describe("telegram inbound media", () => {
       onSpy.mockReset();
       replySpy.mockReset();
 
-      createTelegramBot({ token: "tok" });
+      await createTelegramBot({ token: "tok" });
       const handler = onSpy.mock.calls.find((call) => call[0] === "message")?.[1] as (
         ctx: Record<string, unknown>,
       ) => Promise<void>;

@@ -60,7 +60,7 @@ type RunPreparedReplyParams = {
   agentCfg: AgentDefaults;
   sessionCfg: OpenClawConfig["session"];
   commandAuthorized: boolean;
-  command: ReturnType<typeof buildCommandContext>;
+  command: Awaited<ReturnType<typeof buildCommandContext>>;
   commandSource: string;
   allowTextCommands: boolean;
   directives: InlineDirectives;

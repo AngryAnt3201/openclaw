@@ -13,7 +13,14 @@ export const TRIGGER_NODE_TYPES = ["cron", "webhook", "task_event", "manual"] as
 
 export type TriggerNodeType = (typeof TRIGGER_NODE_TYPES)[number];
 
-export const PROCESSING_NODE_TYPES = ["agent", "app", "condition", "approval", "loop"] as const;
+export const PROCESSING_NODE_TYPES = [
+  "agent",
+  "app",
+  "condition",
+  "approval",
+  "loop",
+  "code",
+] as const;
 
 export type ProcessingNodeType = (typeof PROCESSING_NODE_TYPES)[number];
 
@@ -111,6 +118,14 @@ export type LoopConfig = {
   condition: string;
 };
 
+export type CodeNodeConfig = {
+  kind: "code";
+  description: string;
+  language?: string;
+  maxRetries?: number;
+  timeout?: number;
+};
+
 // ===========================================================================
 // NODE CONFIGS — Action nodes
 // ===========================================================================
@@ -143,6 +158,7 @@ export type NodeConfig =
   | ConditionConfig
   | ApprovalConfig
   | LoopConfig
+  | CodeNodeConfig
   | NotifyConfig
   | OutputConfig;
 

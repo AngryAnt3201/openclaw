@@ -36,7 +36,7 @@ describe("nodes camera_snap", () => {
       throw new Error(`unexpected method: ${String(method)}`);
     });
 
-    const tool = createOpenClawTools().find((candidate) => candidate.name === "nodes");
+    const tool = (await createOpenClawTools()).find((candidate) => candidate.name === "nodes");
     if (!tool) {
       throw new Error("missing nodes tool");
     }
@@ -74,7 +74,7 @@ describe("nodes camera_snap", () => {
       throw new Error(`unexpected method: ${String(method)}`);
     });
 
-    const tool = createOpenClawTools().find((candidate) => candidate.name === "nodes");
+    const tool = (await createOpenClawTools()).find((candidate) => candidate.name === "nodes");
     if (!tool) {
       throw new Error("missing nodes tool");
     }
@@ -117,7 +117,7 @@ describe("nodes run", () => {
       throw new Error(`unexpected method: ${String(method)}`);
     });
 
-    const tool = createOpenClawTools().find((candidate) => candidate.name === "nodes");
+    const tool = (await createOpenClawTools()).find((candidate) => candidate.name === "nodes");
     if (!tool) {
       throw new Error("missing nodes tool");
     }

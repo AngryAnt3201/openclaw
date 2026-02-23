@@ -50,7 +50,7 @@ export async function buildProviderStatusIndex(
   for (const plugin of listChannelPlugins()) {
     const accountIds = plugin.config.listAccountIds(cfg);
     for (const accountId of accountIds) {
-      const account = plugin.config.resolveAccount(cfg, accountId);
+      const account = await plugin.config.resolveAccount(cfg, accountId);
       const snapshot = plugin.config.describeAccount?.(account, cfg);
       const enabled = plugin.config.isEnabled
         ? plugin.config.isEnabled(account, cfg)

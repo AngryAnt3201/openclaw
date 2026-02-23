@@ -15,7 +15,7 @@ describe("createOpenClawCodingTools", () => {
       await fs.writeFile(path.join(tmpDir, testFile), testContent, "utf8");
 
       // Create tools with explicit workspaceDir
-      const tools = createOpenClawCodingTools({ workspaceDir: tmpDir });
+      const tools = await createOpenClawCodingTools({ workspaceDir: tmpDir });
       const readTool = tools.find((tool) => tool.name === "read");
       expect(readTool).toBeDefined();
 
@@ -40,7 +40,7 @@ describe("createOpenClawCodingTools", () => {
       const testContent = "written via workspace path";
 
       // Create tools with explicit workspaceDir
-      const tools = createOpenClawCodingTools({ workspaceDir: tmpDir });
+      const tools = await createOpenClawCodingTools({ workspaceDir: tmpDir });
       const writeTool = tools.find((tool) => tool.name === "write");
       expect(writeTool).toBeDefined();
 
@@ -66,7 +66,7 @@ describe("createOpenClawCodingTools", () => {
       await fs.writeFile(path.join(tmpDir, testFile), originalContent, "utf8");
 
       // Create tools with explicit workspaceDir
-      const tools = createOpenClawCodingTools({ workspaceDir: tmpDir });
+      const tools = await createOpenClawCodingTools({ workspaceDir: tmpDir });
       const editTool = tools.find((tool) => tool.name === "edit");
       expect(editTool).toBeDefined();
 
@@ -87,7 +87,7 @@ describe("createOpenClawCodingTools", () => {
   it("accepts Claude Code parameter aliases for read/write/edit", async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-alias-"));
     try {
-      const tools = createOpenClawCodingTools({ workspaceDir: tmpDir });
+      const tools = await createOpenClawCodingTools({ workspaceDir: tmpDir });
       const readTool = tools.find((tool) => tool.name === "read");
       const writeTool = tools.find((tool) => tool.name === "write");
       const editTool = tools.find((tool) => tool.name === "edit");

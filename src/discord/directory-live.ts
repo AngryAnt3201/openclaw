@@ -21,7 +21,7 @@ function buildUserRank(user: DiscordUser): number {
 export async function listDiscordDirectoryGroupsLive(
   params: DirectoryConfigParams,
 ): Promise<ChannelDirectoryEntry[]> {
-  const account = resolveDiscordAccount({ cfg: params.cfg, accountId: params.accountId });
+  const account = await resolveDiscordAccount({ cfg: params.cfg, accountId: params.accountId });
   const token = normalizeDiscordToken(account.token);
   if (!token) {
     return [];
@@ -59,7 +59,7 @@ export async function listDiscordDirectoryGroupsLive(
 export async function listDiscordDirectoryPeersLive(
   params: DirectoryConfigParams,
 ): Promise<ChannelDirectoryEntry[]> {
-  const account = resolveDiscordAccount({ cfg: params.cfg, accountId: params.accountId });
+  const account = await resolveDiscordAccount({ cfg: params.cfg, accountId: params.accountId });
   const token = normalizeDiscordToken(account.token);
   if (!token) {
     return [];

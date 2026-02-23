@@ -55,13 +55,19 @@ export const executeAppNode: NodeExecutorFn = async (
     const health = (await context.callGatewayRpc("launcher.health", { appId: config.appId })) as {
       healthy: boolean;
     } | null;
+    let startResult: { proxyUrl?: string } | null = null;
     if (!health?.healthy) {
-      await context.callGatewayRpc("launcher.start", { appId: config.appId });
+      startResult = (await context.callGatewayRpc("launcher.start", { appId: config.appId })) as {
+        proxyUrl?: string;
+      } | null;
       await pollHealth(context, config.appId);
     }
 
     // 3. Build proxy URL + agent prompt
-    const proxyUrl = `http://localhost:18789/app-proxy/${config.appId}/`;
+    const proxyUrl =
+      startResult?.proxyUrl ??
+      ((app as Record<string, unknown>).proxy_url as string | undefined) ??
+      `http://127.0.0.1:${app.port ?? 3000}`;
     const prompt = buildAppPrompt(app, proxyUrl, config.prompt, input);
 
     // 4. Execute via agent session

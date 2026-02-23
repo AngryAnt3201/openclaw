@@ -122,6 +122,7 @@ export async function migrateLegacyLauncherStore(
       device_id: null,
       env_vars: null,
       health_check_url: null,
+      proxy_url: null,
       createdAtMs: now,
       updatedAtMs: now,
     }));

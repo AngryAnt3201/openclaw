@@ -194,15 +194,44 @@ export const launcherHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
+      const appPort = app.port ?? 3000;
       const result = await context.processManager.start(appId, {
         runCommand: app.run_command,
         workingDir: app.working_dir,
-        port: app.port ?? 3000,
+        port: appPort,
         envVars: app.env_vars ?? undefined,
         healthCheckUrl: app.health_check_url ?? undefined,
       });
-      await context.launcherService.update(appId, { status: result.status });
-      const proxyUrl = `http://localhost:18789/app-proxy/${appId}/`;
+
+      // Create per-port reverse proxy if external bind IP is available
+      let proxyUrl: string | null = null;
+      if (context.portProxy && context.externalBindIp) {
+        try {
+          const proxyResult = await context.portProxy.create(appId, {
+            externalHost: context.externalBindIp,
+            externalPort: appPort,
+            targetPort: appPort,
+          });
+          proxyUrl = proxyResult.url;
+        } catch (proxyErr) {
+          const errMsg = String(proxyErr);
+          if (errMsg.includes("EADDRINUSE")) {
+            // Port already occupied on external IP — app itself bound to
+            // 0.0.0.0 so it's already externally accessible. Use direct URL.
+            proxyUrl = `http://${context.externalBindIp}:${appPort}`;
+            context.logGateway?.info?.(
+              `port proxy: ${appId} already bound externally, using direct URL`,
+            );
+          } else {
+            context.logGateway?.warn?.(`port proxy failed for ${appId}: ${errMsg}`);
+          }
+        }
+      }
+
+      await context.launcherService.update(appId, {
+        status: result.status,
+        proxy_url: proxyUrl,
+      });
       respond(true, { ...result, proxyUrl }, undefined);
     } catch (err) {
       respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, String(err)));
@@ -226,9 +255,13 @@ export const launcherHandlers: GatewayRequestHandlers = {
       );
       return;
     }
+    // Destroy per-port proxy first
+    if (context.portProxy) {
+      await context.portProxy.destroy(appId);
+    }
     const stopped = context.processManager.stop(appId);
     if (stopped) {
-      await context.launcherService.update(appId, { status: "stopped" });
+      await context.launcherService.update(appId, { status: "stopped", proxy_url: null });
     }
     respond(true, { stopped, status: stopped ? "stopped" : "not_running" }, undefined);
   },

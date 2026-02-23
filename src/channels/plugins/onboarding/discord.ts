@@ -182,7 +182,7 @@ async function promptDiscordAllowFrom(params: {
     params.accountId && normalizeAccountId(params.accountId)
       ? (normalizeAccountId(params.accountId) ?? DEFAULT_ACCOUNT_ID)
       : resolveDefaultDiscordAccountId(params.cfg);
-  const resolved = resolveDiscordAccount({ cfg: params.cfg, accountId });
+  const resolved = await resolveDiscordAccount({ cfg: params.cfg, accountId });
   const token = resolved.token;
   const existing = params.cfg.channels?.discord?.dm?.allowFrom ?? [];
   await params.prompter.note(
@@ -273,9 +273,12 @@ const dmPolicy: ChannelOnboardingDmPolicy = {
 export const discordOnboardingAdapter: ChannelOnboardingAdapter = {
   channel,
   getStatus: async ({ cfg }) => {
-    const configured = listDiscordAccountIds(cfg).some((accountId) =>
-      Boolean(resolveDiscordAccount({ cfg, accountId }).token),
+    const results = await Promise.all(
+      listDiscordAccountIds(cfg).map(async (accountId) =>
+        Boolean((await resolveDiscordAccount({ cfg, accountId })).token),
+      ),
     );
+    const configured = results.some(Boolean);
     return {
       channel,
       configured,
@@ -302,7 +305,7 @@ export const discordOnboardingAdapter: ChannelOnboardingAdapter = {
     }
 
     let next = cfg;
-    const resolvedAccount = resolveDiscordAccount({
+    const resolvedAccount = await resolveDiscordAccount({
       cfg: next,
       accountId: discordAccountId,
     });
@@ -411,7 +414,7 @@ export const discordOnboardingAdapter: ChannelOnboardingAdapter = {
       if (accessConfig.policy !== "allowlist") {
         next = setDiscordGroupPolicy(next, discordAccountId, accessConfig.policy);
       } else {
-        const accountWithTokens = resolveDiscordAccount({
+        const accountWithTokens = await resolveDiscordAccount({
           cfg: next,
           accountId: discordAccountId,
         });

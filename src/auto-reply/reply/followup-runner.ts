@@ -233,7 +233,7 @@ export function createFollowupRunner(params: {
       const replyToChannel =
         queued.originatingChannel ??
         (queued.run.messageProvider?.toLowerCase() as OriginatingChannelType | undefined);
-      const replyToMode = resolveReplyToMode(
+      const replyToMode = await resolveReplyToMode(
         queued.run.config,
         replyToChannel,
         queued.originatingAccountId,

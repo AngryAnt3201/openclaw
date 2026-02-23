@@ -9,7 +9,11 @@ vi.mock("../../gateway/call.js", () => ({
   callGateway: vi.fn(),
 }));
 
-function buildParams(commandBody: string, cfg: OpenClawConfig, ctxOverrides?: Partial<MsgContext>) {
+async function buildParams(
+  commandBody: string,
+  cfg: OpenClawConfig,
+  ctxOverrides?: Partial<MsgContext>,
+) {
   const ctx = {
     Body: commandBody,
     CommandBody: commandBody,
@@ -20,7 +24,7 @@ function buildParams(commandBody: string, cfg: OpenClawConfig, ctxOverrides?: Pa
     ...ctxOverrides,
   } as MsgContext;
 
-  const command = buildCommandContext({
+  const command = await buildCommandContext({
     ctx,
     cfg,
     isGroup: false,
@@ -57,7 +61,7 @@ describe("/approve command", () => {
       commands: { text: true },
       channels: { whatsapp: { allowFrom: ["*"] } },
     } as OpenClawConfig;
-    const params = buildParams("/approve", cfg);
+    const params = await buildParams("/approve", cfg);
     const result = await handleCommands(params);
     expect(result.shouldContinue).toBe(false);
     expect(result.reply?.text).toContain("Usage: /approve");
@@ -68,7 +72,7 @@ describe("/approve command", () => {
       commands: { text: true },
       channels: { whatsapp: { allowFrom: ["*"] } },
     } as OpenClawConfig;
-    const params = buildParams("/approve abc allow-once", cfg, { SenderId: "123" });
+    const params = await buildParams("/approve abc allow-once", cfg, { SenderId: "123" });
 
     const mockCallGateway = vi.mocked(callGateway);
     mockCallGateway.mockResolvedValueOnce({ ok: true });
@@ -88,7 +92,7 @@ describe("/approve command", () => {
     const cfg = {
       commands: { text: true },
     } as OpenClawConfig;
-    const params = buildParams("/approve abc allow-once", cfg, {
+    const params = await buildParams("/approve abc allow-once", cfg, {
       Provider: "webchat",
       Surface: "webchat",
       GatewayClientScopes: ["operator.write"],
@@ -107,7 +111,7 @@ describe("/approve command", () => {
     const cfg = {
       commands: { text: true },
     } as OpenClawConfig;
-    const params = buildParams("/approve abc allow-once", cfg, {
+    const params = await buildParams("/approve abc allow-once", cfg, {
       Provider: "webchat",
       Surface: "webchat",
       GatewayClientScopes: ["operator.approvals"],
@@ -131,7 +135,7 @@ describe("/approve command", () => {
     const cfg = {
       commands: { text: true },
     } as OpenClawConfig;
-    const params = buildParams("/approve abc allow-once", cfg, {
+    const params = await buildParams("/approve abc allow-once", cfg, {
       Provider: "webchat",
       Surface: "webchat",
       GatewayClientScopes: ["operator.admin"],

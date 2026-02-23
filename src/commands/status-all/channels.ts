@@ -138,7 +138,7 @@ const formatAllowFrom = (params: {
   return params.allowFrom.map((entry) => String(entry).trim()).filter(Boolean);
 };
 
-const buildAccountNotes = (params: {
+const buildAccountNotes = async (params: {
   plugin: ChannelPlugin;
   cfg: OpenClawConfig;
   entry: ChannelAccountRow;
@@ -175,7 +175,8 @@ const buildAccountNotes = (params: {
   }
 
   const allowFrom =
-    plugin.config.resolveAllowFrom?.({ cfg, accountId: snapshot.accountId }) ?? snapshot.allowFrom;
+    (await plugin.config.resolveAllowFrom?.({ cfg, accountId: snapshot.accountId })) ??
+    snapshot.allowFrom;
   if (allowFrom?.length) {
     const formatted = formatAllowFrom({
       plugin,
@@ -346,7 +347,7 @@ export async function buildChannelsTable(
 
     const accounts: ChannelAccountRow[] = [];
     for (const accountId of resolvedAccountIds) {
-      const account = plugin.config.resolveAccount(cfg, accountId);
+      const account = await plugin.config.resolveAccount(cfg, accountId);
       const enabled = resolveAccountEnabled(plugin, account, cfg);
       const configured = await resolveAccountConfigured(plugin, account, cfg);
       const snapshot = buildAccountSnapshot({
@@ -475,17 +476,19 @@ export async function buildChannelsTable(
       details.push({
         title: `${label} accounts`,
         columns: ["Account", "Status", "Notes"],
-        rows: configuredAccounts.map((entry) => {
-          const notes = buildAccountNotes({ plugin, cfg, entry });
-          return {
-            Account: formatAccountLabel({
-              accountId: entry.accountId,
-              name: entry.snapshot.name,
-            }),
-            Status: entry.enabled ? "OK" : "WARN",
-            Notes: notes.join(" · "),
-          };
-        }),
+        rows: await Promise.all(
+          configuredAccounts.map(async (entry) => {
+            const notes = await buildAccountNotes({ plugin, cfg, entry });
+            return {
+              Account: formatAccountLabel({
+                accountId: entry.accountId,
+                name: entry.snapshot.name,
+              }),
+              Status: entry.enabled ? "OK" : "WARN",
+              Notes: notes.join(" · "),
+            };
+          }),
+        ),
       });
     }
   }

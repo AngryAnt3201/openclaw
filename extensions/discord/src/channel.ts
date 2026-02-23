@@ -75,7 +75,7 @@ export const discordPlugin: ChannelPlugin<ResolvedDiscordAccount> = {
   configSchema: buildChannelConfigSchema(DiscordConfigSchema),
   config: {
     listAccountIds: (cfg) => listDiscordAccountIds(cfg),
-    resolveAccount: (cfg, accountId) => resolveDiscordAccount({ cfg, accountId }),
+    resolveAccount: async (cfg, accountId) => resolveDiscordAccount({ cfg, accountId }),
     defaultAccountId: (cfg) => resolveDefaultDiscordAccountId(cfg),
     setAccountEnabled: ({ cfg, accountId, enabled }) =>
       setAccountEnabledInConfigSection({
@@ -100,8 +100,8 @@ export const discordPlugin: ChannelPlugin<ResolvedDiscordAccount> = {
       configured: Boolean(account.token?.trim()),
       tokenSource: account.tokenSource,
     }),
-    resolveAllowFrom: ({ cfg, accountId }) =>
-      (resolveDiscordAccount({ cfg, accountId }).config.dm?.allowFrom ?? []).map((entry) =>
+    resolveAllowFrom: async ({ cfg, accountId }) =>
+      ((await resolveDiscordAccount({ cfg, accountId })).config.dm?.allowFrom ?? []).map((entry) =>
         String(entry),
       ),
     formatAllowFrom: ({ allowFrom }) =>
@@ -176,7 +176,7 @@ export const discordPlugin: ChannelPlugin<ResolvedDiscordAccount> = {
   },
   resolver: {
     resolveTargets: async ({ cfg, accountId, inputs, kind }) => {
-      const account = resolveDiscordAccount({ cfg, accountId });
+      const account = await resolveDiscordAccount({ cfg, accountId });
       const token = account.token?.trim();
       if (!token) {
         return inputs.map((input) => ({
@@ -333,7 +333,7 @@ export const discordPlugin: ChannelPlugin<ResolvedDiscordAccount> = {
         includeApplication: true,
       }),
     auditAccount: async ({ account, timeoutMs, cfg }) => {
-      const { channelIds, unresolvedChannels } = collectDiscordAuditChannelIds({
+      const { channelIds, unresolvedChannels } = await collectDiscordAuditChannelIds({
         cfg,
         accountId: account.accountId,
       });

@@ -5,17 +5,17 @@ import type { ReplyPayload } from "../types.js";
 import { getChannelDock } from "../../channels/dock.js";
 import { normalizeChannelId } from "../../channels/plugins/index.js";
 
-export function resolveReplyToMode(
+export async function resolveReplyToMode(
   cfg: OpenClawConfig,
   channel?: OriginatingChannelType,
   accountId?: string | null,
   chatType?: string | null,
-): ReplyToMode {
+): Promise<ReplyToMode> {
   const provider = normalizeChannelId(channel);
   if (!provider) {
     return "all";
   }
-  const resolved = getChannelDock(provider)?.threading?.resolveReplyToMode?.({
+  const resolved = await getChannelDock(provider)?.threading?.resolveReplyToMode?.({
     cfg,
     accountId,
     chatType,

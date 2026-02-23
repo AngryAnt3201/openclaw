@@ -34,8 +34,8 @@ type SlackListChannelsResponse = {
   response_metadata?: { next_cursor?: string };
 };
 
-function resolveReadToken(params: DirectoryConfigParams): string | undefined {
-  const account = resolveSlackAccount({ cfg: params.cfg, accountId: params.accountId });
+async function resolveReadToken(params: DirectoryConfigParams): Promise<string | undefined> {
+  const account = await resolveSlackAccount({ cfg: params.cfg, accountId: params.accountId });
   const userToken = account.config.userToken?.trim() || undefined;
   return userToken ?? account.botToken?.trim();
 }
@@ -62,7 +62,7 @@ function buildChannelRank(channel: SlackChannel): number {
 export async function listSlackDirectoryPeersLive(
   params: DirectoryConfigParams,
 ): Promise<ChannelDirectoryEntry[]> {
-  const token = resolveReadToken(params);
+  const token = await resolveReadToken(params);
   if (!token) {
     return [];
   }
@@ -128,7 +128,7 @@ export async function listSlackDirectoryPeersLive(
 export async function listSlackDirectoryGroupsLive(
   params: DirectoryConfigParams,
 ): Promise<ChannelDirectoryEntry[]> {
-  const token = resolveReadToken(params);
+  const token = await resolveReadToken(params);
   if (!token) {
     return [];
   }

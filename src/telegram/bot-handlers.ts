@@ -297,7 +297,7 @@ export const registerTelegramHandlers = ({
         return;
       }
 
-      const inlineButtonsScope = resolveTelegramInlineButtonsScope({
+      const inlineButtonsScope = await resolveTelegramInlineButtonsScope({
         cfg,
         accountId,
       });

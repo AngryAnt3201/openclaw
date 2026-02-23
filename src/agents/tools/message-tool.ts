@@ -303,9 +303,9 @@ type MessageToolOptions = {
   requireExplicitTarget?: boolean;
 };
 
-function buildMessageToolSchema(cfg: OpenClawConfig) {
-  const actions = listChannelMessageActions(cfg);
-  const includeButtons = supportsChannelMessageButtons(cfg);
+async function buildMessageToolSchema(cfg: OpenClawConfig) {
+  const actions = await listChannelMessageActions(cfg);
+  const includeButtons = await supportsChannelMessageButtons(cfg);
   const includeCards = supportsChannelMessageCards(cfg);
   return buildMessageToolSchemaFromActions(actions.length > 0 ? actions : ["send"], {
     includeButtons,
@@ -348,17 +348,17 @@ function filterActionsForContext(params: {
   return params.actions.filter((action) => !BLUEBUBBLES_GROUP_ACTIONS.has(action));
 }
 
-function buildMessageToolDescription(options?: {
+async function buildMessageToolDescription(options?: {
   config?: OpenClawConfig;
   currentChannel?: string;
   currentChannelId?: string;
-}): string {
+}): Promise<string> {
   const baseDescription = "Send, delete, and manage messages via channel plugins.";
 
   // If we have a current channel, show only its supported actions
   if (options?.currentChannel) {
     const channelActions = filterActionsForContext({
-      actions: listChannelSupportedActions({
+      actions: await listChannelSupportedActions({
         cfg: options.config,
         channel: options.currentChannel,
       }),
@@ -375,7 +375,7 @@ function buildMessageToolDescription(options?: {
 
   // Fallback to generic description with all configured actions
   if (options?.config) {
-    const actions = listChannelMessageActions(options.config);
+    const actions = await listChannelMessageActions(options.config);
     if (actions.length > 0) {
       return `${baseDescription} Supports actions: ${actions.join(", ")}.`;
     }
@@ -384,10 +384,10 @@ function buildMessageToolDescription(options?: {
   return `${baseDescription} Supports actions: send, delete, react, poll, pin, threads, and more.`;
 }
 
-export function createMessageTool(options?: MessageToolOptions): AnyAgentTool {
+export async function createMessageTool(options?: MessageToolOptions): Promise<AnyAgentTool> {
   const agentAccountId = resolveAgentAccountId(options?.agentAccountId);
-  const schema = options?.config ? buildMessageToolSchema(options.config) : MessageToolSchema;
-  const description = buildMessageToolDescription({
+  const schema = options?.config ? await buildMessageToolSchema(options.config) : MessageToolSchema;
+  const description = await buildMessageToolDescription({
     config: options?.config,
     currentChannel: options?.currentChannelProvider,
     currentChannelId: options?.currentChannelId,

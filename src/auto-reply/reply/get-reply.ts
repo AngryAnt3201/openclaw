@@ -130,7 +130,7 @@ export async function getReplyFromConfig(
   }
 
   const commandAuthorized = finalized.CommandAuthorized;
-  resolveCommandAuthorization({
+  await resolveCommandAuthorization({
     ctx: finalized,
     cfg,
     commandAuthorized,

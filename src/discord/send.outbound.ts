@@ -57,7 +57,7 @@ export async function sendMessageDiscord(
   opts: DiscordSendOpts = {},
 ): Promise<DiscordSendResult> {
   const cfg = loadConfig();
-  const accountInfo = resolveDiscordAccount({
+  const accountInfo = await resolveDiscordAccount({
     cfg,
     accountId: opts.accountId,
   });
@@ -68,7 +68,7 @@ export async function sendMessageDiscord(
   });
   const chunkMode = resolveChunkMode(cfg, "discord", accountInfo.accountId);
   const textWithTables = convertMarkdownTables(text ?? "", tableMode);
-  const { token, rest, request } = createDiscordClient(opts, cfg);
+  const { token, rest, request } = await createDiscordClient(opts, cfg);
   const recipient = await parseAndResolveRecipient(to, opts.accountId);
   const { channelId } = await resolveChannelId(rest, recipient, request);
 
@@ -230,7 +230,7 @@ export async function sendStickerDiscord(
   opts: DiscordSendOpts & { content?: string } = {},
 ): Promise<DiscordSendResult> {
   const cfg = loadConfig();
-  const { rest, request } = createDiscordClient(opts, cfg);
+  const { rest, request } = await createDiscordClient(opts, cfg);
   const recipient = await parseAndResolveRecipient(to, opts.accountId);
   const { channelId } = await resolveChannelId(rest, recipient, request);
   const content = opts.content?.trim();
@@ -257,7 +257,7 @@ export async function sendPollDiscord(
   opts: DiscordSendOpts & { content?: string } = {},
 ): Promise<DiscordSendResult> {
   const cfg = loadConfig();
-  const { rest, request } = createDiscordClient(opts, cfg);
+  const { rest, request } = await createDiscordClient(opts, cfg);
   const recipient = await parseAndResolveRecipient(to, opts.accountId);
   const { channelId } = await resolveChannelId(rest, recipient, request);
   const content = opts.content?.trim();

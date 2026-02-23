@@ -116,14 +116,14 @@ export function resolveSessionDeliveryTarget(params: {
 }
 
 // Channel docking: prefer plugin.outbound.resolveTarget + allowFrom to normalize destinations.
-export function resolveOutboundTarget(params: {
+export async function resolveOutboundTarget(params: {
   channel: GatewayMessageChannel;
   to?: string;
   allowFrom?: string[];
   cfg?: OpenClawConfig;
   accountId?: string | null;
   mode?: ChannelOutboundTargetMode;
-}): OutboundTargetResolution {
+}): Promise<OutboundTargetResolution> {
   if (params.channel === INTERNAL_MESSAGE_CHANNEL) {
     return {
       ok: false,
@@ -144,7 +144,7 @@ export function resolveOutboundTarget(params: {
   const allowFrom =
     params.allowFrom ??
     (params.cfg && plugin.config.resolveAllowFrom
-      ? plugin.config.resolveAllowFrom({
+      ? await plugin.config.resolveAllowFrom({
           cfg: params.cfg,
           accountId: params.accountId ?? undefined,
         })
@@ -172,11 +172,11 @@ export function resolveOutboundTarget(params: {
   };
 }
 
-export function resolveHeartbeatDeliveryTarget(params: {
+export async function resolveHeartbeatDeliveryTarget(params: {
   cfg: OpenClawConfig;
   entry?: SessionEntry;
   heartbeat?: AgentDefaultsConfig["heartbeat"];
-}): OutboundTarget {
+}): Promise<OutboundTarget> {
   const { cfg, entry } = params;
   const heartbeat = params.heartbeat ?? cfg.agents?.defaults?.heartbeat;
   const rawTarget = heartbeat?.target;
@@ -244,7 +244,7 @@ export function resolveHeartbeatDeliveryTarget(params: {
     };
   }
 
-  const resolved = resolveOutboundTarget({
+  const resolved = await resolveOutboundTarget({
     channel: resolvedTarget.channel,
     to: resolvedTarget.to,
     cfg,
@@ -264,7 +264,7 @@ export function resolveHeartbeatDeliveryTarget(params: {
   let reason: string | undefined;
   const plugin = getChannelPlugin(resolvedTarget.channel);
   if (plugin?.config.resolveAllowFrom) {
-    const explicit = resolveOutboundTarget({
+    const explicit = await resolveOutboundTarget({
       channel: resolvedTarget.channel,
       to: resolvedTarget.to,
       cfg,
@@ -321,21 +321,21 @@ function resolveHeartbeatSenderId(params: {
   return candidates[0] ?? "heartbeat";
 }
 
-export function resolveHeartbeatSenderContext(params: {
+export async function resolveHeartbeatSenderContext(params: {
   cfg: OpenClawConfig;
   entry?: SessionEntry;
   delivery: OutboundTarget;
-}): HeartbeatSenderContext {
+}): Promise<HeartbeatSenderContext> {
   const provider =
     params.delivery.channel !== "none" ? params.delivery.channel : params.delivery.lastChannel;
   const accountId =
     params.delivery.accountId ??
     (provider === params.delivery.lastChannel ? params.delivery.lastAccountId : undefined);
   const allowFrom = provider
-    ? (getChannelPlugin(provider)?.config.resolveAllowFrom?.({
+    ? ((await getChannelPlugin(provider)?.config.resolveAllowFrom?.({
         cfg: params.cfg,
         accountId,
-      }) ?? [])
+      })) ?? [])
     : [];
 
   const sender = resolveHeartbeatSenderId({

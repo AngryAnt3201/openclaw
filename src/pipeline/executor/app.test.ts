@@ -70,7 +70,7 @@ describe("executeAppNode", () => {
         pid: 123,
         port: 3001,
         status: "starting",
-        proxyUrl: "http://localhost:18789/app-proxy/my-app/",
+        proxyUrl: "http://100.70.238.120:3001",
       })
       .mockResolvedValueOnce({ healthy: true, uptimeMs: 1000 });
     const ctx = makeContext({

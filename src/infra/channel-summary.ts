@@ -163,7 +163,7 @@ export async function buildChannelSummary(
     const entries: ChannelAccountEntry[] = [];
 
     for (const accountId of resolvedAccountIds) {
-      const account = plugin.config.resolveAccount(effective, accountId);
+      const account = await plugin.config.resolveAccount(effective, accountId);
       const enabled = resolveAccountEnabled(plugin, account, effective);
       const configured = await resolveAccountConfigured(plugin, account, effective);
       const snapshot = buildAccountSnapshot({

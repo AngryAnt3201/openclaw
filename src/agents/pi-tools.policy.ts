@@ -272,7 +272,7 @@ export function resolveEffectiveToolPolicy(params: {
   };
 }
 
-export function resolveGroupToolPolicy(params: {
+export async function resolveGroupToolPolicy(params: {
   config?: OpenClawConfig;
   sessionKey?: string;
   spawnedBy?: string | null;
@@ -285,7 +285,7 @@ export function resolveGroupToolPolicy(params: {
   senderName?: string | null;
   senderUsername?: string | null;
   senderE164?: string | null;
-}): SandboxToolPolicy | undefined {
+}): Promise<SandboxToolPolicy | undefined> {
   if (!params.config) {
     return undefined;
   }
@@ -307,7 +307,7 @@ export function resolveGroupToolPolicy(params: {
     dock = undefined;
   }
   const toolsConfig =
-    dock?.groups?.resolveToolPolicy?.({
+    (await dock?.groups?.resolveToolPolicy?.({
       cfg: params.config,
       groupId,
       groupChannel: params.groupChannel,
@@ -317,7 +317,7 @@ export function resolveGroupToolPolicy(params: {
       senderName: params.senderName,
       senderUsername: params.senderUsername,
       senderE164: params.senderE164,
-    }) ??
+    })) ??
     resolveChannelGroupToolsPolicy({
       cfg: params.config,
       channel,

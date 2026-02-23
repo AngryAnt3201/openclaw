@@ -325,7 +325,7 @@ export class DiscordExecApprovalHandler {
 
     this.requestCache.set(request.id, request);
 
-    const { rest, request: discordRequest } = createDiscordClient(
+    const { rest, request: discordRequest } = await createDiscordClient(
       { token: this.opts.token, accountId: this.opts.accountId },
       this.opts.cfg,
     );
@@ -469,7 +469,7 @@ export class DiscordExecApprovalHandler {
     embed: ReturnType<typeof formatExpiredEmbed>,
   ): Promise<void> {
     try {
-      const { rest, request: discordRequest } = createDiscordClient(
+      const { rest, request: discordRequest } = await createDiscordClient(
         { token: this.opts.token, accountId: this.opts.accountId },
         this.opts.cfg,
       );

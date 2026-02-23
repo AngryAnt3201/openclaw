@@ -4,8 +4,8 @@ import { listEnabledDiscordAccounts } from "../../../discord/accounts.js";
 import { handleDiscordMessageAction } from "./discord/handle-action.js";
 
 export const discordMessageActions: ChannelMessageActionAdapter = {
-  listActions: ({ cfg }) => {
-    const accounts = listEnabledDiscordAccounts(cfg).filter(
+  listActions: async ({ cfg }) => {
+    const accounts = (await listEnabledDiscordAccounts(cfg)).filter(
       (account) => account.tokenSource !== "none",
     );
     if (accounts.length === 0) {

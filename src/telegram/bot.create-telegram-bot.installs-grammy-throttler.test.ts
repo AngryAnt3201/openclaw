@@ -173,17 +173,17 @@ describe("createTelegramBot", () => {
 
   // groupPolicy tests
 
-  it("installs grammY throttler", () => {
-    createTelegramBot({ token: "tok" });
+  it("installs grammY throttler", async () => {
+    await createTelegramBot({ token: "tok" });
     expect(throttlerSpy).toHaveBeenCalledTimes(1);
     expect(useSpy).toHaveBeenCalledWith("throttler");
   });
-  it("uses wrapped fetch when global fetch is available", () => {
+  it("uses wrapped fetch when global fetch is available", async () => {
     const originalFetch = globalThis.fetch;
     const fetchSpy = vi.fn() as unknown as typeof fetch;
     globalThis.fetch = fetchSpy;
     try {
-      createTelegramBot({ token: "tok" });
+      await createTelegramBot({ token: "tok" });
       const fetchImpl = resolveTelegramFetch();
       expect(fetchImpl).toBeTypeOf("function");
       expect(fetchImpl).not.toBe(fetchSpy);
@@ -195,13 +195,13 @@ describe("createTelegramBot", () => {
       globalThis.fetch = originalFetch;
     }
   });
-  it("passes timeoutSeconds even without a custom fetch", () => {
+  it("passes timeoutSeconds even without a custom fetch", async () => {
     loadConfig.mockReturnValue({
       channels: {
         telegram: { dmPolicy: "open", allowFrom: ["*"], timeoutSeconds: 60 },
       },
     });
-    createTelegramBot({ token: "tok" });
+    await createTelegramBot({ token: "tok" });
     expect(botCtorSpy).toHaveBeenCalledWith(
       "tok",
       expect.objectContaining({
@@ -209,7 +209,7 @@ describe("createTelegramBot", () => {
       }),
     );
   });
-  it("prefers per-account timeoutSeconds overrides", () => {
+  it("prefers per-account timeoutSeconds overrides", async () => {
     loadConfig.mockReturnValue({
       channels: {
         telegram: {
@@ -222,7 +222,7 @@ describe("createTelegramBot", () => {
         },
       },
     });
-    createTelegramBot({ token: "tok", accountId: "foo" });
+    await createTelegramBot({ token: "tok", accountId: "foo" });
     expect(botCtorSpy).toHaveBeenCalledWith(
       "tok",
       expect.objectContaining({
@@ -230,8 +230,8 @@ describe("createTelegramBot", () => {
       }),
     );
   });
-  it("sequentializes updates by chat and thread", () => {
-    createTelegramBot({ token: "tok" });
+  it("sequentializes updates by chat and thread", async () => {
+    await createTelegramBot({ token: "tok" });
     expect(sequentializeSpy).toHaveBeenCalledTimes(1);
     expect(middlewareUseSpy).toHaveBeenCalledWith(sequentializeSpy.mock.results[0]?.value);
     expect(sequentializeKey).toBe(getTelegramSequentialKey);
@@ -277,7 +277,7 @@ describe("createTelegramBot", () => {
     const replySpy = replyModule.__replySpy as unknown as ReturnType<typeof vi.fn>;
     replySpy.mockReset();
 
-    createTelegramBot({ token: "tok" });
+    await createTelegramBot({ token: "tok" });
     const callbackHandler = onSpy.mock.calls.find((call) => call[0] === "callback_query")?.[1] as (
       ctx: Record<string, unknown>,
     ) => Promise<void>;
@@ -312,7 +312,7 @@ describe("createTelegramBot", () => {
       const replySpy = replyModule.__replySpy as unknown as ReturnType<typeof vi.fn>;
       replySpy.mockReset();
 
-      createTelegramBot({ token: "tok" });
+      await createTelegramBot({ token: "tok" });
       expect(onSpy).toHaveBeenCalledWith("message", expect.any(Function));
       const handler = getOnHandler("message") as (ctx: Record<string, unknown>) => Promise<void>;
 
@@ -361,7 +361,7 @@ describe("createTelegramBot", () => {
       created: true,
     });
 
-    createTelegramBot({ token: "tok" });
+    await createTelegramBot({ token: "tok" });
     const handler = getOnHandler("message") as (ctx: Record<string, unknown>) => Promise<void>;
 
     await handler({
@@ -396,7 +396,7 @@ describe("createTelegramBot", () => {
       .mockResolvedValueOnce({ code: "PAIRME12", created: true })
       .mockResolvedValueOnce({ code: "PAIRME12", created: false });
 
-    createTelegramBot({ token: "tok" });
+    await createTelegramBot({ token: "tok" });
     const handler = getOnHandler("message") as (ctx: Record<string, unknown>) => Promise<void>;
 
     const message = {
@@ -424,7 +424,7 @@ describe("createTelegramBot", () => {
     onSpy.mockReset();
     sendChatActionSpy.mockReset();
 
-    createTelegramBot({ token: "tok" });
+    await createTelegramBot({ token: "tok" });
     const handler = getOnHandler("message") as (ctx: Record<string, unknown>) => Promise<void>;
     await handler({
       message: { chat: { id: 42, type: "private" }, text: "hi" },

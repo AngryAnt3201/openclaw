@@ -17,7 +17,7 @@ export type DirectoryConfigParams = {
 export async function listSlackDirectoryPeersFromConfig(
   params: DirectoryConfigParams,
 ): Promise<ChannelDirectoryEntry[]> {
-  const account = resolveSlackAccount({ cfg: params.cfg, accountId: params.accountId });
+  const account = await resolveSlackAccount({ cfg: params.cfg, accountId: params.accountId });
   const q = params.query?.trim().toLowerCase() || "";
   const ids = new Set<string>();
 
@@ -65,7 +65,7 @@ export async function listSlackDirectoryPeersFromConfig(
 export async function listSlackDirectoryGroupsFromConfig(
   params: DirectoryConfigParams,
 ): Promise<ChannelDirectoryEntry[]> {
-  const account = resolveSlackAccount({ cfg: params.cfg, accountId: params.accountId });
+  const account = await resolveSlackAccount({ cfg: params.cfg, accountId: params.accountId });
   const q = params.query?.trim().toLowerCase() || "";
   return Object.keys(account.config.channels ?? {})
     .map((raw) => raw.trim())
@@ -80,7 +80,7 @@ export async function listSlackDirectoryGroupsFromConfig(
 export async function listDiscordDirectoryPeersFromConfig(
   params: DirectoryConfigParams,
 ): Promise<ChannelDirectoryEntry[]> {
-  const account = resolveDiscordAccount({ cfg: params.cfg, accountId: params.accountId });
+  const account = await resolveDiscordAccount({ cfg: params.cfg, accountId: params.accountId });
   const q = params.query?.trim().toLowerCase() || "";
   const ids = new Set<string>();
 
@@ -134,7 +134,7 @@ export async function listDiscordDirectoryPeersFromConfig(
 export async function listDiscordDirectoryGroupsFromConfig(
   params: DirectoryConfigParams,
 ): Promise<ChannelDirectoryEntry[]> {
-  const account = resolveDiscordAccount({ cfg: params.cfg, accountId: params.accountId });
+  const account = await resolveDiscordAccount({ cfg: params.cfg, accountId: params.accountId });
   const q = params.query?.trim().toLowerCase() || "";
   const ids = new Set<string>();
   for (const guild of Object.values(account.config.guilds ?? {})) {
@@ -166,7 +166,7 @@ export async function listDiscordDirectoryGroupsFromConfig(
 export async function listTelegramDirectoryPeersFromConfig(
   params: DirectoryConfigParams,
 ): Promise<ChannelDirectoryEntry[]> {
-  const account = resolveTelegramAccount({ cfg: params.cfg, accountId: params.accountId });
+  const account = await resolveTelegramAccount({ cfg: params.cfg, accountId: params.accountId });
   const q = params.query?.trim().toLowerCase() || "";
   const raw = [
     ...(account.config.allowFrom ?? []).map((entry) => String(entry)),
@@ -200,7 +200,7 @@ export async function listTelegramDirectoryPeersFromConfig(
 export async function listTelegramDirectoryGroupsFromConfig(
   params: DirectoryConfigParams,
 ): Promise<ChannelDirectoryEntry[]> {
-  const account = resolveTelegramAccount({ cfg: params.cfg, accountId: params.accountId });
+  const account = await resolveTelegramAccount({ cfg: params.cfg, accountId: params.accountId });
   const q = params.query?.trim().toLowerCase() || "";
   return Object.keys(account.config.groups ?? {})
     .map((id) => id.trim())

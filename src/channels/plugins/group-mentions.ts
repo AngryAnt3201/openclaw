@@ -207,8 +207,10 @@ export function resolveGoogleChatGroupToolPolicy(
   });
 }
 
-export function resolveSlackGroupRequireMention(params: GroupMentionParams): boolean {
-  const account = resolveSlackAccount({
+export async function resolveSlackGroupRequireMention(
+  params: GroupMentionParams,
+): Promise<boolean> {
+  const account = await resolveSlackAccount({
     cfg: params.cfg,
     accountId: params.accountId,
   });
@@ -344,10 +346,10 @@ export function resolveDiscordGroupToolPolicy(
   return undefined;
 }
 
-export function resolveSlackGroupToolPolicy(
+export async function resolveSlackGroupToolPolicy(
   params: GroupMentionParams,
-): GroupToolPolicyConfig | undefined {
-  const account = resolveSlackAccount({
+): Promise<GroupToolPolicyConfig | undefined> {
+  const account = await resolveSlackAccount({
     cfg: params.cfg,
     accountId: params.accountId,
   });

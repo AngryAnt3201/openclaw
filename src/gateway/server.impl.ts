@@ -439,6 +439,7 @@ export async function startGatewayServer(
     notificationService,
     storePath: notificationStorePath,
     triggers: notificationTriggers,
+    channelTargets: notificationChannelTargets,
   } = notificationState;
 
   // Wrap broadcast for task service: task events also trigger notifications + auto-synthesis + credential lease cleanup
@@ -676,6 +677,7 @@ export async function startGatewayServer(
       taskStorePath,
       notificationService,
       notificationStorePath,
+      notificationChannelTargets,
       launcherService,
       launcherStorePath,
       processManager,

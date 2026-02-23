@@ -93,7 +93,7 @@ export async function deliverAgentCommandResult(params: {
   const resolvedAccountId = deliveryPlan.resolvedAccountId;
   const resolved =
     deliver && isDeliveryChannelKnown && deliveryChannel
-      ? resolveAgentOutboundTarget({
+      ? await resolveAgentOutboundTarget({
           cfg,
           plan: deliveryPlan,
           targetMode,

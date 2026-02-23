@@ -26,7 +26,7 @@ type ExecOverrides = Pick<ExecToolDefaults, "host" | "security" | "ask" | "node"
 
 export type ReplyDirectiveContinuation = {
   commandSource: string;
-  command: ReturnType<typeof buildCommandContext>;
+  command: Awaited<ReturnType<typeof buildCommandContext>>;
   allowTextCommands: boolean;
   skillCommands?: SkillCommandSpec[];
   directives: InlineDirectives;
@@ -153,7 +153,7 @@ export async function resolveReplyDirectives(params: {
     "";
   const promptSource = sessionCtx.BodyForAgent ?? sessionCtx.BodyStripped ?? sessionCtx.Body ?? "";
   const commandText = commandSource || promptSource;
-  const command = buildCommandContext({
+  const command = await buildCommandContext({
     ctx,
     cfg,
     agentId,
@@ -337,7 +337,7 @@ export async function resolveReplyDirectives(params: {
     };
   }
 
-  const requireMention = resolveGroupRequireMention({
+  const requireMention = await resolveGroupRequireMention({
     cfg,
     ctx: sessionCtx,
     groupResolution,

@@ -59,10 +59,12 @@ describe("openclaw-tools: subagents", () => {
       return {};
     });
 
-    const tool = createOpenClawTools({
-      agentSessionKey: "agent:research:main",
-      agentChannel: "discord",
-    }).find((candidate) => candidate.name === "sessions_spawn");
+    const tool = (
+      await createOpenClawTools({
+        agentSessionKey: "agent:research:main",
+        agentChannel: "discord",
+      })
+    ).find((candidate) => candidate.name === "sessions_spawn");
     if (!tool) {
       throw new Error("missing sessions_spawn tool");
     }
@@ -110,10 +112,12 @@ describe("openclaw-tools: subagents", () => {
       return {};
     });
 
-    const tool = createOpenClawTools({
-      agentSessionKey: "main",
-      agentChannel: "whatsapp",
-    }).find((candidate) => candidate.name === "sessions_spawn");
+    const tool = (
+      await createOpenClawTools({
+        agentSessionKey: "main",
+        agentChannel: "whatsapp",
+      })
+    ).find((candidate) => candidate.name === "sessions_spawn");
     if (!tool) {
       throw new Error("missing sessions_spawn tool");
     }
@@ -147,10 +151,12 @@ describe("openclaw-tools: subagents", () => {
       return {};
     });
 
-    const tool = createOpenClawTools({
-      agentSessionKey: "main",
-      agentChannel: "whatsapp",
-    }).find((candidate) => candidate.name === "sessions_spawn");
+    const tool = (
+      await createOpenClawTools({
+        agentSessionKey: "main",
+        agentChannel: "whatsapp",
+      })
+    ).find((candidate) => candidate.name === "sessions_spawn");
     if (!tool) {
       throw new Error("missing sessions_spawn tool");
     }

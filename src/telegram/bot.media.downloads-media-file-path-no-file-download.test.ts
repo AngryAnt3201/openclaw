@@ -135,7 +135,7 @@ describe("telegram inbound media", () => {
 
       const runtimeLog = vi.fn();
       const runtimeError = vi.fn();
-      createTelegramBot({
+      await createTelegramBot({
         token: "tok",
         runtime: {
           log: runtimeLog,
@@ -201,7 +201,7 @@ describe("telegram inbound media", () => {
       arrayBuffer: async () => new Uint8Array([0xff, 0xd8, 0xff]).buffer,
     } as Response);
 
-    createTelegramBot({
+    await createTelegramBot({
       token: "tok",
       proxyFetch: proxyFetch as unknown as typeof fetch,
       runtime: {
@@ -248,7 +248,7 @@ describe("telegram inbound media", () => {
     const runtimeError = vi.fn();
     const fetchSpy = vi.spyOn(globalThis, "fetch" as never);
 
-    createTelegramBot({
+    await createTelegramBot({
       token: "tok",
       runtime: {
         log: runtimeLog,
@@ -315,7 +315,7 @@ describe("telegram media groups", () => {
         arrayBuffer: async () => new Uint8Array([0x89, 0x50, 0x4e, 0x47]).buffer,
       } as Response);
 
-      createTelegramBot({
+      await createTelegramBot({
         token: "tok",
         runtime: {
           log: vi.fn(),
@@ -390,7 +390,7 @@ describe("telegram media groups", () => {
         arrayBuffer: async () => new Uint8Array([0x89, 0x50, 0x4e, 0x47]).buffer,
       } as Response);
 
-      createTelegramBot({ token: "tok" });
+      await createTelegramBot({ token: "tok" });
       const handler = onSpy.mock.calls.find((call) => call[0] === "message")?.[1] as (
         ctx: Record<string, unknown>,
       ) => Promise<void>;
@@ -457,7 +457,7 @@ describe("telegram stickers", () => {
 
       const runtimeLog = vi.fn();
       const runtimeError = vi.fn();
-      createTelegramBot({
+      await createTelegramBot({
         token: "tok",
         runtime: {
           log: runtimeLog,
@@ -539,7 +539,7 @@ describe("telegram stickers", () => {
       });
 
       const runtimeError = vi.fn();
-      createTelegramBot({
+      await createTelegramBot({
         token: "tok",
         runtime: {
           log: vi.fn(),
@@ -613,7 +613,7 @@ describe("telegram stickers", () => {
       const runtimeError = vi.fn();
       const fetchSpy = vi.spyOn(globalThis, "fetch" as never);
 
-      createTelegramBot({
+      await createTelegramBot({
         token: "tok",
         runtime: {
           log: vi.fn(),
@@ -673,7 +673,7 @@ describe("telegram stickers", () => {
       const runtimeError = vi.fn();
       const fetchSpy = vi.spyOn(globalThis, "fetch" as never);
 
-      createTelegramBot({
+      await createTelegramBot({
         token: "tok",
         runtime: {
           log: vi.fn(),
@@ -742,7 +742,7 @@ describe("telegram text fragments", () => {
       onSpy.mockReset();
       replySpy.mockReset();
 
-      createTelegramBot({ token: "tok" });
+      await createTelegramBot({ token: "tok" });
       const handler = onSpy.mock.calls.find((call) => call[0] === "message")?.[1] as (
         ctx: Record<string, unknown>,
       ) => Promise<void>;

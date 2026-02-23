@@ -142,7 +142,7 @@ function resolveDiscordGatewayIntents(
 
 export async function monitorDiscordProvider(opts: MonitorDiscordOpts = {}) {
   const cfg = opts.config ?? loadConfig();
-  const account = resolveDiscordAccount({
+  const account = await resolveDiscordAccount({
     cfg,
     accountId: opts.accountId,
   });

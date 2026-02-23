@@ -7,6 +7,7 @@ import type {
   SessionsListResult,
 } from "./session-utils.types.js";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
+import { BUILTIN_AGENT_IDS, getBuiltInAgentConfig } from "../agents/builtin/index.js";
 import { lookupContextTokens } from "../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
 import {
@@ -290,7 +291,7 @@ export function listAgentsForGateway(cfg: OpenClawConfig): {
   const scope = cfg.session?.scope ?? "per-sender";
   const configuredById = new Map<
     string,
-    { name?: string; identity?: GatewayAgentRow["identity"] }
+    { name?: string; model?: string; identity?: GatewayAgentRow["identity"] }
   >();
   for (const entry of cfg.agents?.list ?? []) {
     if (!entry?.id) {
@@ -309,8 +310,19 @@ export function listAgentsForGateway(cfg: OpenClawConfig): {
           ),
         }
       : undefined;
+    // Resolve model from entry (string or { primary } object)
+    let model: string | undefined;
+    if (typeof entry.model === "string" && entry.model.trim()) {
+      model = entry.model.trim();
+    } else if (entry.model && typeof entry.model === "object") {
+      const primary = (entry.model as { primary?: string }).primary?.trim();
+      if (primary) {
+        model = primary;
+      }
+    }
     configuredById.set(normalizeAgentId(entry.id), {
       name: typeof entry.name === "string" && entry.name.trim() ? entry.name.trim() : undefined,
+      model,
       identity,
     });
   }
@@ -328,10 +340,20 @@ export function listAgentsForGateway(cfg: OpenClawConfig): {
   }
   const agents = agentIds.map((id) => {
     const meta = configuredById.get(id);
+    const builtInDef = getBuiltInAgentConfig(id);
     return {
       id,
-      name: meta?.name,
+      name: meta?.name ?? builtInDef?.name,
+      model: meta?.model ?? builtInDef?.model,
       identity: meta?.identity,
+      ...(builtInDef
+        ? {
+            builtIn: true as const,
+            description: builtInDef.description,
+            icon: builtInDef.icon,
+            color: builtInDef.color,
+          }
+        : {}),
     };
   });
   return { defaultId, mainKey, scope, agents };

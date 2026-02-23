@@ -15,7 +15,10 @@ export type CommandAuthorization = {
   to?: string;
 };
 
-function resolveProviderFromContext(ctx: MsgContext, cfg: OpenClawConfig): ChannelId | undefined {
+async function resolveProviderFromContext(
+  ctx: MsgContext,
+  cfg: OpenClawConfig,
+): Promise<ChannelId | undefined> {
   const direct =
     normalizeAnyChannelId(ctx.Provider) ??
     normalizeAnyChannelId(ctx.Surface) ??
@@ -32,21 +35,21 @@ function resolveProviderFromContext(ctx: MsgContext, cfg: OpenClawConfig): Chann
       return normalized;
     }
   }
-  const configured = listChannelDocks()
-    .map((dock) => {
-      if (!dock.config?.resolveAllowFrom) {
-        return null;
-      }
-      const allowFrom = dock.config.resolveAllowFrom({
-        cfg,
-        accountId: ctx.AccountId,
-      });
-      if (!Array.isArray(allowFrom) || allowFrom.length === 0) {
-        return null;
-      }
-      return dock.id;
-    })
-    .filter((value): value is ChannelId => Boolean(value));
+  const docks = listChannelDocks();
+  const configured: ChannelId[] = [];
+  for (const dock of docks) {
+    if (!dock.config?.resolveAllowFrom) {
+      continue;
+    }
+    const allowFrom = await dock.config.resolveAllowFrom({
+      cfg,
+      accountId: ctx.AccountId,
+    });
+    if (!Array.isArray(allowFrom) || allowFrom.length === 0) {
+      continue;
+    }
+    configured.push(dock.id);
+  }
   if (configured.length === 1) {
     return configured[0];
   }
@@ -165,18 +168,18 @@ function resolveSenderCandidates(params: {
   return normalized;
 }
 
-export function resolveCommandAuthorization(params: {
+export async function resolveCommandAuthorization(params: {
   ctx: MsgContext;
   cfg: OpenClawConfig;
   commandAuthorized: boolean;
-}): CommandAuthorization {
+}): Promise<CommandAuthorization> {
   const { ctx, cfg, commandAuthorized } = params;
-  const providerId = resolveProviderFromContext(ctx, cfg);
+  const providerId = await resolveProviderFromContext(ctx, cfg);
   const dock = providerId ? getChannelDock(providerId) : undefined;
   const from = (ctx.From ?? "").trim();
   const to = (ctx.To ?? "").trim();
   const allowFromRaw = dock?.config?.resolveAllowFrom
-    ? dock.config.resolveAllowFrom({ cfg, accountId: ctx.AccountId })
+    ? await dock.config.resolveAllowFrom({ cfg, accountId: ctx.AccountId })
     : [];
   const allowFromList = formatAllowFromList({
     dock,

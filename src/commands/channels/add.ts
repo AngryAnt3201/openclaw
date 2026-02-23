@@ -117,7 +117,7 @@ export async function channelsAddCommand(
       for (const channel of selection) {
         const accountId = accountIds[channel] ?? DEFAULT_ACCOUNT_ID;
         const plugin = getChannelPlugin(channel);
-        const account = plugin?.config.resolveAccount(nextConfig, accountId) as
+        const account = (await plugin?.config.resolveAccount(nextConfig, accountId)) as
           | { name?: string }
           | undefined;
         const snapshot = plugin?.config.describeAccount?.(account, nextConfig);

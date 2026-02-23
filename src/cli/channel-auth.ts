@@ -53,7 +53,7 @@ export async function runChannelLogout(
   // Auth-only flow: resolve account + clear session state only.
   const cfg = loadConfig();
   const accountId = opts.account?.trim() || resolveChannelDefaultAccountId({ plugin, cfg });
-  const account = plugin.config.resolveAccount(cfg, accountId);
+  const account = await plugin.config.resolveAccount(cfg, accountId);
   await plugin.gateway.logoutAccount({
     cfg,
     accountId,

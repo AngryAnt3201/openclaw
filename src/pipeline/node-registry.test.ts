@@ -134,7 +134,7 @@ describe("NodeRegistry", () => {
     });
 
     it("registers exactly 11 built-in types", () => {
-      expect(registry.list()).toHaveLength(11);
+      expect(registry.list()).toHaveLength(12);
     });
 
     it("every definition has a non-empty label and description", () => {
@@ -175,7 +175,7 @@ describe("NodeRegistry", () => {
     it("can be called multiple times without duplicating entries", () => {
       registry.registerBuiltins();
       registry.registerBuiltins();
-      expect(registry.list()).toHaveLength(11);
+      expect(registry.list()).toHaveLength(12);
     });
 
     it("includes the expected built-in types", () => {
@@ -187,6 +187,7 @@ describe("NodeRegistry", () => {
         "agent",
         "app",
         "approval",
+        "code",
         "condition",
         "cron",
         "loop",
@@ -221,7 +222,7 @@ describe("NodeRegistry", () => {
   // -----------------------------------------------------------------------
 
   it("exports BUILTIN_NODE_DEFINITIONS as a frozen array of 11 items", () => {
-    expect(BUILTIN_NODE_DEFINITIONS).toHaveLength(11);
+    expect(BUILTIN_NODE_DEFINITIONS).toHaveLength(12);
   });
 
   // -----------------------------------------------------------------------
@@ -233,7 +234,7 @@ describe("NodeRegistry", () => {
     const custom = makeDef({ type: "custom:my_plugin", category: "action", label: "My Plugin" });
     registry.register(custom);
 
-    expect(registry.list()).toHaveLength(12);
+    expect(registry.list()).toHaveLength(13);
     expect(registry.get("custom:my_plugin")?.label).toBe("My Plugin");
     // Builtins still intact
     expect(registry.get("agent")).toBeDefined();
@@ -244,7 +245,7 @@ describe("NodeRegistry", () => {
     const override = makeDef({ type: "agent", category: "processing", label: "Custom Agent" });
     registry.register(override);
 
-    expect(registry.list()).toHaveLength(11);
+    expect(registry.list()).toHaveLength(12);
     expect(registry.get("agent")?.label).toBe("Custom Agent");
   });
 });

@@ -150,11 +150,13 @@ export async function initSessionState(params: {
   // Use CommandBody/RawBody for reset trigger matching (clean message without structural context).
   const rawBody = commandSource;
   const trimmedBody = rawBody.trim();
-  const resetAuthorized = resolveCommandAuthorization({
-    ctx,
-    cfg,
-    commandAuthorized,
-  }).isAuthorizedSender;
+  const resetAuthorized = (
+    await resolveCommandAuthorization({
+      ctx,
+      cfg,
+      commandAuthorized,
+    })
+  ).isAuthorizedSender;
   // Timestamp/message prefixes (e.g. "[Dec 4 17:35] ") are added by the
   // web inbox before we get here. They prevented reset triggers like "/new"
   // from matching, so strip structural wrappers when checking for resets.

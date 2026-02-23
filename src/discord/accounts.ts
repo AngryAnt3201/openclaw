@@ -1,5 +1,6 @@
 import type { OpenClawConfig } from "../config/config.js";
 import type { DiscordAccountConfig } from "../config/types.js";
+import type { CredentialService } from "../credentials/service.js";
 import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../routing/session-key.js";
 import { resolveDiscordToken } from "./token.js";
 
@@ -8,8 +9,10 @@ export type ResolvedDiscordAccount = {
   enabled: boolean;
   name?: string;
   token: string;
-  tokenSource: "env" | "config" | "none";
+  tokenSource: "env" | "config" | "credential" | "none";
   config: DiscordAccountConfig;
+  credentialId?: string;
+  credentialAccountId?: string;
 };
 
 function listConfiguredAccountIds(cfg: OpenClawConfig): string[] {
@@ -55,16 +58,21 @@ function mergeDiscordAccountConfig(cfg: OpenClawConfig, accountId: string): Disc
   return { ...base, ...account };
 }
 
-export function resolveDiscordAccount(params: {
+export async function resolveDiscordAccount(params: {
   cfg: OpenClawConfig;
   accountId?: string | null;
-}): ResolvedDiscordAccount {
+  credentialService?: CredentialService;
+}): Promise<ResolvedDiscordAccount> {
   const accountId = normalizeAccountId(params.accountId);
   const baseEnabled = params.cfg.channels?.discord?.enabled !== false;
   const merged = mergeDiscordAccountConfig(params.cfg, accountId);
   const accountEnabled = merged.enabled !== false;
   const enabled = baseEnabled && accountEnabled;
-  const tokenResolution = resolveDiscordToken(params.cfg, { accountId });
+  const tokenResolution = await resolveDiscordToken(params.cfg, {
+    accountId,
+    credentialService: params.credentialService,
+    credentialAccountId: merged.credentialAccountId,
+  });
   return {
     accountId,
     enabled,
@@ -72,11 +80,18 @@ export function resolveDiscordAccount(params: {
     token: tokenResolution.token,
     tokenSource: tokenResolution.source,
     config: merged,
+    credentialId: tokenResolution.credentialId,
+    credentialAccountId: tokenResolution.credentialAccountId,
   };
 }
 
-export function listEnabledDiscordAccounts(cfg: OpenClawConfig): ResolvedDiscordAccount[] {
-  return listDiscordAccountIds(cfg)
-    .map((accountId) => resolveDiscordAccount({ cfg, accountId }))
-    .filter((account) => account.enabled);
+export async function listEnabledDiscordAccounts(
+  cfg: OpenClawConfig,
+  credentialService?: CredentialService,
+): Promise<ResolvedDiscordAccount[]> {
+  const ids = listDiscordAccountIds(cfg);
+  const accounts = await Promise.all(
+    ids.map((accountId) => resolveDiscordAccount({ cfg, accountId, credentialService })),
+  );
+  return accounts.filter((account) => account.enabled);
 }

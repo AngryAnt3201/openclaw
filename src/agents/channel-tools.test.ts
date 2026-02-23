@@ -41,12 +41,12 @@ describe("channel tools", () => {
     errorSpy.mockClear();
   });
 
-  it("skips crashing plugins and logs once", () => {
+  it("skips crashing plugins and logs once", async () => {
     const cfg = {} as OpenClawConfig;
-    expect(listAllChannelSupportedActions({ cfg })).toEqual([]);
+    expect(await listAllChannelSupportedActions({ cfg })).toEqual([]);
     expect(errorSpy).toHaveBeenCalledTimes(1);
 
-    expect(listAllChannelSupportedActions({ cfg })).toEqual([]);
+    expect(await listAllChannelSupportedActions({ cfg })).toEqual([]);
     expect(errorSpy).toHaveBeenCalledTimes(1);
   });
 });

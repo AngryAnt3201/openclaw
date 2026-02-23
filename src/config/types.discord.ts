@@ -110,7 +110,10 @@ export type DiscordAccountConfig = {
   configWrites?: boolean;
   /** If false, do not start this Discord account. Default: true. */
   enabled?: boolean;
+  /** @deprecated Use credentialAccountId instead. */
   token?: string;
+  /** Credential manager account ID for token resolution. */
+  credentialAccountId?: string;
   /** Allow bot-authored messages to trigger replies (default: false). */
   allowBots?: boolean;
   /**

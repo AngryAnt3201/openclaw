@@ -40,7 +40,10 @@ export type ChannelSetupAdapter = {
 
 export type ChannelConfigAdapter<ResolvedAccount> = {
   listAccountIds: (cfg: OpenClawConfig) => string[];
-  resolveAccount: (cfg: OpenClawConfig, accountId?: string | null) => ResolvedAccount;
+  resolveAccount: (
+    cfg: OpenClawConfig,
+    accountId?: string | null,
+  ) => ResolvedAccount | Promise<ResolvedAccount>;
   defaultAccountId?: (cfg: OpenClawConfig) => string;
   setAccountEnabled?: (params: {
     cfg: OpenClawConfig;
@@ -56,7 +59,7 @@ export type ChannelConfigAdapter<ResolvedAccount> = {
   resolveAllowFrom?: (params: {
     cfg: OpenClawConfig;
     accountId?: string | null;
-  }) => string[] | undefined;
+  }) => string[] | undefined | Promise<string[] | undefined>;
   formatAllowFrom?: (params: {
     cfg: OpenClawConfig;
     accountId?: string | null;
@@ -65,9 +68,13 @@ export type ChannelConfigAdapter<ResolvedAccount> = {
 };
 
 export type ChannelGroupAdapter = {
-  resolveRequireMention?: (params: ChannelGroupContext) => boolean | undefined;
+  resolveRequireMention?: (
+    params: ChannelGroupContext,
+  ) => boolean | undefined | Promise<boolean | undefined>;
   resolveGroupIntroHint?: (params: ChannelGroupContext) => string | undefined;
-  resolveToolPolicy?: (params: ChannelGroupContext) => GroupToolPolicyConfig | undefined;
+  resolveToolPolicy?: (
+    params: ChannelGroupContext,
+  ) => GroupToolPolicyConfig | undefined | Promise<GroupToolPolicyConfig | undefined>;
 };
 
 export type ChannelOutboundContext = {
@@ -155,6 +162,7 @@ export type ChannelGatewayContext<ResolvedAccount = unknown> = {
   log?: ChannelLogSink;
   getStatus: () => ChannelAccountSnapshot;
   setStatus: (next: ChannelAccountSnapshot) => void;
+  credentialService?: import("../../credentials/service.js").CredentialService;
 };
 
 export type ChannelLogoutResult = {

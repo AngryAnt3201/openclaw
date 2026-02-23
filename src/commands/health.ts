@@ -453,7 +453,7 @@ export async function getHealthSnapshot(params?: {
     const accountSummaries: Record<string, ChannelAccountHealthSummary> = {};
 
     for (const accountId of accountIdsToProbe) {
-      const account = plugin.config.resolveAccount(cfg, accountId);
+      const account = await plugin.config.resolveAccount(cfg, accountId);
       const enabled = plugin.config.isEnabled
         ? plugin.config.isEnabled(account, cfg)
         : isAccountEnabled(account);
@@ -624,7 +624,7 @@ export async function healthCommand(
           `  ${plugin.id}: accounts=${accountIds.join(", ") || "(none)"} default=${defaultAccountId}`,
         );
         for (const accountId of accountIds) {
-          const account = plugin.config.resolveAccount(cfg, accountId);
+          const account = await plugin.config.resolveAccount(cfg, accountId);
           const record = asRecord(account);
           const tokenSource =
             record && typeof record.tokenSource === "string" ? record.tokenSource : undefined;
@@ -727,7 +727,7 @@ export async function healthCommand(
         defaultAccountId,
         boundAccounts,
       });
-      const account = plugin.config.resolveAccount(cfg, accountId);
+      const account = await plugin.config.resolveAccount(cfg, accountId);
       plugin.status.logSelfId({
         account,
         cfg,

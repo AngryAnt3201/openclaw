@@ -16,11 +16,11 @@ describe("resolveOutboundTarget", () => {
     );
   });
 
-  it("falls back to whatsapp allowFrom via config", () => {
+  it("falls back to whatsapp allowFrom via config", async () => {
     const cfg: OpenClawConfig = {
       channels: { whatsapp: { allowFrom: ["+1555"] } },
     };
-    const res = resolveOutboundTarget({
+    const res = await resolveOutboundTarget({
       channel: "whatsapp",
       to: "",
       cfg,
@@ -77,8 +77,8 @@ describe("resolveOutboundTarget", () => {
       input: { channel: "whatsapp" as const, to: "", allowFrom: ["wat"] },
       expectedErrorIncludes: "WhatsApp",
     },
-  ])("$name", ({ input, expected, expectedErrorIncludes }) => {
-    const res = resolveOutboundTarget(input);
+  ])("$name", async ({ input, expected, expectedErrorIncludes }) => {
+    const res = await resolveOutboundTarget(input);
     if (expected) {
       expect(res).toEqual(expected);
       return;
@@ -89,16 +89,16 @@ describe("resolveOutboundTarget", () => {
     }
   });
 
-  it("rejects telegram with missing target", () => {
-    const res = resolveOutboundTarget({ channel: "telegram", to: " " });
+  it("rejects telegram with missing target", async () => {
+    const res = await resolveOutboundTarget({ channel: "telegram", to: " " });
     expect(res.ok).toBe(false);
     if (!res.ok) {
       expect(res.error.message).toContain("Telegram");
     }
   });
 
-  it("rejects webchat delivery", () => {
-    const res = resolveOutboundTarget({ channel: "webchat", to: "x" });
+  it("rejects webchat delivery", async () => {
+    const res = await resolveOutboundTarget({ channel: "webchat", to: "x" });
     expect(res.ok).toBe(false);
     if (!res.ok) {
       expect(res.error.message).toContain("WebChat");

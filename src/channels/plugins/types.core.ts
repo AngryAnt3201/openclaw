@@ -222,14 +222,14 @@ export type ChannelThreadingAdapter = {
     cfg: OpenClawConfig;
     accountId?: string | null;
     chatType?: string | null;
-  }) => "off" | "first" | "all";
+  }) => "off" | "first" | "all" | Promise<"off" | "first" | "all">;
   allowTagsWhenOff?: boolean;
   buildToolContext?: (params: {
     cfg: OpenClawConfig;
     accountId?: string | null;
     context: ChannelThreadingContext;
     hasRepliedRef?: { value: boolean };
-  }) => ChannelThreadingToolContext | undefined;
+  }) => ChannelThreadingToolContext | undefined | Promise<ChannelThreadingToolContext | undefined>;
 };
 
 export type ChannelThreadingContext = {
@@ -312,9 +312,11 @@ export type ChannelToolSend = {
 };
 
 export type ChannelMessageActionAdapter = {
-  listActions?: (params: { cfg: OpenClawConfig }) => ChannelMessageActionName[];
+  listActions?: (params: {
+    cfg: OpenClawConfig;
+  }) => ChannelMessageActionName[] | Promise<ChannelMessageActionName[]>;
   supportsAction?: (params: { action: ChannelMessageActionName }) => boolean;
-  supportsButtons?: (params: { cfg: OpenClawConfig }) => boolean;
+  supportsButtons?: (params: { cfg: OpenClawConfig }) => boolean | Promise<boolean>;
   supportsCards?: (params: { cfg: OpenClawConfig }) => boolean;
   extractToolSend?: (params: { args: Record<string, unknown> }) => ChannelToolSend | null;
   handleAction?: (ctx: ChannelMessageActionContext) => Promise<AgentToolResult<unknown>>;

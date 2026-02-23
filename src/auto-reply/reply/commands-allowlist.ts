@@ -285,7 +285,7 @@ async function resolveSlackNames(params: {
   accountId?: string | null;
   entries: string[];
 }) {
-  const account = resolveSlackAccount({ cfg: params.cfg, accountId: params.accountId });
+  const account = await resolveSlackAccount({ cfg: params.cfg, accountId: params.accountId });
   const token = account.config.userToken?.trim() || account.botToken?.trim();
   if (!token) {
     return new Map<string, string>();
@@ -305,7 +305,7 @@ async function resolveDiscordNames(params: {
   accountId?: string | null;
   entries: string[];
 }) {
-  const account = resolveDiscordAccount({ cfg: params.cfg, accountId: params.accountId });
+  const account = await resolveDiscordAccount({ cfg: params.cfg, accountId: params.accountId });
   const token = account.token?.trim();
   if (!token) {
     return new Map<string, string>();
@@ -365,7 +365,7 @@ export const handleAllowlistCommand: CommandHandler = async (params, allowTextCo
     let groupPolicy: string | undefined;
 
     if (channelId === "telegram") {
-      const account = resolveTelegramAccount({ cfg: params.cfg, accountId });
+      const account = await resolveTelegramAccount({ cfg: params.cfg, accountId });
       dmAllowFrom = (account.config.allowFrom ?? []).map(String);
       groupAllowFrom = (account.config.groupAllowFrom ?? []).map(String);
       dmPolicy = account.config.dmPolicy;
@@ -403,7 +403,7 @@ export const handleAllowlistCommand: CommandHandler = async (params, allowTextCo
       dmPolicy = account.config.dmPolicy;
       groupPolicy = account.config.groupPolicy;
     } else if (channelId === "slack") {
-      const account = resolveSlackAccount({ cfg: params.cfg, accountId });
+      const account = await resolveSlackAccount({ cfg: params.cfg, accountId });
       dmAllowFrom = (account.dm?.allowFrom ?? []).map(String);
       groupPolicy = account.groupPolicy;
       const channels = account.channels ?? {};
@@ -414,7 +414,7 @@ export const handleAllowlistCommand: CommandHandler = async (params, allowTextCo
         })
         .filter(Boolean) as Array<{ label: string; entries: string[] }>;
     } else if (channelId === "discord") {
-      const account = resolveDiscordAccount({ cfg: params.cfg, accountId });
+      const account = await resolveDiscordAccount({ cfg: params.cfg, accountId });
       dmAllowFrom = (account.config.dm?.allowFrom ?? []).map(String);
       groupPolicy = account.config.groupPolicy;
       const guilds = account.config.guilds ?? {};

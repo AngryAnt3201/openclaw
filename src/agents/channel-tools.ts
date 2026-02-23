@@ -13,10 +13,10 @@ import { defaultRuntime } from "../runtime.js";
  * Get the list of supported message actions for a specific channel.
  * Returns an empty array if channel is not found or has no actions configured.
  */
-export function listChannelSupportedActions(params: {
+export async function listChannelSupportedActions(params: {
   cfg?: OpenClawConfig;
   channel?: string;
-}): ChannelMessageActionName[] {
+}): Promise<ChannelMessageActionName[]> {
   if (!params.channel) {
     return [];
   }
@@ -25,22 +25,22 @@ export function listChannelSupportedActions(params: {
     return [];
   }
   const cfg = params.cfg ?? ({} as OpenClawConfig);
-  return runPluginListActions(plugin, cfg);
+  return await runPluginListActions(plugin, cfg);
 }
 
 /**
  * Get the list of all supported message actions across all configured channels.
  */
-export function listAllChannelSupportedActions(params: {
+export async function listAllChannelSupportedActions(params: {
   cfg?: OpenClawConfig;
-}): ChannelMessageActionName[] {
+}): Promise<ChannelMessageActionName[]> {
   const actions = new Set<ChannelMessageActionName>();
   for (const plugin of listChannelPlugins()) {
     if (!plugin.actions?.listActions) {
       continue;
     }
     const cfg = params.cfg ?? ({} as OpenClawConfig);
-    const channelActions = runPluginListActions(plugin, cfg);
+    const channelActions = await runPluginListActions(plugin, cfg);
     for (const action of channelActions) {
       actions.add(action);
     }
@@ -86,15 +86,15 @@ export function resolveChannelMessageToolHints(params: {
 
 const loggedListActionErrors = new Set<string>();
 
-function runPluginListActions(
+async function runPluginListActions(
   plugin: ChannelPlugin,
   cfg: OpenClawConfig,
-): ChannelMessageActionName[] {
+): Promise<ChannelMessageActionName[]> {
   if (!plugin.actions?.listActions) {
     return [];
   }
   try {
-    const listed = plugin.actions.listActions({ cfg });
+    const listed = await plugin.actions.listActions({ cfg });
     return Array.isArray(listed) ? listed : [];
   } catch (err) {
     logListActionsError(plugin.id, err);

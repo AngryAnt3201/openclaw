@@ -6,6 +6,7 @@ import { resolveSessionAgentId } from "./agent-scope.js";
 import { createAgentsListTool } from "./tools/agents-list-tool.js";
 import { createBrowserTool } from "./tools/browser-tool.js";
 import { createCanvasTool } from "./tools/canvas-tool.js";
+import { createCodeTool } from "./tools/code-tool.js";
 import { createCredentialTool } from "./tools/credential-tool.js";
 import { createCronTool } from "./tools/cron-tool.js";
 import { createDeviceTool } from "./tools/device-tool.js";
@@ -17,6 +18,7 @@ import { createMaestroAppTool } from "./tools/maestro-app-tool.js";
 import { createMaestroSessionTool } from "./tools/maestro-session-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
+import { createPipelineTool } from "./tools/pipeline-tool.js";
 import { createPluginTool } from "./tools/plugin-tool.js";
 import { createSessionStatusTool } from "./tools/session-status-tool.js";
 import { createSessionsHistoryTool } from "./tools/sessions-history-tool.js";
@@ -186,6 +188,8 @@ export async function createOpenClawTools(options?: {
     createWidgetTool({
       agentSessionKey: options?.agentSessionKey,
     }),
+    createPipelineTool(),
+    createCodeTool(),
   ];
 
   const pluginTools = resolvePluginTools({

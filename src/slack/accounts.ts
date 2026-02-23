@@ -1,10 +1,11 @@
 import type { OpenClawConfig } from "../config/config.js";
 import type { SlackAccountConfig } from "../config/types.js";
+import type { CredentialService } from "../credentials/service.js";
 import { normalizeChatType } from "../channels/chat-type.js";
 import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../routing/session-key.js";
-import { resolveSlackAppToken, resolveSlackBotToken } from "./token.js";
+import { normalizeSlackToken, resolveSlackAppToken, resolveSlackBotToken } from "./token.js";
 
-export type SlackTokenSource = "env" | "config" | "none";
+export type SlackTokenSource = "env" | "config" | "credential" | "none";
 
 export type ResolvedSlackAccount = {
   accountId: string;
@@ -71,20 +72,60 @@ function mergeSlackAccountConfig(cfg: OpenClawConfig, accountId: string): SlackA
   return { ...base, ...account };
 }
 
-export function resolveSlackAccount(params: {
+export async function resolveSlackAccount(params: {
   cfg: OpenClawConfig;
   accountId?: string | null;
-}): ResolvedSlackAccount {
+  credentialService?: CredentialService;
+}): Promise<ResolvedSlackAccount> {
   const accountId = normalizeAccountId(params.accountId);
   const baseEnabled = params.cfg.channels?.slack?.enabled !== false;
   const merged = mergeSlackAccountConfig(params.cfg, accountId);
   const accountEnabled = merged.enabled !== false;
   const enabled = baseEnabled && accountEnabled;
   const allowEnv = accountId === DEFAULT_ACCOUNT_ID;
-  const envBot = allowEnv ? resolveSlackBotToken(process.env.SLACK_BOT_TOKEN) : undefined;
-  const envApp = allowEnv ? resolveSlackAppToken(process.env.SLACK_APP_TOKEN) : undefined;
-  const configBot = resolveSlackBotToken(merged.botToken);
-  const configApp = resolveSlackAppToken(merged.appToken);
+  const credAcctId = merged.credentialAccountId;
+
+  // Credential-backed resolution (async)
+  if (params.credentialService && credAcctId) {
+    const botResult = await resolveSlackBotToken(merged.botToken, {
+      credentialService: params.credentialService,
+      credentialAccountId: credAcctId,
+      allowEnvFallback: allowEnv,
+    });
+    const appResult = await resolveSlackAppToken(merged.appToken, {
+      credentialService: params.credentialService,
+      credentialAccountId: credAcctId,
+      allowEnvFallback: allowEnv,
+    });
+
+    return {
+      accountId,
+      enabled,
+      name: merged.name?.trim() || undefined,
+      botToken: botResult.token,
+      appToken: appResult.token,
+      botTokenSource: botResult.source,
+      appTokenSource: appResult.source,
+      config: merged,
+      groupPolicy: merged.groupPolicy,
+      textChunkLimit: merged.textChunkLimit,
+      mediaMaxMb: merged.mediaMaxMb,
+      reactionNotifications: merged.reactionNotifications,
+      reactionAllowlist: merged.reactionAllowlist,
+      replyToMode: merged.replyToMode,
+      replyToModeByChatType: merged.replyToModeByChatType,
+      actions: merged.actions,
+      slashCommand: merged.slashCommand,
+      dm: merged.dm,
+      channels: merged.channels,
+    };
+  }
+
+  // Legacy sync resolution
+  const envBot = allowEnv ? normalizeSlackToken(process.env.SLACK_BOT_TOKEN) : undefined;
+  const envApp = allowEnv ? normalizeSlackToken(process.env.SLACK_APP_TOKEN) : undefined;
+  const configBot = normalizeSlackToken(merged.botToken);
+  const configApp = normalizeSlackToken(merged.appToken);
   const botToken = configBot ?? envBot;
   const appToken = configApp ?? envApp;
   const botTokenSource: SlackTokenSource = configBot ? "config" : envBot ? "env" : "none";
@@ -113,10 +154,15 @@ export function resolveSlackAccount(params: {
   };
 }
 
-export function listEnabledSlackAccounts(cfg: OpenClawConfig): ResolvedSlackAccount[] {
-  return listSlackAccountIds(cfg)
-    .map((accountId) => resolveSlackAccount({ cfg, accountId }))
-    .filter((account) => account.enabled);
+export async function listEnabledSlackAccounts(
+  cfg: OpenClawConfig,
+  credentialService?: CredentialService,
+): Promise<ResolvedSlackAccount[]> {
+  const ids = listSlackAccountIds(cfg);
+  const accounts = await Promise.all(
+    ids.map((accountId) => resolveSlackAccount({ cfg, accountId, credentialService })),
+  );
+  return accounts.filter((account) => account.enabled);
 }
 
 export function resolveSlackReplyToMode(

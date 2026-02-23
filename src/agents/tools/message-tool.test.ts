@@ -31,7 +31,7 @@ describe("message tool agent routing", () => {
       dryRun: true,
     } satisfies MessageActionRunResult);
 
-    const tool = createMessageTool({
+    const tool = await createMessageTool({
       agentSessionKey: "agent:alpha:main",
       config: {} as never,
     });
@@ -61,7 +61,7 @@ describe("message tool path passthrough", () => {
       dryRun: true,
     } satisfies MessageActionRunResult);
 
-    const tool = createMessageTool({
+    const tool = await createMessageTool({
       config: {} as never,
     });
 
@@ -89,7 +89,7 @@ describe("message tool path passthrough", () => {
       dryRun: true,
     } satisfies MessageActionRunResult);
 
-    const tool = createMessageTool({
+    const tool = await createMessageTool({
       config: {} as never,
     });
 
@@ -142,12 +142,12 @@ describe("message tool description", () => {
     },
   };
 
-  it("hides BlueBubbles group actions for DM targets", () => {
+  it("hides BlueBubbles group actions for DM targets", async () => {
     setActivePluginRegistry(
       createTestRegistry([{ pluginId: "bluebubbles", source: "test", plugin: bluebubblesPlugin }]),
     );
 
-    const tool = createMessageTool({
+    const tool = await createMessageTool({
       config: {} as never,
       currentChannelProvider: "bluebubbles",
       currentChannelId: "bluebubbles:chat_guid:iMessage;-;+15551234567",
@@ -175,7 +175,7 @@ describe("message tool sandbox passthrough", () => {
       dryRun: true,
     } satisfies MessageActionRunResult);
 
-    const tool = createMessageTool({
+    const tool = await createMessageTool({
       config: {} as never,
       sandboxRoot: "/tmp/sandbox",
     });
@@ -202,7 +202,7 @@ describe("message tool sandbox passthrough", () => {
       dryRun: true,
     } satisfies MessageActionRunResult);
 
-    const tool = createMessageTool({
+    const tool = await createMessageTool({
       config: {} as never,
     });
 

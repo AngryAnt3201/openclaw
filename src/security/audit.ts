@@ -559,7 +559,7 @@ async function collectChannelSecurityFindings(params: {
       cfg: params.cfg,
       accountIds,
     });
-    const account = plugin.config.resolveAccount(params.cfg, defaultAccountId);
+    const account = await plugin.config.resolveAccount(params.cfg, defaultAccountId);
     const enabled = plugin.config.isEnabled ? plugin.config.isEnabled(account, params.cfg) : true;
     if (!enabled) {
       continue;

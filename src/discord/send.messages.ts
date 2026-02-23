@@ -15,7 +15,7 @@ export async function readMessagesDiscord(
   query: DiscordMessageQuery = {},
   opts: DiscordReactOpts = {},
 ): Promise<APIMessage[]> {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   const limit =
     typeof query.limit === "number" && Number.isFinite(query.limit)
       ? Math.min(Math.max(Math.floor(query.limit), 1), 100)
@@ -41,7 +41,7 @@ export async function fetchMessageDiscord(
   messageId: string,
   opts: DiscordReactOpts = {},
 ): Promise<APIMessage> {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   return (await rest.get(Routes.channelMessage(channelId, messageId))) as APIMessage;
 }
 
@@ -51,7 +51,7 @@ export async function editMessageDiscord(
   payload: DiscordMessageEdit,
   opts: DiscordReactOpts = {},
 ): Promise<APIMessage> {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   return (await rest.patch(Routes.channelMessage(channelId, messageId), {
     body: { content: payload.content },
   })) as APIMessage;
@@ -62,7 +62,7 @@ export async function deleteMessageDiscord(
   messageId: string,
   opts: DiscordReactOpts = {},
 ) {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   await rest.delete(Routes.channelMessage(channelId, messageId));
   return { ok: true };
 }
@@ -72,7 +72,7 @@ export async function pinMessageDiscord(
   messageId: string,
   opts: DiscordReactOpts = {},
 ) {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   await rest.put(Routes.channelPin(channelId, messageId));
   return { ok: true };
 }
@@ -82,7 +82,7 @@ export async function unpinMessageDiscord(
   messageId: string,
   opts: DiscordReactOpts = {},
 ) {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   await rest.delete(Routes.channelPin(channelId, messageId));
   return { ok: true };
 }
@@ -91,7 +91,7 @@ export async function listPinsDiscord(
   channelId: string,
   opts: DiscordReactOpts = {},
 ): Promise<APIMessage[]> {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   return (await rest.get(Routes.channelPins(channelId))) as APIMessage[];
 }
 
@@ -100,7 +100,7 @@ export async function createThreadDiscord(
   payload: DiscordThreadCreate,
   opts: DiscordReactOpts = {},
 ) {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   const body: Record<string, unknown> = { name: payload.name };
   if (payload.autoArchiveMinutes) {
     body.auto_archive_duration = payload.autoArchiveMinutes;
@@ -129,7 +129,7 @@ export async function createThreadDiscord(
 }
 
 export async function listThreadsDiscord(payload: DiscordThreadList, opts: DiscordReactOpts = {}) {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   if (payload.includeArchived) {
     if (!payload.channelId) {
       throw new Error("channelId required to list archived threads");
@@ -150,7 +150,7 @@ export async function searchMessagesDiscord(
   query: DiscordSearchQuery,
   opts: DiscordReactOpts = {},
 ) {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   const params = new URLSearchParams();
   params.set("content", query.content);
   if (query.channelIds?.length) {

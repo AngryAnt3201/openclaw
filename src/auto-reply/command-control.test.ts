@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 describe("resolveCommandAuthorization", () => {
-  it("falls back from empty SenderId to SenderE164", () => {
+  it("falls back from empty SenderId to SenderE164", async () => {
     const cfg = {
       channels: { whatsapp: { allowFrom: ["+123"] } },
     } as OpenClawConfig;
@@ -40,7 +40,7 @@ describe("resolveCommandAuthorization", () => {
       SenderE164: "+123",
     } as MsgContext;
 
-    const auth = resolveCommandAuthorization({
+    const auth = await resolveCommandAuthorization({
       ctx,
       cfg,
       commandAuthorized: true,
@@ -50,7 +50,7 @@ describe("resolveCommandAuthorization", () => {
     expect(auth.isAuthorizedSender).toBe(true);
   });
 
-  it("falls back from whitespace SenderId to SenderE164", () => {
+  it("falls back from whitespace SenderId to SenderE164", async () => {
     const cfg = {
       channels: { whatsapp: { allowFrom: ["+123"] } },
     } as OpenClawConfig;
@@ -63,7 +63,7 @@ describe("resolveCommandAuthorization", () => {
       SenderE164: "+123",
     } as MsgContext;
 
-    const auth = resolveCommandAuthorization({
+    const auth = await resolveCommandAuthorization({
       ctx,
       cfg,
       commandAuthorized: true,
@@ -73,7 +73,7 @@ describe("resolveCommandAuthorization", () => {
     expect(auth.isAuthorizedSender).toBe(true);
   });
 
-  it("falls back to From when SenderId and SenderE164 are whitespace", () => {
+  it("falls back to From when SenderId and SenderE164 are whitespace", async () => {
     const cfg = {
       channels: { whatsapp: { allowFrom: ["+999"] } },
     } as OpenClawConfig;
@@ -86,7 +86,7 @@ describe("resolveCommandAuthorization", () => {
       SenderE164: "   ",
     } as MsgContext;
 
-    const auth = resolveCommandAuthorization({
+    const auth = await resolveCommandAuthorization({
       ctx,
       cfg,
       commandAuthorized: true,
@@ -96,7 +96,7 @@ describe("resolveCommandAuthorization", () => {
     expect(auth.isAuthorizedSender).toBe(true);
   });
 
-  it("falls back from un-normalizable SenderId to SenderE164", () => {
+  it("falls back from un-normalizable SenderId to SenderE164", async () => {
     const cfg = {
       channels: { whatsapp: { allowFrom: ["+123"] } },
     } as OpenClawConfig;
@@ -109,7 +109,7 @@ describe("resolveCommandAuthorization", () => {
       SenderE164: "+123",
     } as MsgContext;
 
-    const auth = resolveCommandAuthorization({
+    const auth = await resolveCommandAuthorization({
       ctx,
       cfg,
       commandAuthorized: true,
@@ -119,7 +119,7 @@ describe("resolveCommandAuthorization", () => {
     expect(auth.isAuthorizedSender).toBe(true);
   });
 
-  it("prefers SenderE164 when SenderId does not match allowFrom", () => {
+  it("prefers SenderE164 when SenderId does not match allowFrom", async () => {
     const cfg = {
       channels: { whatsapp: { allowFrom: ["+41796666864"] } },
     } as OpenClawConfig;
@@ -132,7 +132,7 @@ describe("resolveCommandAuthorization", () => {
       SenderE164: "+41796666864",
     } as MsgContext;
 
-    const auth = resolveCommandAuthorization({
+    const auth = await resolveCommandAuthorization({
       ctx,
       cfg,
       commandAuthorized: true,
@@ -142,7 +142,7 @@ describe("resolveCommandAuthorization", () => {
     expect(auth.isAuthorizedSender).toBe(true);
   });
 
-  it("uses explicit owner allowlist when allowFrom is wildcard", () => {
+  it("uses explicit owner allowlist when allowFrom is wildcard", async () => {
     const cfg = {
       commands: { ownerAllowFrom: ["whatsapp:+15551234567"] },
       channels: { whatsapp: { allowFrom: ["*"] } },
@@ -154,7 +154,7 @@ describe("resolveCommandAuthorization", () => {
       From: "whatsapp:+15551234567",
       SenderE164: "+15551234567",
     } as MsgContext;
-    const ownerAuth = resolveCommandAuthorization({
+    const ownerAuth = await resolveCommandAuthorization({
       ctx: ownerCtx,
       cfg,
       commandAuthorized: true,
@@ -168,7 +168,7 @@ describe("resolveCommandAuthorization", () => {
       From: "whatsapp:+19995551234",
       SenderE164: "+19995551234",
     } as MsgContext;
-    const otherAuth = resolveCommandAuthorization({
+    const otherAuth = await resolveCommandAuthorization({
       ctx: otherCtx,
       cfg,
       commandAuthorized: true,
@@ -177,7 +177,7 @@ describe("resolveCommandAuthorization", () => {
     expect(otherAuth.isAuthorizedSender).toBe(false);
   });
 
-  it("uses owner allowlist override from context when configured", () => {
+  it("uses owner allowlist override from context when configured", async () => {
     setActivePluginRegistry(
       createTestRegistry([
         {
@@ -202,7 +202,7 @@ describe("resolveCommandAuthorization", () => {
       OwnerAllowFrom: ["discord:123"],
     } as MsgContext;
 
-    const auth = resolveCommandAuthorization({
+    const auth = await resolveCommandAuthorization({
       ctx,
       cfg,
       commandAuthorized: true,

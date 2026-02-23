@@ -333,7 +333,7 @@ export const agentHandlers: GatewayRequestHandlers = {
 
     if (!resolvedTo && isDeliverableMessageChannel(resolvedChannel)) {
       const cfgResolved = cfgForAgent ?? cfg;
-      const fallback = resolveAgentOutboundTarget({
+      const fallback = await resolveAgentOutboundTarget({
         cfg: cfgResolved,
         plan: deliveryPlan,
         targetMode: "implicit",

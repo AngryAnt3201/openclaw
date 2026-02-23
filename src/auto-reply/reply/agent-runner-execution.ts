@@ -175,7 +175,7 @@ export async function runAgentTurnWithFallback(params: {
           params.followupRun.run.config,
           resolveAgentIdFromSessionKey(params.followupRun.run.sessionKey),
         ),
-        run: (provider, model) => {
+        run: async (provider, model) => {
           // Notify that model selection is complete (including after fallback).
           // This allows responsePrefix template interpolation with the actual model.
           params.opts?.onModelSelected?.({
@@ -293,11 +293,11 @@ export async function runAgentTurnWithFallback(params: {
             senderUsername: params.sessionCtx.SenderUsername?.trim() || undefined,
             senderE164: params.sessionCtx.SenderE164?.trim() || undefined,
             // Provider threading context for tool auto-injection
-            ...buildThreadingToolContext({
+            ...(await buildThreadingToolContext({
               sessionCtx: params.sessionCtx,
               config: params.followupRun.run.config,
               hasRepliedRef: params.opts?.hasRepliedRef,
-            }),
+            })),
             sessionFile: params.followupRun.run.sessionFile,
             workspaceDir: params.followupRun.run.workspaceDir,
             agentDir: params.followupRun.run.agentDir,

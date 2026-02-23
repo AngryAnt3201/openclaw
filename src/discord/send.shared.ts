@@ -60,8 +60,8 @@ function resolveRest(token: string, rest?: RequestClient) {
   return rest ?? new RequestClient(token);
 }
 
-function createDiscordClient(opts: DiscordClientOpts, cfg = loadConfig()) {
-  const account = resolveDiscordAccount({ cfg, accountId: opts.accountId });
+async function createDiscordClient(opts: DiscordClientOpts, cfg = loadConfig()) {
+  const account = await resolveDiscordAccount({ cfg, accountId: opts.accountId });
   const token = resolveToken({
     explicit: opts.token,
     accountId: account.accountId,
@@ -76,8 +76,8 @@ function createDiscordClient(opts: DiscordClientOpts, cfg = loadConfig()) {
   return { token, rest, request };
 }
 
-function resolveDiscordRest(opts: DiscordClientOpts) {
-  return createDiscordClient(opts).rest;
+async function resolveDiscordRest(opts: DiscordClientOpts) {
+  return (await createDiscordClient(opts)).rest;
 }
 
 function normalizeReactionEmoji(raw: string) {
@@ -116,7 +116,7 @@ export async function parseAndResolveRecipient(
   accountId?: string,
 ): Promise<DiscordRecipient> {
   const cfg = loadConfig();
-  const accountInfo = resolveDiscordAccount({ cfg, accountId });
+  const accountInfo = await resolveDiscordAccount({ cfg, accountId });
 
   // First try to resolve using directory lookup (handles usernames)
   const trimmed = raw.trim();

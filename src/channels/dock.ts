@@ -50,7 +50,7 @@ export type ChannelDock = {
     resolveAllowFrom?: (params: {
       cfg: OpenClawConfig;
       accountId?: string | null;
-    }) => Array<string | number> | undefined;
+    }) => Array<string | number> | undefined | Promise<Array<string | number> | undefined>;
     formatAllowFrom?: (params: {
       cfg: OpenClawConfig;
       accountId?: string | null;
@@ -96,8 +96,8 @@ const DOCKS: Record<ChatChannelId, ChannelDock> = {
     },
     outbound: { textChunkLimit: 4000 },
     config: {
-      resolveAllowFrom: ({ cfg, accountId }) =>
-        (resolveTelegramAccount({ cfg, accountId }).config.allowFrom ?? []).map((entry) =>
+      resolveAllowFrom: async ({ cfg, accountId }) =>
+        ((await resolveTelegramAccount({ cfg, accountId })).config.allowFrom ?? []).map((entry) =>
           String(entry),
         ),
       formatAllowFrom: ({ allowFrom }) =>
@@ -191,9 +191,9 @@ const DOCKS: Record<ChatChannelId, ChannelDock> = {
       allowFromFallback: ({ cfg }) => cfg.channels?.discord?.dm?.allowFrom,
     },
     config: {
-      resolveAllowFrom: ({ cfg, accountId }) =>
-        (resolveDiscordAccount({ cfg, accountId }).config.dm?.allowFrom ?? []).map((entry) =>
-          String(entry),
+      resolveAllowFrom: async ({ cfg, accountId }) =>
+        ((await resolveDiscordAccount({ cfg, accountId })).config.dm?.allowFrom ?? []).map(
+          (entry) => String(entry),
         ),
       formatAllowFrom: ({ allowFrom }) => formatLower(allowFrom),
     },
@@ -285,8 +285,10 @@ const DOCKS: Record<ChatChannelId, ChannelDock> = {
       blockStreamingCoalesceDefaults: { minChars: 1500, idleMs: 1000 },
     },
     config: {
-      resolveAllowFrom: ({ cfg, accountId }) =>
-        (resolveSlackAccount({ cfg, accountId }).dm?.allowFrom ?? []).map((entry) => String(entry)),
+      resolveAllowFrom: async ({ cfg, accountId }) =>
+        ((await resolveSlackAccount({ cfg, accountId })).dm?.allowFrom ?? []).map((entry) =>
+          String(entry),
+        ),
       formatAllowFrom: ({ allowFrom }) => formatLower(allowFrom),
     },
     groups: {
@@ -297,10 +299,10 @@ const DOCKS: Record<ChatChannelId, ChannelDock> = {
       stripPatterns: () => ["<@[^>]+>"],
     },
     threading: {
-      resolveReplyToMode: ({ cfg, accountId, chatType }) =>
-        resolveSlackReplyToMode(resolveSlackAccount({ cfg, accountId }), chatType),
+      resolveReplyToMode: async ({ cfg, accountId, chatType }) =>
+        resolveSlackReplyToMode(await resolveSlackAccount({ cfg, accountId }), chatType),
       allowTagsWhenOff: true,
-      buildToolContext: (params) => buildSlackThreadingToolContext(params),
+      buildToolContext: async (params) => buildSlackThreadingToolContext(params),
     },
   },
   signal: {

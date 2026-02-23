@@ -105,7 +105,7 @@ export async function runMemoryFlushIfNeeded(params: {
         params.followupRun.run.config,
         resolveAgentIdFromSessionKey(params.followupRun.run.sessionKey),
       ),
-      run: (provider, model) => {
+      run: async (provider, model) => {
         const authProfileId =
           provider === params.followupRun.run.provider
             ? params.followupRun.run.authProfileId
@@ -119,11 +119,11 @@ export async function runMemoryFlushIfNeeded(params: {
           messageTo: params.sessionCtx.OriginatingTo ?? params.sessionCtx.To,
           messageThreadId: params.sessionCtx.MessageThreadId ?? undefined,
           // Provider threading context for tool auto-injection
-          ...buildThreadingToolContext({
+          ...(await buildThreadingToolContext({
             sessionCtx: params.sessionCtx,
             config: params.followupRun.run.config,
             hasRepliedRef: params.opts?.hasRepliedRef,
-          }),
+          })),
           senderId: params.sessionCtx.SenderId?.trim() || undefined,
           senderName: params.sessionCtx.SenderName?.trim() || undefined,
           senderUsername: params.sessionCtx.SenderUsername?.trim() || undefined,

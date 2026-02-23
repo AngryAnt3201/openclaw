@@ -116,7 +116,7 @@ export const sendHandlers: GatewayRequestHandlers = {
     const work = (async (): Promise<InflightResult> => {
       try {
         const cfg = loadConfig();
-        const resolved = resolveOutboundTarget({
+        const resolved = await resolveOutboundTarget({
           channel: outboundChannel,
           to,
           cfg,
@@ -305,7 +305,7 @@ export const sendHandlers: GatewayRequestHandlers = {
         return;
       }
       const cfg = loadConfig();
-      const resolved = resolveOutboundTarget({
+      const resolved = await resolveOutboundTarget({
         channel: channel,
         to,
         cfg,

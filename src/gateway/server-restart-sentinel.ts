@@ -67,7 +67,7 @@ export async function scheduleRestartSentinelWake(params: { deps: CliDeps }) {
     return;
   }
 
-  const resolved = resolveOutboundTarget({
+  const resolved = await resolveOutboundTarget({
     channel,
     to,
     cfg,

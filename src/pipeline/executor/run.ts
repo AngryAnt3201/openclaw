@@ -18,7 +18,10 @@ import { VALID_TRIGGER_NODE_TYPES } from "../types.js";
 import { executeNotifyNode, executeOutputNode } from "./action.js";
 import { executeAgentNode } from "./agent.js";
 import { executeAppNode } from "./app.js";
+import { executeApprovalNode } from "./approval.js";
+import { executeCodeNode } from "./code.js";
 import { executeConditionNode } from "./condition.js";
+import { executeLoopNode } from "./loop.js";
 
 // ---------------------------------------------------------------------------
 // Run event types (mirrors frontend PipelineRunEvent)
@@ -45,6 +48,8 @@ export interface RunEvent {
   durationMs?: number;
   status?: string;
   totalDurationMs?: number;
+  /** Gateway session key (for agent/code nodes that spawned a session). */
+  sessionKey?: string;
 }
 
 export type RunEventCallback = (event: RunEvent) => void;
@@ -56,7 +61,10 @@ export type RunEventCallback = (event: RunEvent) => void;
 const NODE_EXECUTORS: Record<string, NodeExecutorFn> = {
   agent: executeAgentNode,
   app: executeAppNode,
+  approval: executeApprovalNode,
+  code: executeCodeNode,
   condition: executeConditionNode,
+  loop: executeLoopNode,
   notify: executeNotifyNode,
   output: executeOutputNode,
 };
@@ -224,6 +232,7 @@ export async function executePipeline(
         timestamp: Date.now(),
         output: execResult.output,
         durationMs: execResult.durationMs,
+        sessionKey: execResult.sessionKey,
       });
     } else if (execResult.status === "failure") {
       onEvent({
@@ -232,7 +241,7 @@ export async function executePipeline(
         pipelineId: pipeline.id,
         nodeId: node.id,
         timestamp: Date.now(),
-        error: execResult.error,
+        error: execResult.error ?? `Node "${node.label}" failed`,
         durationMs: execResult.durationMs,
       });
 
@@ -243,15 +252,16 @@ export async function executePipeline(
       }
     }
 
-    // Handle condition branching: mark non-taken branches as skipped.
-    if (node.type === "condition" && execResult.outputHandle) {
+    // Handle branching: any node with an outputHandle (condition, approval, loop)
+    // marks non-taken branches as skipped.
+    if (execResult.outputHandle) {
       markSkippedBranches(node.id, execResult.outputHandle, pipeline.edges, nodeMap, skippedNodes);
     }
   }
 
   // Determine overall run status.
-  const hasFailure = nodeResults.some((r) => r.status === "failed");
-  const finalStatus = hasFailure ? "failed" : "success";
+  const firstFailure = nodeResults.find((r) => r.status === "failed");
+  const finalStatus = firstFailure ? "failed" : "success";
   const totalDurationMs = Date.now() - startMs;
 
   // Emit run_completed.
@@ -261,6 +271,7 @@ export async function executePipeline(
     pipelineId: pipeline.id,
     timestamp: Date.now(),
     status: finalStatus,
+    error: firstFailure?.error,
     totalDurationMs,
   });
 

@@ -122,6 +122,8 @@ export class LauncherService {
         tags: input.tags ?? [],
         color: input.color ?? null,
 
+        proxy_url: null,
+
         createdAtMs: now,
         updatedAtMs: now,
       };
@@ -212,6 +214,9 @@ export class LauncherService {
       }
       if (patch.color !== undefined) {
         app.color = patch.color;
+      }
+      if (patch.proxy_url !== undefined) {
+        app.proxy_url = patch.proxy_url;
       }
       app.updatedAtMs = this.now();
 

@@ -242,6 +242,32 @@ export const handleNodeEvent = async (ctx: NodeEventContext, nodeId: string, evt
       requestHeartbeatNow({ reason: "exec-event" });
       return;
     }
+    case "maestro.output": {
+      // Broadcast terminal output from a maestro node to all operator clients
+      if (!evt.payloadJSON) {
+        return;
+      }
+      try {
+        const payload = JSON.parse(evt.payloadJSON) as unknown;
+        ctx.broadcast("maestro.output", payload, { dropIfSlow: true });
+      } catch {
+        /* ignore malformed */
+      }
+      return;
+    }
+    case "maestro.sessions.changed": {
+      // Broadcast session list changes from a maestro node
+      if (!evt.payloadJSON) {
+        return;
+      }
+      try {
+        const payload = JSON.parse(evt.payloadJSON) as unknown;
+        ctx.broadcast("maestro.sessions.changed", payload, { dropIfSlow: true });
+      } catch {
+        /* ignore malformed */
+      }
+      return;
+    }
     default:
       return;
   }

@@ -42,7 +42,14 @@ export class AppProcessManager {
 
     const proc = spawn(opts.runCommand, {
       cwd: opts.workingDir,
-      env: { ...process.env, ...opts.envVars, PORT: String(opts.port) },
+      env: {
+        ...process.env,
+        ...opts.envVars,
+        PORT: String(opts.port),
+        // Force app to bind to loopback only — the gateway's per-port
+        // proxy handles external access on the same port number.
+        HOST: "127.0.0.1",
+      },
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
     });

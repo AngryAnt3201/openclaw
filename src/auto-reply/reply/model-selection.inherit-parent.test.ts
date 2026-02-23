@@ -126,7 +126,7 @@ describe("createModelSelectionState parent inheritance", () => {
       agents: {
         defaults: {
           models: {
-            "openai/gpt-4o-mini": {},
+            "openai/gpt-4o-mini": { alias: "default" },
           },
         },
       },

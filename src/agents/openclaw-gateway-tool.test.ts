@@ -25,9 +25,11 @@ describe("gateway tool", () => {
     process.env.OPENCLAW_PROFILE = "isolated";
 
     try {
-      const tool = createOpenClawTools({
-        config: { commands: { restart: true } },
-      }).find((candidate) => candidate.name === "gateway");
+      const tool = (
+        await createOpenClawTools({
+          config: { commands: { restart: true } },
+        })
+      ).find((candidate) => candidate.name === "gateway");
       expect(tool).toBeDefined();
       if (!tool) {
         throw new Error("missing gateway tool");
@@ -75,9 +77,11 @@ describe("gateway tool", () => {
 
   it("passes config.apply through gateway call", async () => {
     const { callGatewayTool } = await import("./tools/gateway.js");
-    const tool = createOpenClawTools({
-      agentSessionKey: "agent:main:whatsapp:dm:+15555550123",
-    }).find((candidate) => candidate.name === "gateway");
+    const tool = (
+      await createOpenClawTools({
+        agentSessionKey: "agent:main:whatsapp:dm:+15555550123",
+      })
+    ).find((candidate) => candidate.name === "gateway");
     expect(tool).toBeDefined();
     if (!tool) {
       throw new Error("missing gateway tool");
@@ -103,9 +107,11 @@ describe("gateway tool", () => {
 
   it("passes config.patch through gateway call", async () => {
     const { callGatewayTool } = await import("./tools/gateway.js");
-    const tool = createOpenClawTools({
-      agentSessionKey: "agent:main:whatsapp:dm:+15555550123",
-    }).find((candidate) => candidate.name === "gateway");
+    const tool = (
+      await createOpenClawTools({
+        agentSessionKey: "agent:main:whatsapp:dm:+15555550123",
+      })
+    ).find((candidate) => candidate.name === "gateway");
     expect(tool).toBeDefined();
     if (!tool) {
       throw new Error("missing gateway tool");
@@ -131,9 +137,11 @@ describe("gateway tool", () => {
 
   it("passes update.run through gateway call", async () => {
     const { callGatewayTool } = await import("./tools/gateway.js");
-    const tool = createOpenClawTools({
-      agentSessionKey: "agent:main:whatsapp:dm:+15555550123",
-    }).find((candidate) => candidate.name === "gateway");
+    const tool = (
+      await createOpenClawTools({
+        agentSessionKey: "agent:main:whatsapp:dm:+15555550123",
+      })
+    ).find((candidate) => candidate.name === "gateway");
     expect(tool).toBeDefined();
     if (!tool) {
       throw new Error("missing gateway tool");

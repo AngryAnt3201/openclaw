@@ -81,9 +81,9 @@ async function resolveContextReport(
     cfg: params.cfg,
     sessionKey: params.ctx.SessionKey ?? params.sessionKey,
   });
-  const tools = (() => {
+  const tools = await (async () => {
     try {
-      return createOpenClawCodingTools({
+      return await createOpenClawCodingTools({
         config: params.cfg,
         workspaceDir,
         sessionKey: params.sessionKey,

@@ -213,6 +213,7 @@ export type AppAction =
   | { type: "deep_link"; uri: string }
   | { type: "launch_native"; appPath: string }
   | { type: "open_task"; taskId: string }
+  | { type: "open_file"; filePath: string; mimeType?: string; sizeBytes?: number }
   | { type: "noop" };
 
 export type AppRefStyle = "chip" | "obsidian-link";

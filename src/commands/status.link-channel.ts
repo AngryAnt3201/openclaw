@@ -21,7 +21,7 @@ export async function resolveLinkChannelContext(
       cfg,
       accountIds,
     });
-    const account = plugin.config.resolveAccount(cfg, defaultAccountId);
+    const account = await plugin.config.resolveAccount(cfg, defaultAccountId);
     const enabled = plugin.config.isEnabled ? plugin.config.isEnabled(account, cfg) : true;
     const configured = plugin.config.isConfigured
       ? await plugin.config.isConfigured(account, cfg)

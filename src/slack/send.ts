@@ -13,7 +13,7 @@ import { resolveSlackAccount } from "./accounts.js";
 import { createSlackWebClient } from "./client.js";
 import { markdownToSlackMrkdwnChunks } from "./format.js";
 import { parseSlackTarget } from "./targets.js";
-import { resolveSlackBotToken } from "./token.js";
+import { normalizeSlackToken } from "./token.js";
 
 const SLACK_TEXT_LIMIT = 4000;
 
@@ -46,11 +46,11 @@ function resolveToken(params: {
   fallbackToken?: string;
   fallbackSource?: SlackTokenSource;
 }) {
-  const explicit = resolveSlackBotToken(params.explicit);
+  const explicit = normalizeSlackToken(params.explicit);
   if (explicit) {
     return explicit;
   }
-  const fallback = resolveSlackBotToken(params.fallbackToken);
+  const fallback = normalizeSlackToken(params.fallbackToken);
   if (!fallback) {
     logVerbose(
       `slack send: missing bot token for account=${params.accountId} explicit=${Boolean(
@@ -134,7 +134,7 @@ export async function sendMessageSlack(
     throw new Error("Slack send requires text or media");
   }
   const cfg = loadConfig();
-  const account = resolveSlackAccount({
+  const account = await resolveSlackAccount({
     cfg,
     accountId: opts.accountId,
   });

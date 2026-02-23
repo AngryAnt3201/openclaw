@@ -135,11 +135,11 @@ describe("resolveHeartbeatDeliveryTarget", () => {
     updatedAt: Date.now(),
   };
 
-  it("respects target none", () => {
+  it("respects target none", async () => {
     const cfg: OpenClawConfig = {
       agents: { defaults: { heartbeat: { target: "none" } } },
     };
-    expect(resolveHeartbeatDeliveryTarget({ cfg, entry: baseEntry })).toEqual({
+    expect(await resolveHeartbeatDeliveryTarget({ cfg, entry: baseEntry })).toEqual({
       channel: "none",
       reason: "target-none",
       accountId: undefined,
@@ -148,14 +148,14 @@ describe("resolveHeartbeatDeliveryTarget", () => {
     });
   });
 
-  it("uses last route by default", () => {
+  it("uses last route by default", async () => {
     const cfg: OpenClawConfig = {};
     const entry = {
       ...baseEntry,
       lastChannel: "whatsapp" as const,
       lastTo: "+1555",
     };
-    expect(resolveHeartbeatDeliveryTarget({ cfg, entry })).toEqual({
+    expect(await resolveHeartbeatDeliveryTarget({ cfg, entry })).toEqual({
       channel: "whatsapp",
       to: "+1555",
       accountId: undefined,
@@ -164,7 +164,7 @@ describe("resolveHeartbeatDeliveryTarget", () => {
     });
   });
 
-  it("normalizes explicit WhatsApp targets when allowFrom is '*'", () => {
+  it("normalizes explicit WhatsApp targets when allowFrom is '*'", async () => {
     const cfg: OpenClawConfig = {
       agents: {
         defaults: {
@@ -173,7 +173,7 @@ describe("resolveHeartbeatDeliveryTarget", () => {
       },
       channels: { whatsapp: { allowFrom: ["*"] } },
     };
-    expect(resolveHeartbeatDeliveryTarget({ cfg, entry: baseEntry })).toEqual({
+    expect(await resolveHeartbeatDeliveryTarget({ cfg, entry: baseEntry })).toEqual({
       channel: "whatsapp",
       to: "+555123",
       accountId: undefined,
@@ -182,14 +182,14 @@ describe("resolveHeartbeatDeliveryTarget", () => {
     });
   });
 
-  it("skips when last route is webchat", () => {
+  it("skips when last route is webchat", async () => {
     const cfg: OpenClawConfig = {};
     const entry = {
       ...baseEntry,
       lastChannel: "webchat" as const,
       lastTo: "web",
     };
-    expect(resolveHeartbeatDeliveryTarget({ cfg, entry })).toEqual({
+    expect(await resolveHeartbeatDeliveryTarget({ cfg, entry })).toEqual({
       channel: "none",
       reason: "no-target",
       accountId: undefined,
@@ -198,7 +198,7 @@ describe("resolveHeartbeatDeliveryTarget", () => {
     });
   });
 
-  it("applies allowFrom fallback for WhatsApp targets", () => {
+  it("applies allowFrom fallback for WhatsApp targets", async () => {
     const cfg: OpenClawConfig = {
       agents: { defaults: { heartbeat: { target: "whatsapp", to: "+1999" } } },
       channels: { whatsapp: { allowFrom: ["+1555", "+1666"] } },
@@ -208,7 +208,7 @@ describe("resolveHeartbeatDeliveryTarget", () => {
       lastChannel: "whatsapp" as const,
       lastTo: "+1222",
     };
-    expect(resolveHeartbeatDeliveryTarget({ cfg, entry })).toEqual({
+    expect(await resolveHeartbeatDeliveryTarget({ cfg, entry })).toEqual({
       channel: "whatsapp",
       to: "+1555",
       reason: "allowFrom-fallback",
@@ -218,7 +218,7 @@ describe("resolveHeartbeatDeliveryTarget", () => {
     });
   });
 
-  it("keeps WhatsApp group targets even with allowFrom set", () => {
+  it("keeps WhatsApp group targets even with allowFrom set", async () => {
     const cfg: OpenClawConfig = {
       channels: { whatsapp: { allowFrom: ["+1555"] } },
     };
@@ -227,7 +227,7 @@ describe("resolveHeartbeatDeliveryTarget", () => {
       lastChannel: "whatsapp" as const,
       lastTo: "120363401234567890@g.us",
     };
-    expect(resolveHeartbeatDeliveryTarget({ cfg, entry })).toEqual({
+    expect(await resolveHeartbeatDeliveryTarget({ cfg, entry })).toEqual({
       channel: "whatsapp",
       to: "120363401234567890@g.us",
       accountId: undefined,
@@ -236,7 +236,7 @@ describe("resolveHeartbeatDeliveryTarget", () => {
     });
   });
 
-  it("normalizes prefixed WhatsApp group targets for heartbeat delivery", () => {
+  it("normalizes prefixed WhatsApp group targets for heartbeat delivery", async () => {
     const cfg: OpenClawConfig = {
       channels: { whatsapp: { allowFrom: ["+1555"] } },
     };
@@ -245,7 +245,7 @@ describe("resolveHeartbeatDeliveryTarget", () => {
       lastChannel: "whatsapp" as const,
       lastTo: "whatsapp:120363401234567890@G.US",
     };
-    expect(resolveHeartbeatDeliveryTarget({ cfg, entry })).toEqual({
+    expect(await resolveHeartbeatDeliveryTarget({ cfg, entry })).toEqual({
       channel: "whatsapp",
       to: "120363401234567890@g.us",
       accountId: undefined,
@@ -254,11 +254,11 @@ describe("resolveHeartbeatDeliveryTarget", () => {
     });
   });
 
-  it("keeps explicit telegram targets", () => {
+  it("keeps explicit telegram targets", async () => {
     const cfg: OpenClawConfig = {
       agents: { defaults: { heartbeat: { target: "telegram", to: "123" } } },
     };
-    expect(resolveHeartbeatDeliveryTarget({ cfg, entry: baseEntry })).toEqual({
+    expect(await resolveHeartbeatDeliveryTarget({ cfg, entry: baseEntry })).toEqual({
       channel: "telegram",
       to: "123",
       accountId: undefined,
@@ -267,7 +267,7 @@ describe("resolveHeartbeatDeliveryTarget", () => {
     });
   });
 
-  it("uses explicit heartbeat accountId when provided", () => {
+  it("uses explicit heartbeat accountId when provided", async () => {
     const cfg: OpenClawConfig = {
       agents: {
         defaults: {
@@ -276,7 +276,7 @@ describe("resolveHeartbeatDeliveryTarget", () => {
       },
       channels: { telegram: { accounts: { work: { botToken: "token" } } } },
     };
-    expect(resolveHeartbeatDeliveryTarget({ cfg, entry: baseEntry })).toEqual({
+    expect(await resolveHeartbeatDeliveryTarget({ cfg, entry: baseEntry })).toEqual({
       channel: "telegram",
       to: "123",
       accountId: "work",
@@ -285,7 +285,7 @@ describe("resolveHeartbeatDeliveryTarget", () => {
     });
   });
 
-  it("skips when explicit heartbeat accountId is unknown", () => {
+  it("skips when explicit heartbeat accountId is unknown", async () => {
     const cfg: OpenClawConfig = {
       agents: {
         defaults: {
@@ -294,7 +294,7 @@ describe("resolveHeartbeatDeliveryTarget", () => {
       },
       channels: { telegram: { accounts: { work: { botToken: "token" } } } },
     };
-    expect(resolveHeartbeatDeliveryTarget({ cfg, entry: baseEntry })).toEqual({
+    expect(await resolveHeartbeatDeliveryTarget({ cfg, entry: baseEntry })).toEqual({
       channel: "none",
       reason: "unknown-account",
       accountId: "missing",
@@ -303,13 +303,13 @@ describe("resolveHeartbeatDeliveryTarget", () => {
     });
   });
 
-  it("prefers per-agent heartbeat overrides when provided", () => {
+  it("prefers per-agent heartbeat overrides when provided", async () => {
     const cfg: OpenClawConfig = {
       agents: { defaults: { heartbeat: { target: "telegram", to: "123" } } },
     };
     const heartbeat = { target: "whatsapp", to: "+1555" } as const;
     expect(
-      resolveHeartbeatDeliveryTarget({
+      await resolveHeartbeatDeliveryTarget({
         cfg,
         entry: { ...baseEntry, lastChannel: "whatsapp", lastTo: "+1999" },
         heartbeat,
@@ -325,7 +325,7 @@ describe("resolveHeartbeatDeliveryTarget", () => {
 });
 
 describe("resolveHeartbeatSenderContext", () => {
-  it("prefers delivery accountId for allowFrom resolution", () => {
+  it("prefers delivery accountId for allowFrom resolution", async () => {
     const cfg: OpenClawConfig = {
       channels: {
         telegram: {
@@ -351,7 +351,7 @@ describe("resolveHeartbeatSenderContext", () => {
       lastAccountId: "default",
     };
 
-    const ctx = resolveHeartbeatSenderContext({ cfg, entry, delivery });
+    const ctx = await resolveHeartbeatSenderContext({ cfg, entry, delivery });
 
     expect(ctx.allowFrom).toEqual(["222"]);
   });

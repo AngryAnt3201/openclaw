@@ -65,11 +65,11 @@ function listConfiguredGuildChannelKeys(
   return [...ids].toSorted((a, b) => a.localeCompare(b));
 }
 
-export function collectDiscordAuditChannelIds(params: {
+export async function collectDiscordAuditChannelIds(params: {
   cfg: OpenClawConfig;
   accountId?: string | null;
 }) {
-  const account = resolveDiscordAccount({
+  const account = await resolveDiscordAccount({
     cfg: params.cfg,
     accountId: params.accountId,
   });

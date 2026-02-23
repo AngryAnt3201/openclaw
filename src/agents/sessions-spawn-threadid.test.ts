@@ -53,12 +53,14 @@ describe("sessions_spawn requesterOrigin threading", () => {
   });
 
   it("captures threadId in requesterOrigin", async () => {
-    const tool = createOpenClawTools({
-      agentSessionKey: "main",
-      agentChannel: "telegram",
-      agentTo: "telegram:123",
-      agentThreadId: 42,
-    }).find((candidate) => candidate.name === "sessions_spawn");
+    const tool = (
+      await createOpenClawTools({
+        agentSessionKey: "main",
+        agentChannel: "telegram",
+        agentTo: "telegram:123",
+        agentThreadId: 42,
+      })
+    ).find((candidate) => candidate.name === "sessions_spawn");
     if (!tool) {
       throw new Error("missing sessions_spawn tool");
     }
@@ -78,11 +80,13 @@ describe("sessions_spawn requesterOrigin threading", () => {
   });
 
   it("stores requesterOrigin without threadId when none is provided", async () => {
-    const tool = createOpenClawTools({
-      agentSessionKey: "main",
-      agentChannel: "telegram",
-      agentTo: "telegram:123",
-    }).find((candidate) => candidate.name === "sessions_spawn");
+    const tool = (
+      await createOpenClawTools({
+        agentSessionKey: "main",
+        agentChannel: "telegram",
+        agentTo: "telegram:123",
+      })
+    ).find((candidate) => candidate.name === "sessions_spawn");
     if (!tool) {
       throw new Error("missing sessions_spawn tool");
     }

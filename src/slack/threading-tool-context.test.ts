@@ -5,13 +5,13 @@ import { buildSlackThreadingToolContext } from "./threading-tool-context.js";
 const emptyCfg = {} as OpenClawConfig;
 
 describe("buildSlackThreadingToolContext", () => {
-  it("uses top-level replyToMode by default", () => {
+  it("uses top-level replyToMode by default", async () => {
     const cfg = {
       channels: {
         slack: { replyToMode: "first" },
       },
     } as OpenClawConfig;
-    const result = buildSlackThreadingToolContext({
+    const result = await buildSlackThreadingToolContext({
       cfg,
       accountId: null,
       context: { ChatType: "channel" },
@@ -19,7 +19,7 @@ describe("buildSlackThreadingToolContext", () => {
     expect(result.replyToMode).toBe("first");
   });
 
-  it("uses chat-type replyToMode overrides for direct messages when configured", () => {
+  it("uses chat-type replyToMode overrides for direct messages when configured", async () => {
     const cfg = {
       channels: {
         slack: {
@@ -28,7 +28,7 @@ describe("buildSlackThreadingToolContext", () => {
         },
       },
     } as OpenClawConfig;
-    const result = buildSlackThreadingToolContext({
+    const result = await buildSlackThreadingToolContext({
       cfg,
       accountId: null,
       context: { ChatType: "direct" },
@@ -36,7 +36,7 @@ describe("buildSlackThreadingToolContext", () => {
     expect(result.replyToMode).toBe("all");
   });
 
-  it("uses top-level replyToMode for channels when no channel override is set", () => {
+  it("uses top-level replyToMode for channels when no channel override is set", async () => {
     const cfg = {
       channels: {
         slack: {
@@ -45,7 +45,7 @@ describe("buildSlackThreadingToolContext", () => {
         },
       },
     } as OpenClawConfig;
-    const result = buildSlackThreadingToolContext({
+    const result = await buildSlackThreadingToolContext({
       cfg,
       accountId: null,
       context: { ChatType: "channel" },
@@ -53,7 +53,7 @@ describe("buildSlackThreadingToolContext", () => {
     expect(result.replyToMode).toBe("off");
   });
 
-  it("falls back to top-level when no chat-type override is set", () => {
+  it("falls back to top-level when no chat-type override is set", async () => {
     const cfg = {
       channels: {
         slack: {
@@ -61,7 +61,7 @@ describe("buildSlackThreadingToolContext", () => {
         },
       },
     } as OpenClawConfig;
-    const result = buildSlackThreadingToolContext({
+    const result = await buildSlackThreadingToolContext({
       cfg,
       accountId: null,
       context: { ChatType: "direct" },
@@ -69,7 +69,7 @@ describe("buildSlackThreadingToolContext", () => {
     expect(result.replyToMode).toBe("first");
   });
 
-  it("uses legacy dm.replyToMode for direct messages when no chat-type override exists", () => {
+  it("uses legacy dm.replyToMode for direct messages when no chat-type override exists", async () => {
     const cfg = {
       channels: {
         slack: {
@@ -78,7 +78,7 @@ describe("buildSlackThreadingToolContext", () => {
         },
       },
     } as OpenClawConfig;
-    const result = buildSlackThreadingToolContext({
+    const result = await buildSlackThreadingToolContext({
       cfg,
       accountId: null,
       context: { ChatType: "direct" },
@@ -86,13 +86,13 @@ describe("buildSlackThreadingToolContext", () => {
     expect(result.replyToMode).toBe("all");
   });
 
-  it("uses all mode when ThreadLabel is present", () => {
+  it("uses all mode when ThreadLabel is present", async () => {
     const cfg = {
       channels: {
         slack: { replyToMode: "off" },
       },
     } as OpenClawConfig;
-    const result = buildSlackThreadingToolContext({
+    const result = await buildSlackThreadingToolContext({
       cfg,
       accountId: null,
       context: { ChatType: "channel", ThreadLabel: "some-thread" },
@@ -100,8 +100,8 @@ describe("buildSlackThreadingToolContext", () => {
     expect(result.replyToMode).toBe("all");
   });
 
-  it("defaults to off when no replyToMode is configured", () => {
-    const result = buildSlackThreadingToolContext({
+  it("defaults to off when no replyToMode is configured", async () => {
+    const result = await buildSlackThreadingToolContext({
       cfg: emptyCfg,
       accountId: null,
       context: { ChatType: "direct" },

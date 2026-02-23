@@ -64,9 +64,12 @@ export type TelegramAccountConfig = {
   dmPolicy?: DmPolicy;
   /** If false, do not start this Telegram account. Default: true. */
   enabled?: boolean;
+  /** @deprecated Use credentialAccountId instead. */
   botToken?: string;
-  /** Path to file containing bot token (for secret managers like agenix). */
+  /** @deprecated Path to file containing bot token (for secret managers like agenix). Use credentialAccountId instead. */
   tokenFile?: string;
+  /** Credential manager account ID for token resolution. */
+  credentialAccountId?: string;
   /** Control reply threading when reply tags are present (off|first|all). */
   replyToMode?: ReplyToMode;
   groups?: Record<string, TelegramGroupConfig>;

@@ -7,27 +7,27 @@ describe("resolveDiscordToken", () => {
     vi.unstubAllEnvs();
   });
 
-  it("prefers config token over env", () => {
+  it("prefers config token over env", async () => {
     vi.stubEnv("DISCORD_BOT_TOKEN", "env-token");
     const cfg = {
       channels: { discord: { token: "cfg-token" } },
     } as OpenClawConfig;
-    const res = resolveDiscordToken(cfg);
+    const res = await resolveDiscordToken(cfg);
     expect(res.token).toBe("cfg-token");
     expect(res.source).toBe("config");
   });
 
-  it("uses env token when config is missing", () => {
+  it("uses env token when config is missing", async () => {
     vi.stubEnv("DISCORD_BOT_TOKEN", "env-token");
     const cfg = {
       channels: { discord: {} },
     } as OpenClawConfig;
-    const res = resolveDiscordToken(cfg);
+    const res = await resolveDiscordToken(cfg);
     expect(res.token).toBe("env-token");
     expect(res.source).toBe("env");
   });
 
-  it("prefers account token for non-default accounts", () => {
+  it("prefers account token for non-default accounts", async () => {
     vi.stubEnv("DISCORD_BOT_TOKEN", "env-token");
     const cfg = {
       channels: {
@@ -39,7 +39,7 @@ describe("resolveDiscordToken", () => {
         },
       },
     } as OpenClawConfig;
-    const res = resolveDiscordToken(cfg, { accountId: "work" });
+    const res = await resolveDiscordToken(cfg, { accountId: "work" });
     expect(res.token).toBe("acct-token");
     expect(res.source).toBe("config");
   });

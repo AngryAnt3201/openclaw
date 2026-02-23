@@ -20,7 +20,7 @@ export async function fetchMemberInfoDiscord(
   userId: string,
   opts: DiscordReactOpts = {},
 ): Promise<APIGuildMember> {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   return (await rest.get(Routes.guildMember(guildId, userId))) as APIGuildMember;
 }
 
@@ -28,18 +28,18 @@ export async function fetchRoleInfoDiscord(
   guildId: string,
   opts: DiscordReactOpts = {},
 ): Promise<APIRole[]> {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   return (await rest.get(Routes.guildRoles(guildId))) as APIRole[];
 }
 
 export async function addRoleDiscord(payload: DiscordRoleChange, opts: DiscordReactOpts = {}) {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   await rest.put(Routes.guildMemberRole(payload.guildId, payload.userId, payload.roleId));
   return { ok: true };
 }
 
 export async function removeRoleDiscord(payload: DiscordRoleChange, opts: DiscordReactOpts = {}) {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   await rest.delete(Routes.guildMemberRole(payload.guildId, payload.userId, payload.roleId));
   return { ok: true };
 }
@@ -48,7 +48,7 @@ export async function fetchChannelInfoDiscord(
   channelId: string,
   opts: DiscordReactOpts = {},
 ): Promise<APIChannel> {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   return (await rest.get(Routes.channel(channelId))) as APIChannel;
 }
 
@@ -56,7 +56,7 @@ export async function listGuildChannelsDiscord(
   guildId: string,
   opts: DiscordReactOpts = {},
 ): Promise<APIChannel[]> {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   return (await rest.get(Routes.guildChannels(guildId))) as APIChannel[];
 }
 
@@ -65,7 +65,7 @@ export async function fetchVoiceStatusDiscord(
   userId: string,
   opts: DiscordReactOpts = {},
 ): Promise<APIVoiceState> {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   return (await rest.get(Routes.guildVoiceState(guildId, userId))) as APIVoiceState;
 }
 
@@ -73,7 +73,7 @@ export async function listScheduledEventsDiscord(
   guildId: string,
   opts: DiscordReactOpts = {},
 ): Promise<APIGuildScheduledEvent[]> {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   return (await rest.get(Routes.guildScheduledEvents(guildId))) as APIGuildScheduledEvent[];
 }
 
@@ -82,7 +82,7 @@ export async function createScheduledEventDiscord(
   payload: RESTPostAPIGuildScheduledEventJSONBody,
   opts: DiscordReactOpts = {},
 ): Promise<APIGuildScheduledEvent> {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   return (await rest.post(Routes.guildScheduledEvents(guildId), {
     body: payload,
   })) as APIGuildScheduledEvent;
@@ -92,7 +92,7 @@ export async function timeoutMemberDiscord(
   payload: DiscordTimeoutTarget,
   opts: DiscordReactOpts = {},
 ): Promise<APIGuildMember> {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   let until = payload.until;
   if (!until && payload.durationMinutes) {
     const ms = payload.durationMinutes * 60 * 1000;
@@ -110,7 +110,7 @@ export async function kickMemberDiscord(
   payload: DiscordModerationTarget,
   opts: DiscordReactOpts = {},
 ) {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   await rest.delete(Routes.guildMember(payload.guildId, payload.userId), {
     headers: payload.reason
       ? { "X-Audit-Log-Reason": encodeURIComponent(payload.reason) }
@@ -123,7 +123,7 @@ export async function banMemberDiscord(
   payload: DiscordModerationTarget & { deleteMessageDays?: number },
   opts: DiscordReactOpts = {},
 ) {
-  const rest = resolveDiscordRest(opts);
+  const rest = await resolveDiscordRest(opts);
   const deleteMessageDays =
     typeof payload.deleteMessageDays === "number" && Number.isFinite(payload.deleteMessageDays)
       ? Math.min(Math.max(Math.floor(payload.deleteMessageDays), 0), 7)

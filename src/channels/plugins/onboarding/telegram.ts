@@ -63,7 +63,7 @@ async function promptTelegramAllowFrom(params: {
   accountId: string;
 }): Promise<OpenClawConfig> {
   const { cfg, prompter, accountId } = params;
-  const resolved = resolveTelegramAccount({ cfg, accountId });
+  const resolved = await resolveTelegramAccount({ cfg, accountId });
   const existingAllowFrom = resolved.config.allowFrom ?? [];
   await noteTelegramUserIdHelp(prompter);
 
@@ -204,9 +204,12 @@ const dmPolicy: ChannelOnboardingDmPolicy = {
 export const telegramOnboardingAdapter: ChannelOnboardingAdapter = {
   channel,
   getStatus: async ({ cfg }) => {
-    const configured = listTelegramAccountIds(cfg).some((accountId) =>
-      Boolean(resolveTelegramAccount({ cfg, accountId }).token),
+    const results = await Promise.all(
+      listTelegramAccountIds(cfg).map(async (accountId) =>
+        Boolean((await resolveTelegramAccount({ cfg, accountId })).token),
+      ),
     );
+    const configured = results.some(Boolean);
     return {
       channel,
       configured,
@@ -239,7 +242,7 @@ export const telegramOnboardingAdapter: ChannelOnboardingAdapter = {
     }
 
     let next = cfg;
-    const resolvedAccount = resolveTelegramAccount({
+    const resolvedAccount = await resolveTelegramAccount({
       cfg: next,
       accountId: telegramAccountId,
     });

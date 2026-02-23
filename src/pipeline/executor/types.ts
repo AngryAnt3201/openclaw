@@ -45,6 +45,8 @@ export type NodeExecutionResult = {
    * Edges whose `sourceHandle` matches this value are traversed.
    */
   outputHandle?: string;
+  /** Gateway session key for agent/code nodes that spawned a session. */
+  sessionKey?: string;
 };
 
 // ---------------------------------------------------------------------------

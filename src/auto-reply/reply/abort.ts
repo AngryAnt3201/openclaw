@@ -153,7 +153,7 @@ export async function tryFastAbortFromMessage(params: {
   }
 
   const commandAuthorized = ctx.CommandAuthorized;
-  const auth = resolveCommandAuthorization({
+  const auth = await resolveCommandAuthorization({
     ctx,
     cfg,
     commandAuthorized,

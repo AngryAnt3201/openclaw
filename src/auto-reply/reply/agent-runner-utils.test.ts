@@ -6,14 +6,14 @@ import { buildThreadingToolContext } from "./agent-runner-utils.js";
 describe("buildThreadingToolContext", () => {
   const cfg = {} as OpenClawConfig;
 
-  it("uses conversation id for WhatsApp", () => {
+  it("uses conversation id for WhatsApp", async () => {
     const sessionCtx = {
       Provider: "whatsapp",
       From: "123@g.us",
       To: "+15550001",
     } as TemplateContext;
 
-    const result = buildThreadingToolContext({
+    const result = await buildThreadingToolContext({
       sessionCtx,
       config: cfg,
       hasRepliedRef: undefined,
@@ -22,13 +22,13 @@ describe("buildThreadingToolContext", () => {
     expect(result.currentChannelId).toBe("123@g.us");
   });
 
-  it("falls back to To for WhatsApp when From is missing", () => {
+  it("falls back to To for WhatsApp when From is missing", async () => {
     const sessionCtx = {
       Provider: "whatsapp",
       To: "+15550001",
     } as TemplateContext;
 
-    const result = buildThreadingToolContext({
+    const result = await buildThreadingToolContext({
       sessionCtx,
       config: cfg,
       hasRepliedRef: undefined,
@@ -37,14 +37,14 @@ describe("buildThreadingToolContext", () => {
     expect(result.currentChannelId).toBe("+15550001");
   });
 
-  it("uses the recipient id for other channels", () => {
+  it("uses the recipient id for other channels", async () => {
     const sessionCtx = {
       Provider: "telegram",
       From: "user:42",
       To: "chat:99",
     } as TemplateContext;
 
-    const result = buildThreadingToolContext({
+    const result = await buildThreadingToolContext({
       sessionCtx,
       config: cfg,
       hasRepliedRef: undefined,
@@ -53,7 +53,7 @@ describe("buildThreadingToolContext", () => {
     expect(result.currentChannelId).toBe("chat:99");
   });
 
-  it("uses the sender handle for iMessage direct chats", () => {
+  it("uses the sender handle for iMessage direct chats", async () => {
     const sessionCtx = {
       Provider: "imessage",
       ChatType: "direct",
@@ -61,7 +61,7 @@ describe("buildThreadingToolContext", () => {
       To: "chat_id:12",
     } as TemplateContext;
 
-    const result = buildThreadingToolContext({
+    const result = await buildThreadingToolContext({
       sessionCtx,
       config: cfg,
       hasRepliedRef: undefined,
@@ -70,7 +70,7 @@ describe("buildThreadingToolContext", () => {
     expect(result.currentChannelId).toBe("imessage:+15550001");
   });
 
-  it("uses chat_id for iMessage groups", () => {
+  it("uses chat_id for iMessage groups", async () => {
     const sessionCtx = {
       Provider: "imessage",
       ChatType: "group",
@@ -78,7 +78,7 @@ describe("buildThreadingToolContext", () => {
       To: "chat_id:7",
     } as TemplateContext;
 
-    const result = buildThreadingToolContext({
+    const result = await buildThreadingToolContext({
       sessionCtx,
       config: cfg,
       hasRepliedRef: undefined,
@@ -87,14 +87,14 @@ describe("buildThreadingToolContext", () => {
     expect(result.currentChannelId).toBe("chat_id:7");
   });
 
-  it("prefers MessageThreadId for Slack tool threading", () => {
+  it("prefers MessageThreadId for Slack tool threading", async () => {
     const sessionCtx = {
       Provider: "slack",
       To: "channel:C1",
       MessageThreadId: "123.456",
     } as TemplateContext;
 
-    const result = buildThreadingToolContext({
+    const result = await buildThreadingToolContext({
       sessionCtx,
       config: { channels: { slack: { replyToMode: "all" } } } as OpenClawConfig,
       hasRepliedRef: undefined,

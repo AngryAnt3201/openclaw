@@ -15,20 +15,20 @@ vi.mock("./channel-tools.js", () => {
 });
 
 describe("whatsapp_login tool gating", () => {
-  it("removes whatsapp_login for unauthorized senders", () => {
-    const tools = createOpenClawCodingTools({ senderIsOwner: false });
+  it("removes whatsapp_login for unauthorized senders", async () => {
+    const tools = await createOpenClawCodingTools({ senderIsOwner: false });
     const toolNames = tools.map((tool) => tool.name);
     expect(toolNames).not.toContain("whatsapp_login");
   });
 
-  it("keeps whatsapp_login for authorized senders", () => {
-    const tools = createOpenClawCodingTools({ senderIsOwner: true });
+  it("keeps whatsapp_login for authorized senders", async () => {
+    const tools = await createOpenClawCodingTools({ senderIsOwner: true });
     const toolNames = tools.map((tool) => tool.name);
     expect(toolNames).toContain("whatsapp_login");
   });
 
-  it("defaults to removing whatsapp_login when owner status is unknown", () => {
-    const tools = createOpenClawCodingTools();
+  it("defaults to removing whatsapp_login when owner status is unknown", async () => {
+    const tools = await createOpenClawCodingTools();
     const toolNames = tools.map((tool) => tool.name);
     expect(toolNames).not.toContain("whatsapp_login");
   });

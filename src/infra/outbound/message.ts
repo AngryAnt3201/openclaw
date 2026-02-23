@@ -148,7 +148,7 @@ export async function sendMessage(params: MessageSendParams): Promise<MessageSen
 
   if (deliveryMode !== "gateway") {
     const outboundChannel = channel;
-    const resolvedTarget = resolveOutboundTarget({
+    const resolvedTarget = await resolveOutboundTarget({
       channel: outboundChannel,
       to: params.to,
       cfg,

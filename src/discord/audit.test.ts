@@ -29,7 +29,7 @@ describe("discord audit", () => {
       },
     } as unknown as import("../config/config.js").OpenClawConfig;
 
-    const collected = collectDiscordAuditChannelIds({
+    const collected = await collectDiscordAuditChannelIds({
       cfg,
       accountId: "default",
     });
