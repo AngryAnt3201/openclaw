@@ -253,6 +253,7 @@ export type Task = {
 
   // Hierarchy
   parentTaskId?: string;
+  projectId?: string;
   subTasks?: SubTask[];
 
   // Scheduling
@@ -303,6 +304,7 @@ export type TaskCreateInput = {
   priority?: TaskPriority;
   agentId?: string;
   parentTaskId?: string;
+  projectId?: string;
   permissions?: TaskPolicy;
   app?: TaskApp;
   cronBinding?: CronBinding;
@@ -318,6 +320,9 @@ export type TaskPatch = {
   description?: string;
   status?: TaskStatus;
   priority?: TaskPriority;
+  type?: TaskType;
+  agentId?: string;
+  projectId?: string;
   progress?: number;
   progressMessage?: string;
   inputPrompt?: string;
@@ -419,5 +424,6 @@ export type TaskFilter = {
   type?: TaskType;
   agentId?: string;
   parentTaskId?: string;
+  projectId?: string;
   limit?: number;
 };

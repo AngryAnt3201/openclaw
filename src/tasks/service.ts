@@ -132,6 +132,7 @@ export class TaskService {
         agentId: input.agentId ?? "default",
         app: input.app,
         parentTaskId: input.parentTaskId,
+        projectId: input.projectId,
         permissions: input.permissions,
         cronBinding: input.cronBinding,
         refs: input.refs,
@@ -181,6 +182,15 @@ export class TaskService {
       }
       if (patch.priority !== undefined) {
         task.priority = patch.priority;
+      }
+      if (patch.type !== undefined) {
+        task.type = patch.type;
+      }
+      if (patch.agentId !== undefined) {
+        task.agentId = patch.agentId;
+      }
+      if (patch.projectId !== undefined) {
+        task.projectId = patch.projectId;
       }
       if (patch.progress !== undefined) {
         task.progress = patch.progress;
@@ -499,6 +509,9 @@ export class TaskService {
       }
       if (filter.parentTaskId) {
         tasks = tasks.filter((t) => t.parentTaskId === filter.parentTaskId);
+      }
+      if (filter.projectId) {
+        tasks = tasks.filter((t) => t.projectId === filter.projectId);
       }
       if (filter.limit && filter.limit > 0) {
         tasks = tasks.slice(0, filter.limit);
