@@ -27,6 +27,7 @@ import { nodeHandlers } from "./server-methods/nodes.js";
 import { notificationHandlers } from "./server-methods/notifications.js";
 import { pipelineHandlers } from "./server-methods/pipeline.js";
 import { pluginsHandlers } from "./server-methods/plugins.js";
+import { projectHandlers } from "./server-methods/projects.js";
 import { pushHandlers } from "./server-methods/push.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
@@ -117,6 +118,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...agentProfileHandlers,
   ...pipelineHandlers,
   ...widgetHandlers,
+  ...projectHandlers,
   ...fileHandlers,
 };
 

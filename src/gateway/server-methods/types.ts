@@ -14,6 +14,7 @@ import type { PipelineService } from "../../pipeline/service.js";
 import type { TaskService } from "../../tasks/service.js";
 import type { VaultService } from "../../vault/service.js";
 import type { KBService } from "../../knowledge-base/service.js";
+import type { ProjectService } from "../../projects/service.js";
 import type { WidgetService } from "../../widgets/service.js";
 import type { WizardSession } from "../../wizard/session.js";
 import type { WorkflowEngine } from "../../workflow/engine.js";
@@ -71,6 +72,8 @@ export type GatewayRequestContext = {
   pipelineStorePath?: string;
   widgetService?: WidgetService;
   widgetStorePath?: string;
+  projectService?: ProjectService;
+  projectStorePath?: string;
   execApprovalManager?: ExecApprovalManager;
   loadGatewayModelCatalog: () => Promise<ModelCatalogEntry[]>;
   getHealthCache: () => HealthSummary | null;
