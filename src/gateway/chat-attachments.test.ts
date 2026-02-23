@@ -146,9 +146,13 @@ describe("parseMessageWithAttachments", () => {
       ],
       { log: { warn: (message) => logs.push(message) } },
     );
+    // Fork behavior: non-image files are not dropped; they're appended as metadata notes
+    // The sniffed mime (application/pdf) doesn't match claimed image/png, so a mismatch warning is logged
     expect(parsed.images).toHaveLength(0);
     expect(logs).toHaveLength(1);
-    expect(logs[0]).toMatch(/non-image/i);
+    expect(logs[0]).toMatch(/mime mismatch/i);
+    // The message gets a metadata note appended
+    expect(parsed.message).toContain("not-image.pdf");
   });
 
   it("prefers sniffed mime type and logs mismatch", async () => {
@@ -171,7 +175,7 @@ describe("parseMessageWithAttachments", () => {
     expect(logs[0]).toMatch(/mime mismatch/i);
   });
 
-  it("drops unknown mime when sniff fails and logs", async () => {
+  it("handles unknown mime when sniff fails", async () => {
     const logs: string[] = [];
     const unknown = Buffer.from("not an image").toString("base64");
     const parsed = await parseMessageWithAttachments(
@@ -179,12 +183,12 @@ describe("parseMessageWithAttachments", () => {
       [{ type: "file", fileName: "unknown.bin", content: unknown }],
       { log: { warn: (message) => logs.push(message) } },
     );
+    // Fork behavior: non-image, non-text files are appended as metadata notes
     expect(parsed.images).toHaveLength(0);
-    expect(logs).toHaveLength(1);
-    expect(logs[0]).toMatch(/unable to detect image mime type/i);
+    expect(parsed.message).toContain("unknown.bin");
   });
 
-  it("keeps valid images and drops invalid ones", async () => {
+  it("keeps valid images and handles non-image attachments", async () => {
     const logs: string[] = [];
     const pdf = Buffer.from("%PDF-1.4\n").toString("base64");
     const parsed = await parseMessageWithAttachments(
@@ -208,6 +212,8 @@ describe("parseMessageWithAttachments", () => {
     expect(parsed.images).toHaveLength(1);
     expect(parsed.images[0]?.mimeType).toBe("image/png");
     expect(parsed.images[0]?.data).toBe(PNG_1x1);
-    expect(logs.some((l) => /non-image/i.test(l))).toBe(true);
+    // Fork behavior: non-image file gets mime mismatch warning and is appended as metadata
+    expect(logs.some((l) => /mime mismatch/i.test(l))).toBe(true);
+    expect(parsed.message).toContain("not-image.pdf");
   });
 });

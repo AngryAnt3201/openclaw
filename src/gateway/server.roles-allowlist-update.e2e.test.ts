@@ -25,6 +25,7 @@ import {
   onceMessage,
   rpcReq,
   startServerWithClient,
+  testState,
 } from "./test-helpers.js";
 
 installGatewayTestHooks({ scope: "suite" });
@@ -60,8 +61,13 @@ const connectNodeClient = async (params: {
     resolveReady = resolve;
     rejectReady = reject;
   });
+  const gatewayToken =
+    typeof (testState.gatewayAuth as { token?: unknown } | undefined)?.token === "string"
+      ? (testState.gatewayAuth as { token?: string }).token
+      : undefined;
   const client = new GatewayClient({
     url: `ws://127.0.0.1:${params.port}`,
+    token: gatewayToken,
     role: "node",
     clientName: GATEWAY_CLIENT_NAMES.NODE_HOST,
     clientVersion: "1.0.0",
@@ -201,7 +207,10 @@ describe("gateway update.run", () => {
     process.on("SIGUSR1", sigusr1);
 
     try {
-      await writeConfigFile({ update: { channel: "beta" } });
+      await writeConfigFile({
+        update: { channel: "beta" },
+        plugins: { slots: { memory: "none" } },
+      });
       const updateMock = vi.mocked(runGatewayUpdate);
       updateMock.mockClear();
 
