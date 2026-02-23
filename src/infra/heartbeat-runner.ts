@@ -42,6 +42,7 @@ import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
 import { resolveTaskStorePath } from "../tasks/store.js";
 import { formatErrorMessage } from "./errors.js";
 import { emitHeartbeatEvent, resolveIndicatorType } from "./heartbeat-events.js";
+import { resolveKBContextForHeartbeat } from "./heartbeat-kb-context.js";
 import { resolveTaskContextForHeartbeat } from "./heartbeat-task-context.js";
 import { resolveVaultContextForHeartbeat } from "./heartbeat-vault-context.js";
 import { resolveHeartbeatVisibility } from "./heartbeat-visibility.js";
@@ -634,6 +635,19 @@ export async function runHeartbeatOnce(opts: {
     }
   } catch {
     // Vault unavailable — proceed without vault context.
+  }
+
+  // Append KB context so the agent knows about recent knowledge base activity.
+  try {
+    const kbVaultPath = (cfg as Record<string, unknown>).knowledgeBase
+      ? ((cfg as Record<string, unknown>).knowledgeBase as { vaultPath?: string })?.vaultPath
+      : undefined;
+    const kbContext = await resolveKBContextForHeartbeat(kbVaultPath);
+    if (kbContext) {
+      prompt = `${prompt}${kbContext}`;
+    }
+  } catch {
+    // KB unavailable — proceed without KB context.
   }
 
   const ctx = {

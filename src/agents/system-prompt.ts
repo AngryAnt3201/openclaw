@@ -246,6 +246,7 @@ export function buildAgentSystemPrompt(params: {
     task: "Manage Miranda task queue (create/update/list/cancel tasks visible in the user's UI)",
     vault:
       "Read, create, update, search, and manage notes in the Miranda knowledge vault (Obsidian-compatible markdown). Use to persist research, context, and findings.",
+    kb: "Read, create, and search notes in the connected knowledge base (Obsidian, Logseq, Notion, or custom). Actions: list, get, create, search, tags.",
   };
 
   const toolOrder = [
@@ -274,6 +275,7 @@ export function buildAgentSystemPrompt(params: {
     "image",
     "task",
     "vault",
+    "kb",
   ];
 
   const rawToolNames = (params.toolNames ?? []).map((tool) => tool.trim());

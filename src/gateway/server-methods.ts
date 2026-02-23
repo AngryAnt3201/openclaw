@@ -17,6 +17,7 @@ import { deviceHandlers } from "./server-methods/devices.js";
 import { execApprovalsHandlers } from "./server-methods/exec-approvals.js";
 import { fileHandlers } from "./server-methods/files.js";
 import { healthHandlers } from "./server-methods/health.js";
+import { knowledgeBaseHandlers } from "./server-methods/knowledge-base.js";
 import { launcherHandlers } from "./server-methods/launcher.js";
 import { logsHandlers } from "./server-methods/logs.js";
 import { modelsHandlers } from "./server-methods/models.js";
@@ -119,6 +120,14 @@ const READ_METHODS = new Set([
   "clawhub.inspect",
   "credential.list",
   "credential.get",
+  "kb.list",
+  "kb.get",
+  "kb.search",
+  "kb.tags",
+  "kb.config.get",
+  "kb.open",
+  "kb.open.note",
+  "kb.status",
   "system-presence",
   "last-heartbeat",
   "node.list",
@@ -204,6 +213,8 @@ const WRITE_METHODS = new Set([
   "credential.rule.remove",
   "credential.checkout",
   "credential.import",
+  "kb.create",
+  "kb.config.set",
 ]);
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
@@ -309,6 +320,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...notificationHandlers,
   ...launcherHandlers,
   ...vaultHandlers,
+  ...knowledgeBaseHandlers,
   ...pluginsHandlers,
   ...deviceRegistryHandlers,
   ...workflowHandlers,

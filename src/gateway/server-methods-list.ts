@@ -134,6 +134,17 @@ const BASE_METHODS = [
   "credential.rule.remove",
   "credential.checkout",
   "credential.import",
+  // Knowledge Base methods
+  "kb.list",
+  "kb.get",
+  "kb.create",
+  "kb.search",
+  "kb.tags",
+  "kb.config.get",
+  "kb.config.set",
+  "kb.open",
+  "kb.open.note",
+  "kb.status",
   // Pipeline methods
   "pipeline.list",
   "pipeline.get",
@@ -217,6 +228,11 @@ export const GATEWAY_EVENTS = [
   "credential.lease.expired",
   "credential.checkout",
   "credential.checkout.blocked",
+  // Knowledge Base events
+  "kb.note.created",
+  "kb.note.updated",
+  "kb.note.deleted",
+  "kb.config.updated",
   // Pipeline events
   "pipeline",
   // Launcher events

@@ -43,6 +43,7 @@ import {
   setSkillsRemoteRegistry,
 } from "../infra/skills-remote.js";
 import { scheduleGatewayUpdateCheck } from "../infra/update-startup.js";
+import { syncTaskToKB } from "../knowledge-base/sync/task-sync.js";
 import { AppPortProxy, resolveExternalBindIp } from "../launcher/port-proxy.js";
 import { AppProcessManager } from "../launcher/process-manager.js";
 import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/diagnostic.js";
@@ -59,6 +60,7 @@ import { buildGatewayCredentialService } from "./server-credentials.js";
 import { buildGatewayCronService } from "./server-cron.js";
 import { buildGatewayDeviceService } from "./server-devices-registry.js";
 import { startGatewayDiscovery } from "./server-discovery-runtime.js";
+import { buildGatewayKBService } from "./server-knowledge-base.js";
 import { applyGatewayLaneConcurrency } from "./server-lanes.js";
 import { buildGatewayLauncherService } from "./server-launcher.js";
 import { startGatewayMaintenanceTimers } from "./server-maintenance.js";
@@ -420,7 +422,9 @@ export async function startGatewayServer(
   // Auto-start the Maestro node bridge so local Maestro sessions are
   // visible as a virtual node in the gateway.
   const maestroNodeBridge = new MaestroNodeBridge(nodeRegistry, broadcast, log);
-  maestroNodeBridge.start();
+  if (!process.env.VITEST) {
+    maestroNodeBridge.start();
+  }
 
   let cronState = buildGatewayCronService({
     cfg: cfgAtStart,
@@ -463,6 +467,13 @@ export async function startGatewayServer(
         void credentialService.revokeTaskLeases(task.id);
       }
     }
+    // Sync completed/updated tasks to the knowledge base
+    if (event === "task.completed" || event === "task.updated") {
+      const task = payload as import("../tasks/types.js").Task | undefined;
+      if (task?.id) {
+        void syncTaskToKB(task, kbState.kbService).catch(() => {});
+      }
+    }
   };
 
   let taskState = buildGatewayTaskService({
@@ -502,6 +513,8 @@ export async function startGatewayServer(
     broadcast,
   });
   let { vaultService, vaultPath: vaultPathResolved } = vaultState;
+
+  const kbState = await buildGatewayKBService({ cfg: cfgAtStart, deps, broadcast });
 
   const credentialState = await buildGatewayCredentialService({
     cfg: cfgAtStart,
@@ -691,6 +704,7 @@ export async function startGatewayServer(
       credentialStorePath,
       vaultService,
       vaultPath: vaultPathResolved,
+      kbService: kbState.kbService,
       workflowService,
       workflowEngine,
       workflowStorePath,
@@ -844,6 +858,7 @@ export async function startGatewayServer(
       workflowEngine.stop();
       credentialService.stopLeaseExpiryTimer();
       await vaultState.close();
+      await kbState.close();
       portProxy.destroyAll();
       processManager.shutdownAll();
       await close(opts);
