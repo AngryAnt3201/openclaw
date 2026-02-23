@@ -13,13 +13,16 @@ import type { NodeRegistry as PipelineNodeRegistry } from "../../pipeline/node-r
 import type { PipelineService } from "../../pipeline/service.js";
 import type { TaskService } from "../../tasks/service.js";
 import type { VaultService } from "../../vault/service.js";
+import type { KBService } from "../../knowledge-base/service.js";
 import type { WidgetService } from "../../widgets/service.js";
 import type { WizardSession } from "../../wizard/session.js";
 import type { WorkflowEngine } from "../../workflow/engine.js";
 import type { WorkflowService } from "../../workflow/service.js";
 import type { ChatAbortControllerEntry } from "../chat-abort.js";
+import type { ExecApprovalManager } from "../exec-approval-manager.js";
 import type { NodeRegistry } from "../node-registry.js";
 import type { ConnectParams, ErrorShape, RequestFrame } from "../protocol/index.js";
+import type { GatewayBroadcastFn, GatewayBroadcastToConnIdsFn } from "../server-broadcast.js";
 import type { ChannelRuntimeSnapshot } from "../server-channels.js";
 import type { DedupeEntry } from "../server-shared.js";
 
@@ -28,6 +31,7 @@ type SubsystemLogger = ReturnType<typeof createSubsystemLogger>;
 export type GatewayClient = {
   connect: ConnectParams;
   connId?: string;
+  clientIp?: string;
 };
 
 export type RespondFn = (
@@ -58,6 +62,7 @@ export type GatewayRequestContext = {
   credentialStorePath?: string;
   vaultService?: VaultService;
   vaultPath?: string;
+  kbService?: KBService;
   workflowService?: WorkflowService;
   workflowEngine?: WorkflowEngine;
   workflowStorePath?: string;
@@ -66,6 +71,7 @@ export type GatewayRequestContext = {
   pipelineStorePath?: string;
   widgetService?: WidgetService;
   widgetStorePath?: string;
+  execApprovalManager?: ExecApprovalManager;
   loadGatewayModelCatalog: () => Promise<ModelCatalogEntry[]>;
   getHealthCache: () => HealthSummary | null;
   refreshHealthSnapshot: (opts?: { probe?: boolean }) => Promise<HealthSummary>;
@@ -73,29 +79,15 @@ export type GatewayRequestContext = {
   logGateway: SubsystemLogger;
   incrementPresenceVersion: () => number;
   getHealthVersion: () => number;
-  broadcast: (
-    event: string,
-    payload: unknown,
-    opts?: {
-      dropIfSlow?: boolean;
-      stateVersion?: { presence?: number; health?: number };
-    },
-  ) => void;
-  broadcastToConnIds: (
-    event: string,
-    payload: unknown,
-    connIds: ReadonlySet<string>,
-    opts?: {
-      dropIfSlow?: boolean;
-      stateVersion?: { presence?: number; health?: number };
-    },
-  ) => void;
+  broadcast: GatewayBroadcastFn;
+  broadcastToConnIds: GatewayBroadcastToConnIdsFn;
   nodeSendToSession: (sessionKey: string, event: string, payload: unknown) => void;
   nodeSendToAllSubscribed: (event: string, payload: unknown) => void;
   nodeSubscribe: (nodeId: string, sessionKey: string) => void;
   nodeUnsubscribe: (nodeId: string, sessionKey: string) => void;
   nodeUnsubscribeAll: (nodeId: string) => void;
   hasConnectedMobileNode: () => boolean;
+  hasExecApprovalClients?: () => boolean;
   nodeRegistry: NodeRegistry;
   agentRunSeq: Map<string, number>;
   chatAbortControllers: Map<string, ChatAbortControllerEntry>;
