@@ -4,6 +4,7 @@ import type { HealthSummary } from "../../commands/health.js";
 import type { CredentialService } from "../../credentials/service.js";
 import type { CronService } from "../../cron/service.js";
 import type { DeviceService } from "../../devices/service.js";
+import type { KBService } from "../../knowledge-base/service.js";
 import type { AppPortProxy } from "../../launcher/port-proxy.js";
 import type { AppProcessManager } from "../../launcher/process-manager.js";
 import type { LauncherService } from "../../launcher/service.js";
@@ -58,6 +59,7 @@ export type GatewayRequestContext = {
   credentialStorePath?: string;
   vaultService?: VaultService;
   vaultPath?: string;
+  kbService?: KBService;
   workflowService?: WorkflowService;
   workflowEngine?: WorkflowEngine;
   workflowStorePath?: string;
