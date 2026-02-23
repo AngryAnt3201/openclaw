@@ -245,13 +245,14 @@ export const notificationHandlers: GatewayRequestHandlers = {
       );
       return;
     }
-    // Merge configured channel targets with user's default channel preferences.
-    const configuredChannels = context.notificationChannelTargets
+    // Merge three sources: configured messaging channels, notification channel targets, and user preferences.
+    const messagingChannels = context.notificationConfiguredChannels ?? [];
+    const targetChannels = context.notificationChannelTargets
       ? Object.keys(context.notificationChannelTargets)
       : [];
     const preferences = await context.notificationService.getPreferences();
     const prefChannels = preferences.defaultChannels ?? [];
-    const channels = [...new Set([...configuredChannels, ...prefChannels])];
+    const channels = [...new Set([...messagingChannels, ...targetChannels, ...prefChannels])];
     respond(true, { channels }, undefined);
   },
 };

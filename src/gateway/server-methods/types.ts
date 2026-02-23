@@ -46,6 +46,7 @@ export type GatewayRequestContext = {
   notificationService?: NotificationService;
   notificationStorePath?: string;
   notificationChannelTargets?: Record<string, string>;
+  notificationConfiguredChannels?: string[];
   launcherService: LauncherService;
   launcherStorePath: string;
   processManager?: AppProcessManager;

@@ -15,6 +15,8 @@ export type GatewayNotificationState = {
   storePath: string;
   triggers: ReturnType<typeof createNotificationTriggers>;
   channelTargets: Record<string, string>;
+  /** Messaging channel names configured in cfg.channels (e.g. "telegram", "discord"). */
+  configuredChannels: string[];
 };
 
 export function buildGatewayNotificationService(params: {
@@ -32,6 +34,21 @@ export function buildGatewayNotificationService(params: {
     for (const [k, v] of Object.entries(targets)) {
       if (typeof v === "string" && v.trim()) {
         channelTargets[k] = v.trim();
+      }
+    }
+  }
+
+  // Detect messaging channels configured in cfg.channels (telegram, discord, etc.)
+  const configuredChannels: string[] = [];
+  const channelsCfg = params.cfg.channels;
+  if (channelsCfg) {
+    for (const [name, section] of Object.entries(channelsCfg)) {
+      if (name === "defaults" || !section || typeof section !== "object") {
+        continue;
+      }
+      const enabled = (section as { enabled?: boolean }).enabled;
+      if (enabled !== false) {
+        configuredChannels.push(name);
       }
     }
   }
@@ -75,5 +92,5 @@ export function buildGatewayNotificationService(params: {
     },
   });
 
-  return { notificationService, storePath, triggers, channelTargets };
+  return { notificationService, storePath, triggers, channelTargets, configuredChannels };
 }
