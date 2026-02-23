@@ -1,5 +1,4 @@
 import { listChannelPlugins } from "../channels/plugins/index.js";
-import { GATEWAY_EVENT_UPDATE_AVAILABLE } from "./events.js";
 
 const BASE_METHODS = [
   "health",
@@ -25,13 +24,11 @@ const BASE_METHODS = [
   "exec.approvals.node.get",
   "exec.approvals.node.set",
   "exec.approval.request",
-  "exec.approval.waitDecision",
   "exec.approval.resolve",
   "wizard.start",
   "wizard.next",
   "wizard.cancel",
   "wizard.status",
-  "talk.config",
   "talk.mode",
   "models.list",
   "agents.list",
@@ -69,7 +66,6 @@ const BASE_METHODS = [
   "device.pair.list",
   "device.pair.approve",
   "device.pair.reject",
-  "device.pair.remove",
   "device.token.rotate",
   "device.token.revoke",
   "node.rename",
@@ -138,17 +134,6 @@ const BASE_METHODS = [
   "credential.rule.remove",
   "credential.checkout",
   "credential.import",
-  // Knowledge Base methods
-  "kb.list",
-  "kb.get",
-  "kb.create",
-  "kb.search",
-  "kb.tags",
-  "kb.config.get",
-  "kb.config.set",
-  "kb.open",
-  "kb.open.note",
-  "kb.status",
   // Pipeline methods
   "pipeline.list",
   "pipeline.get",
@@ -177,6 +162,23 @@ const BASE_METHODS = [
   "chat.history",
   "chat.abort",
   "chat.send",
+  // Knowledge Base methods
+  "kb.list",
+  "kb.get",
+  "kb.create",
+  "kb.search",
+  "kb.tags",
+  "kb.config.get",
+  "kb.config.set",
+  "kb.open",
+  "kb.open.note",
+  "kb.status",
+  // Project methods
+  "project.list",
+  "project.get",
+  "project.create",
+  "project.update",
+  "project.delete",
 ];
 
 export function listGatewayMethods(): string[] {
@@ -232,11 +234,6 @@ export const GATEWAY_EVENTS = [
   "credential.lease.expired",
   "credential.checkout",
   "credential.checkout.blocked",
-  // Knowledge Base events
-  "kb.note.created",
-  "kb.note.updated",
-  "kb.note.deleted",
-  "kb.config.updated",
   // Pipeline events
   "pipeline",
   // Launcher events
@@ -247,5 +244,13 @@ export const GATEWAY_EVENTS = [
   "launcher.unpinned",
   "launcher.reordered",
   "launcher.discovered",
-  GATEWAY_EVENT_UPDATE_AVAILABLE,
+  // Knowledge Base events
+  "kb.note.created",
+  "kb.note.updated",
+  "kb.note.deleted",
+  "kb.config.updated",
+  // Project events
+  "project.created",
+  "project.updated",
+  "project.deleted",
 ];
