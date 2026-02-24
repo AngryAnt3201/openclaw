@@ -16,6 +16,7 @@ import { deviceRegistryHandlers } from "./server-methods/device-registry.js";
 import { deviceHandlers } from "./server-methods/devices.js";
 import { execApprovalsHandlers } from "./server-methods/exec-approvals.js";
 import { fileHandlers } from "./server-methods/files.js";
+import { githubHandlers } from "./server-methods/github.js";
 import { healthHandlers } from "./server-methods/health.js";
 import { launcherHandlers } from "./server-methods/launcher.js";
 import { logsHandlers } from "./server-methods/logs.js";
@@ -314,6 +315,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...pluginsHandlers,
   ...deviceRegistryHandlers,
   ...workflowHandlers,
+  ...githubHandlers,
   ...credentialHandlers,
   ...accountHandlers,
   ...agentProfileHandlers,
