@@ -47,7 +47,7 @@ export const CODER_AGENT_DEF: BuiltInAgentDef = {
   model: "anthropic/claude-sonnet-4-5",
   policyPreset: "coding",
   thinking: "high",
-  tools: ["maestro_session", "task", "github", "workflow", "nodes", "web"],
+  tools: ["maestro_session", "task", "github", "pipeline", "nodes", "web"],
   subagents: { allowAgents: ["*"] },
   sandbox: "off",
 };
