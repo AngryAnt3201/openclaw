@@ -7,9 +7,12 @@
 
 import type { OpenClawConfig } from "../../config/config.js";
 import { normalizeAgentId } from "../../routing/session-key.js";
+import { ARCHITECT_AGENT_DEF, ARCHITECT_AGENT_ID } from "./architect-agent.js";
 import { CODER_AGENT_DEF, CODER_AGENT_ID, type BuiltInAgentDef } from "./coder-agent.js";
 import { MIRANDA_AGENT_DEF, MIRANDA_AGENT_ID } from "./miranda-agent.js";
 
+export { ARCHITECT_AGENT_DEF, ARCHITECT_AGENT_ID } from "./architect-agent.js";
+export { ARCHITECT_SOUL_CONTENT } from "./architect-soul.js";
 export { CODER_AGENT_DEF, CODER_AGENT_ID, type BuiltInAgentDef } from "./coder-agent.js";
 export { CODER_SOUL_CONTENT } from "./coder-soul.js";
 export { MIRANDA_AGENT_DEF, MIRANDA_AGENT_ID } from "./miranda-agent.js";
@@ -20,6 +23,7 @@ export { MIRANDA_SOUL_CONTENT } from "./miranda-soul.js";
 const REGISTRY: ReadonlyMap<string, BuiltInAgentDef> = new Map<string, BuiltInAgentDef>([
   [MIRANDA_AGENT_ID, MIRANDA_AGENT_DEF],
   [CODER_AGENT_ID, CODER_AGENT_DEF],
+  [ARCHITECT_AGENT_ID, ARCHITECT_AGENT_DEF],
 ]);
 
 /** All registered built-in agents (keyed by normalised id). */
