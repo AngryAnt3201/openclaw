@@ -86,7 +86,6 @@ import { syncTaskToKB } from "../knowledge-base/sync/task-sync.js";
 import { buildGatewayWidgetService } from "./server-widgets.js";
 import { buildGatewayProjectService } from "./server-projects.js";
 import { createWizardSessionTracker } from "./server-wizard-sessions.js";
-import { buildGatewayWorkflowService } from "./server-workflow.js";
 import { attachGatewayWsHandlers } from "./server-ws-runtime.js";
 import {
   getHealthCache,
@@ -482,13 +481,6 @@ export async function startGatewayServer(
   });
   let { taskService, storePath: taskStorePath } = taskState;
 
-  const workflowState = buildGatewayWorkflowService({
-    cfg: cfgAtStart,
-    deps,
-    broadcast,
-  });
-  const { workflowService, workflowEngine, storePath: workflowStorePath } = workflowState;
-
   let launcherState = buildGatewayLauncherService({
     cfg: cfgAtStart,
     deps,
@@ -657,8 +649,6 @@ export async function startGatewayServer(
 
   void cron.start().catch((err) => logCron.error(`failed to start: ${String(err)}`));
 
-  workflowEngine.start();
-
   const execApprovalManager = new ExecApprovalManager();
   const execApprovalForwarder = createExecApprovalForwarder();
   const execApprovalHandlers = createExecApprovalHandlers(execApprovalManager, {
@@ -709,9 +699,6 @@ export async function startGatewayServer(
       kbService: kbState.kbService,
       projectService,
       projectStorePath,
-      workflowService,
-      workflowEngine,
-      workflowStorePath,
       pipelineService,
       pipelineNodeRegistry,
       pipelineStorePath,
@@ -859,7 +846,6 @@ export async function startGatewayServer(
       }
       skillsChangeUnsub();
       maestroNodeBridge.stop();
-      workflowEngine.stop();
       credentialService.stopLeaseExpiryTimer();
       await vaultState.close();
       await kbState.close();

@@ -17,8 +17,6 @@ import type { KBService } from "../../knowledge-base/service.js";
 import type { ProjectService } from "../../projects/service.js";
 import type { WidgetService } from "../../widgets/service.js";
 import type { WizardSession } from "../../wizard/session.js";
-import type { WorkflowEngine } from "../../workflow/engine.js";
-import type { WorkflowService } from "../../workflow/service.js";
 import type { ChatAbortControllerEntry } from "../chat-abort.js";
 import type { ExecApprovalManager } from "../exec-approval-manager.js";
 import type { NodeRegistry } from "../node-registry.js";
@@ -64,9 +62,6 @@ export type GatewayRequestContext = {
   vaultService?: VaultService;
   vaultPath?: string;
   kbService?: KBService;
-  workflowService?: WorkflowService;
-  workflowEngine?: WorkflowEngine;
-  workflowStorePath?: string;
   pipelineService?: PipelineService;
   pipelineNodeRegistry?: PipelineNodeRegistry;
   pipelineStorePath?: string;

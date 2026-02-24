@@ -39,7 +39,6 @@ import { voicewakeHandlers } from "./server-methods/voicewake.js";
 import { webHandlers } from "./server-methods/web.js";
 import { widgetHandlers } from "./server-methods/widgets.js";
 import { wizardHandlers } from "./server-methods/wizard.js";
-import { workflowHandlers } from "./server-methods/workflow.js";
 import { knowledgeBaseHandlers } from "./server-methods/knowledge-base.js";
 import { projectHandlers } from "./server-methods/projects.js";
 
@@ -109,10 +108,6 @@ const READ_METHODS = new Set([
   "plugins.list",
   "device.registry.list",
   "device.registry.get",
-  "workflow.get",
-  "workflow.list",
-  "workflow.events",
-  "workflow.policies.get",
   "pr.get",
   "pr.list",
   "pr.checks",
@@ -174,13 +169,6 @@ const WRITE_METHODS = new Set([
   "device.registry.create",
   "device.registry.update",
   "device.registry.delete",
-  "workflow.create",
-  "workflow.pause",
-  "workflow.resume",
-  "workflow.cancel",
-  "workflow.retry_step",
-  "workflow.delete",
-  "workflow.policies.update",
   "pr.create",
   "pr.update",
   "pr.merge",
@@ -189,8 +177,6 @@ const WRITE_METHODS = new Set([
   "issue.update",
   "issue.close",
   "issue.comment",
-  "issue.to_workflow",
-  "review.run",
   "review.diff",
   "credential.create",
   "credential.update",
@@ -314,7 +300,6 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...vaultHandlers,
   ...pluginsHandlers,
   ...deviceRegistryHandlers,
-  ...workflowHandlers,
   ...githubHandlers,
   ...credentialHandlers,
   ...accountHandlers,

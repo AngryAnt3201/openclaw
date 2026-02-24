@@ -31,7 +31,6 @@ import { createVaultTool } from "./tools/vault-tool.js";
 import { createKBTool } from "./tools/kb-tool.js";
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
 import { createWidgetTool } from "./tools/widget-tool.js";
-import { createWorkflowTool } from "./tools/workflow-tool.js";
 
 export async function createOpenClawTools(options?: {
   sandboxBrowserBridgeUrl?: string;
@@ -178,9 +177,6 @@ export async function createOpenClawTools(options?: {
       agentSessionKey: options?.agentSessionKey,
     }),
     createDeviceTool({
-      agentSessionKey: options?.agentSessionKey,
-    }),
-    createWorkflowTool({
       agentSessionKey: options?.agentSessionKey,
     }),
     createGitHubTool({
