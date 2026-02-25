@@ -18,7 +18,6 @@ const GITHUB_ACTIONS = [
   "issue_get",
   "issue_close",
   "issue_comment",
-  "issue_to_workflow",
 ] as const;
 
 const GitHubToolSchema = Type.Object({
@@ -43,8 +42,6 @@ const GitHubToolSchema = Type.Object({
   comment: Type.Optional(Type.String({ description: "Comment body text" })),
   // List filters
   limit: Type.Optional(Type.Number()),
-  // issue_to_workflow
-  repoPath: Type.Optional(Type.String({ description: "Local repo path for workflow" })),
 });
 
 export function createGitHubTool(opts?: { agentSessionKey?: string }): AnyAgentTool {
@@ -53,7 +50,7 @@ export function createGitHubTool(opts?: { agentSessionKey?: string }): AnyAgentT
     name: "github",
     description:
       "Interact with GitHub pull requests and issues. Create, list, merge PRs, " +
-      "create/close issues, add comments, and convert issues to workflows.",
+      "create/close issues, and add comments.",
     parameters: GitHubToolSchema,
     execute: async (_toolCallId, args) => {
       const params = args as Record<string, unknown>;
@@ -210,18 +207,6 @@ export function createGitHubTool(opts?: { agentSessionKey?: string }): AnyAgentT
             number,
             body: comment,
           });
-          return jsonResult(result);
-        }
-        case "issue_to_workflow": {
-          const number = readNumberParam(params, "number", { required: true });
-          if (!owner || !repo) {
-            throw new Error("owner and repo are required");
-          }
-          const payload: Record<string, unknown> = { owner, repo, number };
-          if (params.repoPath) {
-            payload.opts = { repoPath: params.repoPath };
-          }
-          const result = await callGatewayTool("issue.to_workflow", gatewayOpts, payload);
           return jsonResult(result);
         }
         default:
