@@ -17,6 +17,19 @@ import type {
 import { loadPipelineStore, savePipelineStore, appendPipelineEvent } from "./store.js";
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Remove legacy `kind` field from node config. */
+function stripKind(config: Record<string, unknown>): Record<string, unknown> {
+  if (config && typeof config === "object" && "kind" in config) {
+    const { kind: _, ...rest } = config;
+    return rest;
+  }
+  return config ?? {};
+}
+
+// ---------------------------------------------------------------------------
 // Options
 // ---------------------------------------------------------------------------
 
@@ -116,12 +129,21 @@ export class PipelineService {
       const store = await loadPipelineStore(this.state.opts.storePath);
       const now = this.now();
 
+      // Ensure every node has required fields initialized
+      const nodes = (input.nodes ?? []).map((n) => ({
+        ...n,
+        label: n.label ?? n.type ?? "Untitled",
+        position: n.position ?? { x: 0, y: 0 },
+        config: stripKind((n.config ?? {}) as Record<string, unknown>),
+        state: n.state ?? { status: "idle" as const, retryCount: 0 },
+      }));
+
       const pipeline: Pipeline = {
         id: randomUUID(),
         name: input.name,
         description: input.description ?? "",
         enabled: input.enabled ?? false,
-        nodes: input.nodes ?? [],
+        nodes,
         edges: input.edges ?? [],
         status: "draft",
         viewport: input.viewport ?? { x: 0, y: 0, zoom: 1 },
@@ -172,7 +194,13 @@ export class PipelineService {
         pipeline.status = patch.status;
       }
       if (patch.nodes !== undefined) {
-        pipeline.nodes = patch.nodes;
+        pipeline.nodes = patch.nodes.map((n) => ({
+          ...n,
+          label: n.label ?? n.type ?? "Untitled",
+          position: n.position ?? { x: 0, y: 0 },
+          config: stripKind((n.config ?? {}) as Record<string, unknown>),
+          state: n.state ?? { status: "idle" as const, retryCount: 0 },
+        }));
       }
       if (patch.edges !== undefined) {
         pipeline.edges = patch.edges;
