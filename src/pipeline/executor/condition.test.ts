@@ -16,7 +16,7 @@ function makeNode(expression: string): PipelineNode {
     id: "cond-1",
     type: "condition",
     label: "Test Condition",
-    config: { kind: "condition", expression } as NodeConfig,
+    config: { expression } as NodeConfig,
     position: { x: 0, y: 0 },
     state: { status: "idle" as const, retryCount: 0 },
   };

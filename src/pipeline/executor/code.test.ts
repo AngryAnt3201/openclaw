@@ -14,7 +14,7 @@ function makeNode(id: string, config: Record<string, unknown> = {}): PipelineNod
     id,
     type: "code",
     label: id,
-    config: { kind: "code", description: "", ...config } as NodeConfig,
+    config: { description: "", ...config } as NodeConfig,
     position: { x: 0, y: 0 },
     state: { ...DEFAULT_STATE },
   };

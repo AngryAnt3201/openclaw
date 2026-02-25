@@ -13,7 +13,6 @@ function makeApprovalNode(overrides: Record<string, unknown> = {}): PipelineNode
     type: "approval",
     label: "Test Approval Node",
     config: {
-      kind: "approval" as const,
       message: "Please approve this deployment",
       ...overrides,
     },
@@ -87,7 +86,7 @@ describe("executeApprovalNode", () => {
       .mockResolvedValueOnce({ status: "completed", resolution: "approved" });
 
     const ctx = makeContext({ callGatewayRpc: rpc });
-    const node = makeApprovalNode({ timeoutSec: 30 });
+    const node = makeApprovalNode({ timeout: 30 });
 
     const promise = executeApprovalNode(node, undefined, ctx);
 
@@ -127,7 +126,7 @@ describe("executeApprovalNode", () => {
       .mockResolvedValueOnce({ status: "completed", resolution: "rejected" });
 
     const ctx = makeContext({ callGatewayRpc: rpc });
-    const node = makeApprovalNode({ timeoutSec: 30 });
+    const node = makeApprovalNode({ timeout: 30 });
 
     const promise = executeApprovalNode(node, undefined, ctx);
     await vi.advanceTimersByTimeAsync(2_100);
@@ -155,7 +154,7 @@ describe("executeApprovalNode", () => {
       .mockResolvedValueOnce({ status: "cancelled" });
 
     const ctx = makeContext({ callGatewayRpc: rpc });
-    const node = makeApprovalNode({ timeoutSec: 30 });
+    const node = makeApprovalNode({ timeout: 30 });
 
     const promise = executeApprovalNode(node, undefined, ctx);
     await vi.advanceTimersByTimeAsync(2_100);
@@ -180,7 +179,7 @@ describe("executeApprovalNode", () => {
       .mockResolvedValueOnce({ status: "failed" });
 
     const ctx = makeContext({ callGatewayRpc: rpc });
-    const node = makeApprovalNode({ timeoutSec: 30 });
+    const node = makeApprovalNode({ timeout: 30 });
 
     const promise = executeApprovalNode(node, undefined, ctx);
     await vi.advanceTimersByTimeAsync(2_100);
@@ -211,7 +210,7 @@ describe("executeApprovalNode", () => {
 
     const ctx = makeContext({ callGatewayRpc: rpc });
     // Use a tiny timeout so the deadline is hit immediately
-    const node = makeApprovalNode({ timeoutSec: 0.001 });
+    const node = makeApprovalNode({ timeout: 0.001 });
 
     const promise = executeApprovalNode(node, undefined, ctx);
     // Advance past both the tiny timeout and the first poll interval
@@ -237,7 +236,7 @@ describe("executeApprovalNode", () => {
       .mockResolvedValue({ status: "pending" });
 
     const ctx = makeContext({ callGatewayRpc: rpc });
-    const node = makeApprovalNode({ timeoutSec: 0.001, timeoutAction: "deny" });
+    const node = makeApprovalNode({ timeout: 0.001, timeoutAction: "deny" });
 
     const promise = executeApprovalNode(node, undefined, ctx);
     await vi.advanceTimersByTimeAsync(2_100);
@@ -264,7 +263,7 @@ describe("executeApprovalNode", () => {
       .mockResolvedValue({ status: "pending" });
 
     const ctx = makeContext({ callGatewayRpc: rpc });
-    const node = makeApprovalNode({ timeoutSec: 0.001, timeoutAction: "skip" });
+    const node = makeApprovalNode({ timeout: 0.001, timeoutAction: "skip" });
 
     const promise = executeApprovalNode(node, undefined, ctx);
     await vi.advanceTimersByTimeAsync(2_100);
@@ -292,7 +291,7 @@ describe("executeApprovalNode", () => {
       .mockResolvedValueOnce({ status: "completed", resolution: "approved" });
 
     const ctx = makeContext({ callGatewayRpc: rpc });
-    const node = makeApprovalNode({ timeoutSec: 30 });
+    const node = makeApprovalNode({ timeout: 30 });
 
     const promise = executeApprovalNode(node, "Build succeeded on branch main", ctx);
     await vi.advanceTimersByTimeAsync(2_100);
@@ -313,7 +312,7 @@ describe("executeApprovalNode", () => {
       .mockResolvedValueOnce({ status: "completed", resolution: "approved" });
 
     const ctx = makeContext({ callGatewayRpc: rpc });
-    const node = makeApprovalNode({ timeoutSec: 30 });
+    const node = makeApprovalNode({ timeout: 30 });
 
     const inputObj = { branch: "main", tests: 42, passing: true };
     const promise = executeApprovalNode(node, inputObj, ctx);
@@ -334,7 +333,7 @@ describe("executeApprovalNode", () => {
       .mockResolvedValueOnce({ status: "completed", resolution: "approved" });
 
     const ctx = makeContext({ callGatewayRpc: rpc });
-    const node = makeApprovalNode({ timeoutSec: 30 });
+    const node = makeApprovalNode({ timeout: 30 });
 
     const promise = executeApprovalNode(node, null, ctx);
     await vi.advanceTimersByTimeAsync(2_100);
@@ -353,7 +352,7 @@ describe("executeApprovalNode", () => {
       .mockResolvedValueOnce({ status: "completed", resolution: "approved" });
 
     const ctx = makeContext({ callGatewayRpc: rpc });
-    const node = makeApprovalNode({ timeoutSec: 30 });
+    const node = makeApprovalNode({ timeout: 30 });
 
     const promise = executeApprovalNode(node, undefined, ctx);
     await vi.advanceTimersByTimeAsync(2_100);
@@ -371,7 +370,7 @@ describe("executeApprovalNode", () => {
       .mockResolvedValueOnce({ status: "completed", resolution: "approved" });
 
     const ctx = makeContext({ callGatewayRpc: rpc });
-    const node = makeApprovalNode({ timeoutSec: 30 });
+    const node = makeApprovalNode({ timeout: 30 });
 
     const promise = executeApprovalNode(node, {}, ctx);
     await vi.advanceTimersByTimeAsync(2_100);
@@ -468,7 +467,7 @@ describe("executeApprovalNode", () => {
       .mockResolvedValueOnce({ status: "completed", resolution: "approved" });
 
     const ctx = makeContext({ callGatewayRpc: rpc });
-    const node = makeApprovalNode({ timeoutSec: 30 });
+    const node = makeApprovalNode({ timeout: 30 });
 
     const promise = executeApprovalNode(node, undefined, ctx);
 
@@ -557,7 +556,7 @@ describe("executeApprovalNode", () => {
       .mockResolvedValueOnce({ status: "completed", resolution: "custom_resolution" });
 
     const ctx = makeContext({ callGatewayRpc: rpc });
-    const node = makeApprovalNode({ timeoutSec: 30 });
+    const node = makeApprovalNode({ timeout: 30 });
 
     const promise = executeApprovalNode(node, undefined, ctx);
     await vi.advanceTimersByTimeAsync(2_100);
@@ -577,7 +576,7 @@ describe("executeApprovalNode", () => {
       .mockRejectedValueOnce(new Error("connection reset"));
 
     const ctx = makeContext({ callGatewayRpc: rpc });
-    const node = makeApprovalNode({ timeoutSec: 30 });
+    const node = makeApprovalNode({ timeout: 30 });
 
     const promise = executeApprovalNode(node, undefined, ctx);
     await vi.advanceTimersByTimeAsync(2_100);

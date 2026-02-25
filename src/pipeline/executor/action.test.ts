@@ -17,9 +17,8 @@ function makeNotifyNode(config: Record<string, unknown> = {}): PipelineNode {
     type: "notify",
     label: "Test Notify",
     config: {
-      kind: "notify",
       channels: ["slack"],
-      template: "Hello {{input}}",
+      message: "Hello {{input}}",
       priority: "medium",
       ...config,
     } as NodeConfig,
@@ -34,7 +33,6 @@ function makeOutputNode(config: Record<string, unknown> = {}): PipelineNode {
     type: "output",
     label: "Test Output",
     config: {
-      kind: "output",
       format: "json",
       destination: "log",
       ...config,
@@ -57,24 +55,16 @@ function makeContext(overrides: Partial<ExecutorContext> = {}): ExecutorContext 
 // ===========================================================================
 
 describe("executeNotifyNode", () => {
-  it("returns failure when channels is empty", async () => {
-    const result = await executeNotifyNode(
-      makeNotifyNode({ channels: [] }),
-      undefined,
-      makeContext(),
-    );
-    expect(result.status).toBe("failure");
-    expect(result.error).toContain("channel");
+  it("auto-resolves channels when empty", async () => {
+    const ctx = makeContext();
+    const result = await executeNotifyNode(makeNotifyNode({ channels: [] }), "hello", ctx);
+    expect(result.status).toBe("success");
   });
 
-  it("returns failure when template is missing", async () => {
-    const result = await executeNotifyNode(
-      makeNotifyNode({ template: "" }),
-      undefined,
-      makeContext(),
-    );
-    expect(result.status).toBe("failure");
-    expect(result.error).toContain("template");
+  it("auto-generates message when not provided", async () => {
+    const ctx = makeContext();
+    const result = await executeNotifyNode(makeNotifyNode({ message: undefined }), "hello", ctx);
+    expect(result.status).toBe("success");
   });
 
   it("returns failure when callGatewayRpc is not available", async () => {
@@ -103,7 +93,7 @@ describe("executeNotifyNode", () => {
 
   it("interpolates {{input}} with string input", async () => {
     const ctx = makeContext();
-    await executeNotifyNode(makeNotifyNode({ template: "Status: {{input}}" }), "all good", ctx);
+    await executeNotifyNode(makeNotifyNode({ message: "Status: {{input}}" }), "all good", ctx);
 
     const rpcArgs = (ctx.callGatewayRpc as ReturnType<typeof vi.fn>).mock.calls[0][1] as Record<
       string,
@@ -114,7 +104,7 @@ describe("executeNotifyNode", () => {
 
   it("interpolates {{input}} with object input as JSON", async () => {
     const ctx = makeContext();
-    await executeNotifyNode(makeNotifyNode({ template: "Data: {{input}}" }), { score: 42 }, ctx);
+    await executeNotifyNode(makeNotifyNode({ message: "Data: {{input}}" }), { score: 42 }, ctx);
 
     const rpcArgs = (ctx.callGatewayRpc as ReturnType<typeof vi.fn>).mock.calls[0][1] as Record<
       string,
@@ -126,7 +116,7 @@ describe("executeNotifyNode", () => {
   it("interpolates {{input.path}} with nested object", async () => {
     const ctx = makeContext();
     await executeNotifyNode(
-      makeNotifyNode({ template: "Score: {{input.score}}" }),
+      makeNotifyNode({ message: "Score: {{input.score}}" }),
       { score: 95 },
       ctx,
     );

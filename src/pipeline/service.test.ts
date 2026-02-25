@@ -212,7 +212,7 @@ describe("PipelineService.update", () => {
         id: "n1",
         type: "manual" as const,
         label: "Start",
-        config: { kind: "manual" as const },
+        config: { label: "Start" },
         position: { x: 0, y: 0 },
         state: { status: "idle" as const, retryCount: 0 },
       },

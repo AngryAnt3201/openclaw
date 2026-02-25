@@ -47,11 +47,10 @@ function makeNodeState(overrides?: Partial<PipelineNodeState>): PipelineNodeStat
 
 function makeAgentConfig(overrides?: Partial<AgentNodeConfig>): AgentNodeConfig {
   return {
-    kind: "agent",
     prompt: "Summarize the latest commit",
-    skills: [],
     credentials: [],
-    sessionTarget: "isolated",
+    tools: [],
+    session: "isolated",
     ...overrides,
   };
 }
@@ -178,7 +177,7 @@ describe("Pipeline Core Types", () => {
         id: "node-1",
         type: "cron",
         label: "Every hour",
-        config: { kind: "cron", schedule: "0 * * * *" } satisfies CronTriggerConfig,
+        config: { schedule: "0 * * * *" } satisfies CronTriggerConfig,
         position: { x: 100, y: 200 },
         state: makeNodeState(),
       };
@@ -227,140 +226,121 @@ describe("Pipeline Core Types", () => {
   describe("node configs", () => {
     it("should construct AgentNodeConfig with all fields", () => {
       const config: AgentNodeConfig = {
-        kind: "agent",
-        agentId: "agent-main",
         model: "claude-opus-4-20250514",
         prompt: "Review the PR and summarize changes",
-        systemPrompt: "You are a code reviewer.",
-        skills: ["code-review", "summarize"],
-        policyPreset: "coding",
+        tools: ["code-review", "summarize"],
         credentials: ["cred-github", "cred-anthropic"],
-        repoPath: "/home/user/projects/my-app",
-        sessionTarget: "isolated",
+        apps: ["my-app"],
+        session: "isolated",
         thinking: "enabled",
         timeout: 300,
       };
 
-      expect(config.kind).toBe("agent");
       expect(config.prompt).toBe("Review the PR and summarize changes");
-      expect(config.skills).toEqual(["code-review", "summarize"]);
+      expect(config.tools).toEqual(["code-review", "summarize"]);
       expect(config.credentials).toEqual(["cred-github", "cred-anthropic"]);
-      expect(config.sessionTarget).toBe("isolated");
+      expect(config.session).toBe("isolated");
       expect(config.thinking).toBe("enabled");
       expect(config.timeout).toBe(300);
     });
 
     it("should construct AgentNodeConfig with minimal required fields", () => {
       const config: AgentNodeConfig = {
-        kind: "agent",
         prompt: "Do something",
-        skills: [],
-        credentials: [],
-        sessionTarget: "main",
       };
 
-      expect(config.agentId).toBeUndefined();
       expect(config.model).toBeUndefined();
-      expect(config.systemPrompt).toBeUndefined();
-      expect(config.policyPreset).toBeUndefined();
-      expect(config.repoPath).toBeUndefined();
+      expect(config.tools).toBeUndefined();
+      expect(config.credentials).toBeUndefined();
+      expect(config.session).toBeUndefined();
       expect(config.thinking).toBeUndefined();
       expect(config.timeout).toBeUndefined();
     });
 
     it("should construct CronTriggerConfig", () => {
       const config: CronTriggerConfig = {
-        kind: "cron",
         schedule: "*/15 * * * *",
         timezone: "America/New_York",
       };
-      expect(config.kind).toBe("cron");
       expect(config.schedule).toBe("*/15 * * * *");
+      expect(config.timezone).toBe("America/New_York");
     });
 
     it("should construct WebhookTriggerConfig", () => {
       const config: WebhookTriggerConfig = {
-        kind: "webhook",
         path: "/hooks/deploy",
         secret: "wh-secret-123",
         method: "POST",
       };
-      expect(config.kind).toBe("webhook");
       expect(config.path).toBe("/hooks/deploy");
+      expect(config.method).toBe("POST");
     });
 
     it("should construct TaskEventTriggerConfig", () => {
       const config: TaskEventTriggerConfig = {
-        kind: "task_event",
         eventFilter: "status_change",
         taskType: "coding",
         taskStatus: "complete",
       };
-      expect(config.kind).toBe("task_event");
       expect(config.eventFilter).toBe("status_change");
+      expect(config.taskType).toBe("coding");
     });
 
     it("should construct ManualTriggerConfig", () => {
       const config: ManualTriggerConfig = {
-        kind: "manual",
         label: "Run Now",
       };
-      expect(config.kind).toBe("manual");
+      expect(config.label).toBe("Run Now");
     });
 
     it("should construct ConditionConfig", () => {
       const config: ConditionConfig = {
-        kind: "condition",
         expression: "input.status === 'success'",
         trueLabel: "Continue",
         falseLabel: "Skip",
       };
-      expect(config.kind).toBe("condition");
       expect(config.expression).toBe("input.status === 'success'");
+      expect(config.trueLabel).toBe("Continue");
     });
 
     it("should construct ApprovalConfig", () => {
       const config: ApprovalConfig = {
-        kind: "approval",
         approverIds: ["user-1"],
         message: "Please approve deployment",
-        timeoutSec: 3600,
+        timeout: 3600,
         timeoutAction: "deny",
       };
-      expect(config.kind).toBe("approval");
       expect(config.timeoutAction).toBe("deny");
+      expect(config.timeout).toBe(3600);
     });
 
     it("should construct LoopConfig", () => {
       const config: LoopConfig = {
-        kind: "loop",
         maxIterations: 10,
         condition: "result.hasMore === true",
       };
-      expect(config.kind).toBe("loop");
       expect(config.maxIterations).toBe(10);
+      expect(config.condition).toBe("result.hasMore === true");
     });
 
     it("should construct NotifyConfig", () => {
       const config: NotifyConfig = {
-        kind: "notify",
         channels: ["discord", "slack"],
-        template: "Pipeline {{name}} completed",
+        message: "Pipeline {{name}} completed",
         priority: "high",
       };
-      expect(config.kind).toBe("notify");
       expect(config.channels).toHaveLength(2);
+      expect(config.message).toBe("Pipeline {{name}} completed");
     });
 
     it("should construct OutputConfig", () => {
       const config: OutputConfig = {
-        kind: "output",
         format: "json",
         destination: "file",
         path: "/tmp/results.json",
       };
-      expect(config.kind).toBe("output");
       expect(config.format).toBe("json");
+      expect(config.destination).toBe("file");
     });
   });
 

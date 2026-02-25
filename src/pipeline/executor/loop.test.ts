@@ -14,7 +14,7 @@ function makeNode(id: string, config: Partial<NodeConfig> = {}): PipelineNode {
     id,
     type: "loop",
     label: id,
-    config: { kind: "loop", maxIterations: 10, condition: "", ...config } as NodeConfig,
+    config: { maxIterations: 10, condition: "", ...config } as NodeConfig,
     position: { x: 0, y: 0 },
     state: { ...DEFAULT_STATE },
   };

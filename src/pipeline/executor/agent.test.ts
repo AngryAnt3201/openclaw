@@ -19,11 +19,10 @@ function makeNode(config: Record<string, unknown> = {}): PipelineNode {
     type: "agent",
     label: "Test Agent",
     config: {
-      kind: "agent",
       prompt: "do something",
-      skills: [],
+      tools: [],
       credentials: [],
-      sessionTarget: "isolated",
+      session: "isolated",
       ...config,
     } as NodeConfig,
     position: { x: 0, y: 0 },
@@ -57,11 +56,11 @@ describe("executeAgentNode", () => {
 
   // --- Main session path ---
 
-  describe("sessionTarget: main", () => {
+  describe("session: main", () => {
     it("enqueues system event and requests heartbeat", async () => {
       const ctx = makeContext();
       const result = await executeAgentNode(
-        makeNode({ sessionTarget: "main", prompt: "deploy now" }),
+        makeNode({ session: "main", prompt: "deploy now" }),
         undefined,
         ctx,
       );
@@ -69,12 +68,12 @@ describe("executeAgentNode", () => {
       expect(result.status).toBe("success");
       expect(ctx.enqueueSystemEvent).toHaveBeenCalledTimes(1);
       expect(ctx.requestHeartbeatNow).toHaveBeenCalledWith({ reason: "pipeline:agent" });
-      expect(result.output).toMatchObject({ dispatched: true, sessionTarget: "main" });
+      expect(result.output).toMatchObject({ dispatched: true, session: "main" });
     });
 
     it("returns failure when enqueueSystemEvent is not available", async () => {
       const result = await executeAgentNode(
-        makeNode({ sessionTarget: "main" }),
+        makeNode({ session: "main" }),
         undefined,
         makeContext({ enqueueSystemEvent: undefined }),
       );
@@ -86,7 +85,7 @@ describe("executeAgentNode", () => {
     it("includes upstream input in the prompt", async () => {
       const ctx = makeContext();
       await executeAgentNode(
-        makeNode({ sessionTarget: "main", prompt: "analyze this" }),
+        makeNode({ session: "main", prompt: "analyze this" }),
         { data: "from upstream" },
         ctx,
       );
@@ -100,11 +99,11 @@ describe("executeAgentNode", () => {
 
   // --- Isolated session path ---
 
-  describe("sessionTarget: isolated", () => {
+  describe("session: isolated", () => {
     it("calls runIsolatedAgentJob and returns result", async () => {
       const ctx = makeContext();
       const result = await executeAgentNode(
-        makeNode({ sessionTarget: "isolated", prompt: "research topic" }),
+        makeNode({ session: "isolated", prompt: "research topic" }),
         undefined,
         ctx,
       );
@@ -116,7 +115,7 @@ describe("executeAgentNode", () => {
 
     it("returns failure when runIsolatedAgentJob is not available", async () => {
       const result = await executeAgentNode(
-        makeNode({ sessionTarget: "isolated" }),
+        makeNode({ session: "isolated" }),
         undefined,
         makeContext({ runIsolatedAgentJob: undefined }),
       );
@@ -129,10 +128,10 @@ describe("executeAgentNode", () => {
       const ctx = makeContext();
       await executeAgentNode(
         makeNode({
-          sessionTarget: "isolated",
+          session: "isolated",
           prompt: "go",
           model: "claude-3",
-          skills: ["coding", "github"],
+          tools: ["coding", "github"],
           thinking: "high",
           timeout: 600,
         }),
@@ -142,14 +141,14 @@ describe("executeAgentNode", () => {
 
       const callArgs = (ctx.runIsolatedAgentJob as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(callArgs.model).toBe("claude-3");
-      expect(callArgs.skills).toEqual(["coding", "github"]);
+      expect(callArgs.tools).toEqual(["coding", "github"]);
       expect(callArgs.thinking).toBe("high");
       expect(callArgs.timeoutSeconds).toBe(600);
     });
 
     it("uses default timeout (300s) when not specified", async () => {
       const ctx = makeContext();
-      await executeAgentNode(makeNode({ sessionTarget: "isolated", prompt: "go" }), undefined, ctx);
+      await executeAgentNode(makeNode({ session: "isolated", prompt: "go" }), undefined, ctx);
 
       const callArgs = (ctx.runIsolatedAgentJob as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(callArgs.timeoutSeconds).toBe(300);
@@ -158,7 +157,7 @@ describe("executeAgentNode", () => {
     it("passes upstream input as previousOutput", async () => {
       const ctx = makeContext();
       const input = { upstream: "data" };
-      await executeAgentNode(makeNode({ sessionTarget: "isolated", prompt: "go" }), input, ctx);
+      await executeAgentNode(makeNode({ session: "isolated", prompt: "go" }), input, ctx);
 
       const callArgs = (ctx.runIsolatedAgentJob as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(callArgs.previousOutput).toEqual(input);
@@ -167,7 +166,7 @@ describe("executeAgentNode", () => {
     it("includes input context in the message", async () => {
       const ctx = makeContext();
       await executeAgentNode(
-        makeNode({ sessionTarget: "isolated", prompt: "analyze" }),
+        makeNode({ session: "isolated", prompt: "analyze" }),
         { value: 42 },
         ctx,
       );
@@ -186,7 +185,7 @@ describe("executeAgentNode", () => {
       });
 
       const result = await executeAgentNode(
-        makeNode({ sessionTarget: "isolated", prompt: "go" }),
+        makeNode({ session: "isolated", prompt: "go" }),
         undefined,
         ctx,
       );
@@ -201,7 +200,7 @@ describe("executeAgentNode", () => {
       });
 
       const result = await executeAgentNode(
-        makeNode({ sessionTarget: "isolated", prompt: "go" }),
+        makeNode({ session: "isolated", prompt: "go" }),
         undefined,
         ctx,
       );
@@ -217,7 +216,7 @@ describe("executeAgentNode", () => {
     it("undefined input does not add context prefix to prompt", async () => {
       const ctx = makeContext();
       await executeAgentNode(
-        makeNode({ sessionTarget: "isolated", prompt: "hello world" }),
+        makeNode({ session: "isolated", prompt: "hello world" }),
         undefined,
         ctx,
       );
@@ -228,11 +227,7 @@ describe("executeAgentNode", () => {
 
     it("null input does not add context prefix to prompt", async () => {
       const ctx = makeContext();
-      await executeAgentNode(
-        makeNode({ sessionTarget: "isolated", prompt: "hello world" }),
-        null,
-        ctx,
-      );
+      await executeAgentNode(makeNode({ session: "isolated", prompt: "hello world" }), null, ctx);
 
       const callArgs = (ctx.runIsolatedAgentJob as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(callArgs.message).toBe("hello world");
@@ -240,11 +235,7 @@ describe("executeAgentNode", () => {
 
     it("empty object input does not add context prefix", async () => {
       const ctx = makeContext();
-      await executeAgentNode(
-        makeNode({ sessionTarget: "isolated", prompt: "hello world" }),
-        {},
-        ctx,
-      );
+      await executeAgentNode(makeNode({ session: "isolated", prompt: "hello world" }), {}, ctx);
 
       const callArgs = (ctx.runIsolatedAgentJob as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(callArgs.message).toBe("hello world");
@@ -253,7 +244,7 @@ describe("executeAgentNode", () => {
     it("string input is prepended to prompt", async () => {
       const ctx = makeContext();
       await executeAgentNode(
-        makeNode({ sessionTarget: "isolated", prompt: "process this" }),
+        makeNode({ session: "isolated", prompt: "process this" }),
         "raw text data",
         ctx,
       );

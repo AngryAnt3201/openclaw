@@ -14,7 +14,7 @@ function makeNode(id: string, type: string, config?: Partial<NodeConfig>): Pipel
     id,
     type,
     label: id,
-    config: { kind: type, ...config } as NodeConfig,
+    config: { ...config } as NodeConfig,
     position: DEFAULT_POS,
     state: { ...DEFAULT_STATE },
   };

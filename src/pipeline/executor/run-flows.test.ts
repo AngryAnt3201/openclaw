@@ -108,7 +108,7 @@ function node(id: string, type: string, config?: Partial<NodeConfig>): PipelineN
     id,
     type,
     label: id,
-    config: { kind: type, ...config } as NodeConfig,
+    config: { ...config } as NodeConfig,
     position: POS,
     state: { ...DEFAULT_STATE },
   };
@@ -209,7 +209,7 @@ describe("Flow: trigger → code → agent → notify", () => {
     node("t", "manual"),
     node("c", "code", { description: "parse CSV" }),
     node("a", "agent", { prompt: "analyze data" }),
-    node("n", "notify", { channels: ["slack"], template: "Done: {{input}}" }),
+    node("n", "notify", { channels: ["slack"], message: "Done: {{input}}" }),
   ];
   const edges = [edge("t", "c"), edge("c", "a"), edge("a", "n")];
 
@@ -279,7 +279,7 @@ describe("Flow: trigger → agent → condition → branches", () => {
     node("t", "cron"),
     node("a", "agent", { prompt: "check status" }),
     node("cond", "condition", { expression: "input.healthy === true" }),
-    node("yes", "notify", { channels: ["discord"], template: "All good" }),
+    node("yes", "notify", { channels: ["discord"], message: "All good" }),
     node("no", "output", { format: "json", destination: "log" }),
   ];
   const edges = [
@@ -339,7 +339,7 @@ describe("Flow: trigger → approval gate → branches", () => {
     node("t", "manual"),
     node("gate", "approval", { message: "Deploy to prod?" }),
     node("deploy", "agent", { prompt: "deploy" }),
-    node("done", "notify", { channels: ["slack"], template: "Deployed" }),
+    node("done", "notify", { channels: ["slack"], message: "Deployed" }),
     node("abort", "output", { format: "text", destination: "log" }),
   ];
   const edges = [
@@ -444,7 +444,7 @@ describe("Flow: code failure cascades", () => {
       node("t", "manual"),
       node("c", "code", { description: "generate report" }),
       node("a", "agent", { prompt: "review" }),
-      node("n", "notify", { channels: ["slack"], template: "done" }),
+      node("n", "notify", { channels: ["slack"], message: "done" }),
     ];
     const edges = [edge("t", "c"), edge("c", "a"), edge("a", "n")];
     const p = pipeline(nodes, edges);
@@ -541,7 +541,7 @@ describe("Flow: executor exception handling", () => {
     const nodes = [
       node("t", "manual"),
       node("a", "agent", { prompt: "heavy task" }),
-      node("n", "notify", { channels: ["slack"], template: "done" }),
+      node("n", "notify", { channels: ["slack"], message: "done" }),
     ];
     const edges = [edge("t", "a"), edge("a", "n")];
     const p = pipeline(nodes, edges);
@@ -652,7 +652,7 @@ describe("Flow: nested conditions", () => {
       node("c1", "condition", { expression: "true" }),
       node("c2", "condition", { expression: "input.level > 5" }),
       node("high", "agent", { prompt: "high" }), // c2 true branch
-      node("low", "notify", { channels: ["slack"], template: "low" }), // c2 false branch
+      node("low", "notify", { channels: ["slack"], message: "low" }), // c2 false branch
       node("skip", "output", { format: "text" }), // c1 false branch
     ];
     const edges = [
@@ -745,7 +745,7 @@ describe("Flow: edge cases", () => {
     const nodes = [
       node("a1", "agent", { prompt: "task 1" }),
       node("a2", "agent", { prompt: "task 2" }),
-      node("n1", "notify", { channels: ["slack"], template: "hi" }),
+      node("n1", "notify", { channels: ["slack"], message: "hi" }),
     ];
     const p = pipeline(nodes, []); // No edges.
     const { onEvent } = collect();
@@ -804,7 +804,7 @@ describe("Flow: long chain data propagation", () => {
       node("n1", "code", { description: "extract" }),
       node("n2", "agent", { prompt: "parse" }),
       node("n3", "agent", { prompt: "analyze" }),
-      node("n4", "notify", { channels: ["slack"], template: "report" }),
+      node("n4", "notify", { channels: ["slack"], message: "report" }),
       node("n5", "output", { format: "json" }),
     ];
     const edges = [
@@ -850,7 +850,7 @@ describe("Flow: condition with deep chains on both branches", () => {
       // True branch: a1 → a2 → n1
       node("a1", "agent", { prompt: "step 1" }),
       node("a2", "agent", { prompt: "step 2" }),
-      node("n1", "notify", { channels: ["slack"], template: "done" }),
+      node("n1", "notify", { channels: ["slack"], message: "done" }),
       // False branch: c1 → o1
       node("c1", "code", { description: "fallback" }),
       node("o1", "output", { format: "text" }),
@@ -898,8 +898,8 @@ describe("Flow: failure isolation in parallel branches", () => {
       node("t", "manual"),
       node("a1", "agent", { prompt: "branch A" }),
       node("a2", "agent", { prompt: "branch B" }),
-      node("n1", "notify", { channels: ["slack"], template: "A done" }), // downstream of a1
-      node("n2", "notify", { channels: ["slack"], template: "B done" }), // downstream of a2
+      node("n1", "notify", { channels: ["slack"], message: "A done" }), // downstream of a1
+      node("n2", "notify", { channels: ["slack"], message: "B done" }), // downstream of a2
     ];
     const edges = [edge("t", "a1"), edge("t", "a2"), edge("a1", "n1"), edge("a2", "n2")];
     const p = pipeline(nodes, edges);

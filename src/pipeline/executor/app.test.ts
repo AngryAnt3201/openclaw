@@ -9,10 +9,9 @@ function makeAppNode(overrides: Record<string, unknown> = {}): PipelineNode {
     type: "app",
     label: "Test App Node",
     config: {
-      kind: "app" as const,
       appId: "my-app",
       prompt: "Navigate to /dashboard and summarize the metrics",
-      sessionTarget: "isolated" as const,
+      session: "isolated" as const,
       lifecycle: "keep-alive" as const,
       ...overrides,
     },
@@ -102,7 +101,7 @@ describe("executeAppNode", () => {
     expect(rpc).not.toHaveBeenCalledWith("launcher.start", expect.anything());
   });
 
-  it("uses main session when sessionTarget=main", async () => {
+  it("uses main session when session=main", async () => {
     const enqueue = vi.fn();
     const heartbeat = vi.fn();
     const rpc = vi
@@ -119,7 +118,7 @@ describe("executeAppNode", () => {
       enqueueSystemEvent: enqueue,
       requestHeartbeatNow: heartbeat,
     });
-    const node = makeAppNode({ sessionTarget: "main" });
+    const node = makeAppNode({ session: "main" });
     const result = await executeAppNode(node, undefined, ctx);
     expect(result.status).toBe("success");
     expect(enqueue).toHaveBeenCalled();
