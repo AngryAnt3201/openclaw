@@ -10,7 +10,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { PipelineStoreFile, PipelineEvent } from "./types.js";
+import type { PipelineStoreFile, PipelineEvent, PipelineNode } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Path resolution
@@ -44,12 +44,29 @@ function emptyStore(): PipelineStoreFile {
   return { version: 1, pipelines: [] };
 }
 
+/** Normalize a node from legacy format (strip kind, fill defaults). */
+function normalizeLegacyNode(node: PipelineNode): PipelineNode {
+  const config = { ...(node.config as Record<string, unknown>) };
+  delete config.kind;
+  return {
+    ...node,
+    label: node.label ?? (node.type as string) ?? "Untitled",
+    position: node.position ?? { x: 0, y: 0 },
+    config: config as PipelineNode["config"],
+    state: node.state ?? { status: "idle" as const, retryCount: 0 },
+  };
+}
+
 export async function loadPipelineStore(storePath: string): Promise<PipelineStoreFile> {
   try {
     const raw = await fs.readFile(storePath, "utf-8");
     const parsed = JSON.parse(raw) as PipelineStoreFile;
     if (parsed.version !== 1 || !Array.isArray(parsed.pipelines)) {
       return emptyStore();
+    }
+    // Normalize legacy data on load
+    for (const pipeline of parsed.pipelines) {
+      pipeline.nodes = (pipeline.nodes ?? []).map(normalizeLegacyNode);
     }
     return parsed;
   } catch {
