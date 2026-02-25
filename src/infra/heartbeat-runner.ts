@@ -35,6 +35,7 @@ import {
   updateSessionStore,
 } from "../config/sessions.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
+import { resolvePipelineStorePath } from "../pipeline/store.js";
 import { getQueueSize } from "../process/command-queue.js";
 import { CommandLane } from "../process/lanes.js";
 import { normalizeAgentId, toAgentStoreSessionKey } from "../routing/session-key.js";
@@ -42,6 +43,7 @@ import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
 import { resolveTaskStorePath } from "../tasks/store.js";
 import { formatErrorMessage } from "./errors.js";
 import { emitHeartbeatEvent, resolveIndicatorType } from "./heartbeat-events.js";
+import { resolvePipelineContextForHeartbeat } from "./heartbeat-pipeline-context.js";
 import { resolveTaskContextForHeartbeat } from "./heartbeat-task-context.js";
 import { resolveVaultContextForHeartbeat } from "./heartbeat-vault-context.js";
 import { resolveKBContextForHeartbeat } from "./heartbeat-kb-context.js";
@@ -648,6 +650,21 @@ export async function runHeartbeatOnce(opts: {
     }
   } catch {
     // KB unavailable — proceed without KB context.
+  }
+
+  // Append pipeline context so the agent knows about active automations.
+  try {
+    const pipelineStorePath = resolvePipelineStorePath(
+      (cfg as Record<string, unknown>).pipelines
+        ? ((cfg as Record<string, unknown>).pipelines as { store?: string })?.store
+        : undefined,
+    );
+    const pipelineContext = await resolvePipelineContextForHeartbeat(pipelineStorePath);
+    if (pipelineContext) {
+      prompt = `${prompt}${pipelineContext}`;
+    }
+  } catch {
+    // Pipeline store unavailable — proceed without pipeline context.
   }
 
   const ctx = {
