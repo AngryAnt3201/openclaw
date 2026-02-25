@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // PipelineService -- CRUD + lifecycle management for pipelines
 // ---------------------------------------------------------------------------
-// Follows the TaskService / WorkflowService pattern: dependency-injected,
+// Follows the TaskService pattern: dependency-injected,
 // event-driven, file-backed, with promise-based locking for safe concurrent
 // access.
 // ---------------------------------------------------------------------------

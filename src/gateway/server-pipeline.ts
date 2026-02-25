@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Gateway Pipeline Service Builder – follows server-cron.ts / server-workflow.ts pattern
+// Gateway Pipeline Service Builder – follows server-cron.ts pattern
 // ---------------------------------------------------------------------------
 
 import type { CliDeps } from "../cli/deps.js";

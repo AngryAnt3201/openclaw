@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Pipeline Store – File-based persistence following task/workflow store pattern
+// Pipeline Store – File-based persistence following task store pattern
 // ---------------------------------------------------------------------------
 // Storage layout:
 //   ~/.openclaw/pipelines/
