@@ -120,21 +120,16 @@ export const BUILTIN_NODE_DEFINITIONS: readonly NodeDefinition[] = [
     type: "agent",
     category: "processing",
     label: "Agent",
-    description: "Run an AI agent with a prompt, model, and optional skills/credentials.",
+    description: "Run an AI agent with a prompt, model, and optional tools/credentials.",
     icon: "bot",
     configFields: [
       { key: "prompt", label: "Prompt", type: "code", required: true },
       { key: "model", label: "Model", type: "string" },
-      { key: "skills", label: "Skills", type: "string", placeholder: "skill-a, skill-b" },
-      { key: "credentials", label: "Credentials", type: "string", placeholder: "cred-a, cred-b" },
+      { key: "tools", label: "Tools", type: "string", placeholder: "browser, github" },
+      { key: "credentials", label: "Credentials", type: "string", placeholder: "github-token" },
+      { key: "apps", label: "Apps", type: "string", placeholder: "linear" },
       {
-        key: "policyPreset",
-        label: "Policy Preset",
-        type: "select",
-        options: ["research", "coding", "messaging", "full"],
-      },
-      {
-        key: "sessionTarget",
+        key: "session",
         label: "Session Target",
         type: "select",
         options: ["isolated", "main"],
@@ -165,7 +160,7 @@ export const BUILTIN_NODE_DEFINITIONS: readonly NodeDefinition[] = [
       { key: "appId", label: "App", type: "string", required: true },
       { key: "prompt", label: "Prompt", type: "code", required: true },
       {
-        key: "sessionTarget",
+        key: "session",
         label: "Session Target",
         type: "select",
         options: ["isolated", "main"],
@@ -210,7 +205,7 @@ export const BUILTIN_NODE_DEFINITIONS: readonly NodeDefinition[] = [
     icon: "shield-check",
     configFields: [
       { key: "message", label: "Message", type: "string", required: true },
-      { key: "timeoutSec", label: "Timeout (s)", type: "number" },
+      { key: "timeout", label: "Timeout (s)", type: "number" },
     ],
     ports: [
       { id: "in", label: "Input", type: "input" },
@@ -280,10 +275,9 @@ export const BUILTIN_NODE_DEFINITIONS: readonly NodeDefinition[] = [
         key: "channels",
         label: "Channels",
         type: "string",
-        required: true,
         placeholder: "discord, slack",
       },
-      { key: "template", label: "Message", type: "code", required: true },
+      { key: "message", label: "Message", type: "code" },
       {
         key: "priority",
         label: "Priority",
