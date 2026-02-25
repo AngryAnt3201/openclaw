@@ -72,7 +72,7 @@ export const executeAppNode: NodeExecutorFn = async (
 
     // 4. Execute via agent session
     let agentResult: unknown;
-    if (config.sessionTarget === "main") {
+    if (config.session === "main") {
       context.enqueueSystemEvent?.(prompt, {});
       context.requestHeartbeatNow?.({ reason: "pipeline:app" });
       agentResult = { dispatched: true, sessionTarget: "main" };

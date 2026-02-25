@@ -35,7 +35,7 @@ export const executeAgentNode: NodeExecutorFn = async (
   }
 
   try {
-    if (config.sessionTarget === "main") {
+    if (config.session === "main") {
       return await executeMainSession(config, input, context, startMs);
     }
     return await executeIsolatedSession(config, input, context, startMs);
@@ -70,15 +70,13 @@ async function executeMainSession(
   // Build the prompt with upstream context when available.
   const prompt = buildPromptWithInput(config.prompt, input);
 
-  context.enqueueSystemEvent(prompt, {
-    agentId: config.agentId,
-  });
+  context.enqueueSystemEvent(prompt, {});
 
   context.requestHeartbeatNow?.({ reason: "pipeline:agent" });
 
   return {
     status: "success",
-    output: { dispatched: true, prompt, sessionTarget: "main" },
+    output: { dispatched: true, prompt, session: "main" },
     durationMs: Date.now() - startMs,
   };
 }
@@ -106,7 +104,9 @@ async function executeIsolatedSession(
   const result = await context.runIsolatedAgentJob({
     message: buildPromptWithInput(config.prompt, input),
     model: config.model,
-    skills: config.skills,
+    tools: config.tools,
+    credentials: config.credentials,
+    apps: config.apps,
     thinking: config.thinking,
     timeoutSeconds: timeoutSec,
     previousOutput: input,

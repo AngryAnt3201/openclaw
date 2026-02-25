@@ -66,7 +66,7 @@ export const executeApprovalNode: NodeExecutorFn = async (
     }
 
     // Poll until the task is approved, rejected, or times out.
-    const timeoutMs = (config.timeoutSec ?? DEFAULT_TIMEOUT_SEC) * 1000;
+    const timeoutMs = (config.timeout ?? DEFAULT_TIMEOUT_SEC) * 1000;
     const deadline = Date.now() + timeoutMs;
 
     while (Date.now() < deadline) {

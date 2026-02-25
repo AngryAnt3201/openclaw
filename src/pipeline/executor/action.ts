@@ -17,22 +17,6 @@ export const executeNotifyNode: NodeExecutorFn = async (
   const startMs = Date.now();
   const config = node.config as NotifyConfig;
 
-  if (!config.channels || config.channels.length === 0) {
-    return {
-      status: "failure",
-      error: "Notify node requires at least one channel",
-      durationMs: Date.now() - startMs,
-    };
-  }
-
-  if (!config.template) {
-    return {
-      status: "failure",
-      error: "Notify node requires a message template",
-      durationMs: Date.now() - startMs,
-    };
-  }
-
   if (!context.callGatewayRpc) {
     return {
       status: "failure",
@@ -42,14 +26,34 @@ export const executeNotifyNode: NodeExecutorFn = async (
   }
 
   try {
-    // Interpolate input into the template.
-    const message = interpolateTemplate(config.template, input);
+    // Resolve message — use config.message if provided, otherwise auto-generate.
+    const message = config.message
+      ? interpolateTemplate(config.message, input)
+      : autoFormatNotification(node.label, input);
+
+    // Resolve channels — use config.channels if provided, otherwise fetch user defaults.
+    let channels = config.channels && config.channels.length > 0 ? config.channels : undefined;
+    if (!channels) {
+      try {
+        const prefs = (await context.callGatewayRpc("notification.preferences.get", {})) as {
+          defaultChannels?: string[];
+        } | null;
+        if (prefs?.defaultChannels && prefs.defaultChannels.length > 0) {
+          channels = prefs.defaultChannels;
+        }
+      } catch {
+        // Ignore — notification service has its own fallback.
+      }
+      if (!channels) {
+        channels = [];
+      }
+    }
 
     const result = await context.callGatewayRpc("notification.create", {
       type: "custom",
       title: `Pipeline: ${node.label}`,
       body: message,
-      channels: config.channels,
+      channels,
       priority: config.priority ?? "medium",
       source: "pipeline",
     });
@@ -84,7 +88,7 @@ export const executeOutputNode: NodeExecutorFn = async (
   try {
     let formattedOutput: unknown;
 
-    switch (config.format) {
+    switch (config.format ?? "json") {
       case "json":
         formattedOutput = typeof input === "string" ? JSON.parse(input) : input;
         break;
@@ -152,4 +156,25 @@ function interpolateTemplate(template: string, input: unknown): string {
     }
     return `{{${path}}}`;
   });
+}
+
+/**
+ * Auto-generate a notification message from a node label and upstream input.
+ * Truncates the summary to 500 characters to keep notifications concise.
+ */
+function autoFormatNotification(nodeLabel: string, input: unknown): string {
+  let summary: string;
+  if (input === undefined || input === null) {
+    summary = "(no output)";
+  } else if (typeof input === "string") {
+    summary = input;
+  } else {
+    summary = JSON.stringify(input, null, 2);
+  }
+
+  if (summary.length > 500) {
+    summary = summary.slice(0, 497) + "...";
+  }
+
+  return `${nodeLabel} completed:\n${summary}`;
 }
