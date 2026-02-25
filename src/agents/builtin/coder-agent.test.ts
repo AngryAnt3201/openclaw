@@ -183,6 +183,16 @@ describe("ensureBuiltInAgents", () => {
     expect(coder?.tools?.allow).toEqual(CODER_AGENT_DEF.tools);
   });
 
+  it("injects subagents allowlist for auto-created agents", () => {
+    const cfg: OpenClawConfig = {};
+    const { config } = ensureBuiltInAgents(cfg);
+    const list = config.agents?.list ?? [];
+    const miranda = list.find((a) => a.id === "miranda");
+    expect(miranda?.subagents?.allowAgents).toEqual(MIRANDA_AGENT_DEF.subagents.allowAgents);
+    const architect = list.find((a) => a.id === "architect");
+    expect(architect?.subagents?.allowAgents).toEqual(ARCHITECT_AGENT_DEF.subagents.allowAgents);
+  });
+
   it("only adds missing built-ins when one already exists", () => {
     const cfg: OpenClawConfig = {
       agents: {

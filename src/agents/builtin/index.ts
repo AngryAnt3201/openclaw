@@ -91,6 +91,9 @@ export function ensureBuiltInAgents(cfg: OpenClawConfig): {
       tools: {
         allow: def.tools,
       },
+      subagents: {
+        allowAgents: def.subagents.allowAgents,
+      },
     });
     changed = true;
   }
