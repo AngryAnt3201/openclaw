@@ -44,7 +44,7 @@ const GitHubToolSchema = Type.Object({
   limit: Type.Optional(Type.Number()),
 });
 
-export function createGitHubTool(opts?: { agentSessionKey?: string }): AnyAgentTool {
+export function createGitHubTool(_opts?: { agentSessionKey?: string }): AnyAgentTool {
   return {
     label: "GitHub",
     name: "github",

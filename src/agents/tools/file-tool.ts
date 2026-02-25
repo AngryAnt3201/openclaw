@@ -39,31 +39,43 @@ export function createFileTool(_opts?: { agentSessionKey?: string }): AnyAgentTo
 
       switch (action) {
         case "list": {
-          const result = await callGatewayTool("file.list", {
-            nodeId,
-            path: filePath,
-            hidden: params.hidden === true,
-            limit: readNumberParam(params, "limit"),
-          });
+          const result = await callGatewayTool(
+            "file.list",
+            {},
+            {
+              nodeId,
+              path: filePath,
+              hidden: params.hidden === true,
+              limit: readNumberParam(params, "limit"),
+            },
+          );
           return jsonResult(result);
         }
 
         case "read": {
-          const result = await callGatewayTool("file.read", {
-            nodeId,
-            path: filePath,
-            offset: readNumberParam(params, "offset"),
-            limit: readNumberParam(params, "maxBytes"),
-            encoding: readStringParam(params, "encoding"),
-          });
+          const result = await callGatewayTool(
+            "file.read",
+            {},
+            {
+              nodeId,
+              path: filePath,
+              offset: readNumberParam(params, "offset"),
+              limit: readNumberParam(params, "maxBytes"),
+              encoding: readStringParam(params, "encoding"),
+            },
+          );
           return jsonResult(result);
         }
 
         case "stat": {
-          const result = await callGatewayTool("file.stat", {
-            nodeId,
-            path: filePath,
-          });
+          const result = await callGatewayTool(
+            "file.stat",
+            {},
+            {
+              nodeId,
+              path: filePath,
+            },
+          );
           return jsonResult(result);
         }
 

@@ -80,6 +80,12 @@ export interface TaskPolicyApproval {
   approvalMemorySec?: number;
 }
 
+export interface TaskPolicyCredentials {
+  allow?: string[];
+  deny?: string[];
+  allowCategories?: string[];
+}
+
 export interface TaskPolicy {
   preset?: TaskPolicyPreset;
   tools?: TaskPolicyTools;
@@ -89,6 +95,7 @@ export interface TaskPolicy {
   filesystem?: TaskPolicyFilesystem;
   budgets?: TaskPolicyBudgets;
   approval?: TaskPolicyApproval;
+  credentials?: TaskPolicyCredentials;
 }
 
 // ---------------------------------------------------------------------------

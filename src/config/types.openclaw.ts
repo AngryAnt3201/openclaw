@@ -1,3 +1,4 @@
+import type { VaultConfig } from "../vault/types.js";
 import type { AgentBinding, AgentsConfig } from "./types.agents.js";
 import type { ApprovalsConfig } from "./types.approvals.js";
 import type { AuthConfig } from "./types.auth.js";
@@ -27,6 +28,11 @@ import type { PluginsConfig } from "./types.plugins.js";
 import type { SkillsConfig } from "./types.skills.js";
 import type { TasksConfig } from "./types.tasks.js";
 import type { ToolsConfig } from "./types.tools.js";
+
+export type CredentialsConfig = {
+  /** Custom path for the encrypted credential store. */
+  store?: string;
+};
 
 export type OpenClawConfig = {
   meta?: {
@@ -103,6 +109,8 @@ export type OpenClawConfig = {
   talk?: TalkConfig;
   gateway?: GatewayConfig;
   memory?: MemoryConfig;
+  credentials?: CredentialsConfig;
+  vault?: VaultConfig;
 };
 
 export type ConfigValidationIssue = {

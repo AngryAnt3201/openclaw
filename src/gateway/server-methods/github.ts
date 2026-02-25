@@ -39,7 +39,7 @@ export const githubHandlers: GatewayRequestHandlers = {
   // =========================================================================
 
   "pr.create": async ({ params, respond }) => {
-    const input = params as PRCreateInput;
+    const input = params as unknown as PRCreateInput;
     if (!input.owner || !input.repo || !input.title || !input.head || !input.base) {
       respond(
         false,
@@ -93,7 +93,7 @@ export const githubHandlers: GatewayRequestHandlers = {
   },
 
   "pr.update": async ({ params, respond }) => {
-    const input = params as PRUpdateInput;
+    const input = params as unknown as PRUpdateInput;
     if (!input.owner || !input.repo || !input.number) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing required fields"));
       return;
@@ -169,7 +169,7 @@ export const githubHandlers: GatewayRequestHandlers = {
   // =========================================================================
 
   "issue.create": async ({ params, respond }) => {
-    const input = params as IssueCreateInput;
+    const input = params as unknown as IssueCreateInput;
     if (!input.owner || !input.repo || !input.title) {
       respond(
         false,
@@ -223,7 +223,7 @@ export const githubHandlers: GatewayRequestHandlers = {
   },
 
   "issue.update": async ({ params, respond }) => {
-    const input = params as IssueUpdateInput;
+    const input = params as unknown as IssueUpdateInput;
     if (!input.owner || !input.repo || !input.number) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing required fields"));
       return;
