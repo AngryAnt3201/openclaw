@@ -36,7 +36,6 @@ const dailyStandupNodes: PipelineNode[] = [
     label: "Weekday 9 AM",
     position: { x: 80, y: 200 },
     config: {
-      kind: "cron",
       schedule: "0 9 * * 1-5",
       timezone: "America/New_York",
     },
@@ -48,12 +47,9 @@ const dailyStandupNodes: PipelineNode[] = [
     label: "Summarize Activity",
     position: { x: 360, y: 200 },
     config: {
-      kind: "agent",
       prompt:
         "Summarize yesterday's activity across all projects. Include commits, PRs merged, issues closed, and any blockers. Format as a concise standup update.",
-      skills: ["coding"],
-      credentials: [],
-      sessionTarget: "isolated",
+      session: "isolated",
       timeout: 120,
     },
     state: idleState(),
@@ -64,9 +60,8 @@ const dailyStandupNodes: PipelineNode[] = [
     label: "Post to Slack",
     position: { x: 640, y: 200 },
     config: {
-      kind: "notify",
       channels: ["slack"],
-      template: "Daily Standup Summary\n\n{{output}}\n\n---\nGenerated automatically by Miranda",
+      message: "Daily Standup Summary\n\n{{output}}\n\n---\nGenerated automatically by Miranda",
       priority: "medium",
     },
     state: idleState(),
@@ -97,7 +92,6 @@ const prReviewNodes: PipelineNode[] = [
     label: "GitHub Webhook",
     position: { x: 80, y: 200 },
     config: {
-      kind: "webhook",
       path: "/github",
       method: "POST",
     },
@@ -109,15 +103,9 @@ const prReviewNodes: PipelineNode[] = [
     label: "Review Code",
     position: { x: 360, y: 200 },
     config: {
-      kind: "agent",
       prompt:
         "Review this pull request for code quality, potential bugs, security issues, and style consistency. Provide specific, actionable feedback with file and line references.",
-      systemPrompt:
-        "You are an experienced code reviewer. Be thorough but constructive. Prioritize correctness and security over style preferences.",
-      skills: ["coding"],
-      policyPreset: "coding",
-      credentials: [],
-      sessionTarget: "isolated",
+      session: "isolated",
       timeout: 300,
     },
     state: idleState(),
@@ -128,12 +116,9 @@ const prReviewNodes: PipelineNode[] = [
     label: "Post Review Comment",
     position: { x: 640, y: 200 },
     config: {
-      kind: "agent",
       prompt:
         "Post the code review as a comment on the pull request using the github tool's comment action.",
-      skills: ["coding"],
-      credentials: [],
-      sessionTarget: "isolated",
+      session: "isolated",
       timeout: 60,
     },
     state: idleState(),
@@ -164,7 +149,6 @@ const emailTriageNodes: PipelineNode[] = [
     label: "Gmail Webhook",
     position: { x: 80, y: 220 },
     config: {
-      kind: "webhook",
       path: "/gmail",
       method: "POST",
     },
@@ -176,12 +160,9 @@ const emailTriageNodes: PipelineNode[] = [
     label: "Classify Email",
     position: { x: 360, y: 220 },
     config: {
-      kind: "agent",
       prompt:
         "Classify this incoming email. Determine: (1) priority (urgent/normal/low), (2) category (action-required/informational/spam), (3) suggested action. Output JSON with fields: priority, category, action, summary.",
-      skills: [],
-      credentials: [],
-      sessionTarget: "isolated",
+      session: "isolated",
       timeout: 60,
     },
     state: idleState(),
@@ -192,7 +173,6 @@ const emailTriageNodes: PipelineNode[] = [
     label: "Needs Action?",
     position: { x: 600, y: 220 },
     config: {
-      kind: "condition",
       expression: 'output.category === "action-required"',
       trueLabel: "Yes",
       falseLabel: "No",
@@ -205,9 +185,8 @@ const emailTriageNodes: PipelineNode[] = [
     label: "Alert Owner",
     position: { x: 860, y: 140 },
     config: {
-      kind: "notify",
       channels: ["slack"],
-      template: "Action Required: {{output.summary}}\nPriority: {{output.priority}}",
+      message: "Action Required: {{output.summary}}\nPriority: {{output.priority}}",
       priority: "high",
     },
     state: idleState(),
@@ -218,11 +197,8 @@ const emailTriageNodes: PipelineNode[] = [
     label: "Auto-Archive",
     position: { x: 860, y: 310 },
     config: {
-      kind: "agent",
       prompt: "Archive this email and add appropriate labels based on the classification.",
-      skills: [],
-      credentials: [],
-      sessionTarget: "isolated",
+      session: "isolated",
       timeout: 30,
     },
     state: idleState(),
@@ -267,7 +243,6 @@ const issueAutomationNodes: PipelineNode[] = [
     label: "Task Completed",
     position: { x: 80, y: 200 },
     config: {
-      kind: "task_event",
       eventFilter: "completed",
       taskStatus: "completed",
     },
@@ -279,13 +254,9 @@ const issueAutomationNodes: PipelineNode[] = [
     label: "Generate PR Description",
     position: { x: 360, y: 200 },
     config: {
-      kind: "agent",
       prompt:
         "Based on the completed task details, generate a comprehensive pull request description. Include: summary of changes, motivation, testing done, and any breaking changes.",
-      skills: ["coding"],
-      policyPreset: "coding",
-      credentials: [],
-      sessionTarget: "isolated",
+      session: "isolated",
       timeout: 120,
     },
     state: idleState(),
@@ -296,12 +267,9 @@ const issueAutomationNodes: PipelineNode[] = [
     label: "Create PR",
     position: { x: 640, y: 200 },
     config: {
-      kind: "agent",
       prompt:
         "Create a pull request using the github tool's create_pr action with the generated title and description.",
-      skills: ["coding"],
-      credentials: [],
-      sessionTarget: "isolated",
+      session: "isolated",
       timeout: 120,
     },
     state: idleState(),
@@ -332,7 +300,6 @@ const scheduledReportNodes: PipelineNode[] = [
     label: "Weekly Monday 9 AM",
     position: { x: 80, y: 240 },
     config: {
-      kind: "cron",
       schedule: "0 9 * * 1",
       timezone: "America/New_York",
     },
@@ -344,12 +311,9 @@ const scheduledReportNodes: PipelineNode[] = [
     label: "Analyze Metrics",
     position: { x: 360, y: 240 },
     config: {
-      kind: "agent",
       prompt:
         "Analyze this week's project metrics. Include: tasks completed, PRs merged, deployment frequency, error rates, and team velocity trends. Present insights with recommendations.",
-      skills: ["coding"],
-      credentials: [],
-      sessionTarget: "isolated",
+      session: "isolated",
       thinking: "high",
       timeout: 300,
     },
@@ -361,7 +325,6 @@ const scheduledReportNodes: PipelineNode[] = [
     label: "Save Report",
     position: { x: 640, y: 160 },
     config: {
-      kind: "output",
       format: "markdown",
       destination: "file",
       path: "reports/weekly-{{date}}.md",
@@ -374,9 +337,8 @@ const scheduledReportNodes: PipelineNode[] = [
     label: "Slack Summary",
     position: { x: 640, y: 320 },
     config: {
-      kind: "notify",
       channels: ["slack"],
-      template: "Weekly Report Ready\n\n{{output.summary}}\n\nFull report saved to file.",
+      message: "Weekly Report Ready\n\n{{output.summary}}\n\nFull report saved to file.",
       priority: "medium",
     },
     state: idleState(),
