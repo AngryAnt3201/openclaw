@@ -4,7 +4,7 @@
 
 import { Type } from "@sinclair/typebox";
 import { randomUUID } from "node:crypto";
-import { CoreNodeType, CORE_NODE_TYPES } from "../../pipeline/types.js";
+import { CoreNodeType } from "../../pipeline/types.js";
 import { stringEnum } from "../schema/typebox.js";
 import { type AnyAgentTool, jsonResult, readStringParam } from "./common.js";
 import { callGatewayTool } from "./gateway.js";
