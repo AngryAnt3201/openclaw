@@ -9,22 +9,47 @@
 // NODE TYPE IDENTIFIERS
 // ===========================================================================
 
-export const TRIGGER_NODE_TYPES = ["cron", "webhook", "task_event", "manual"] as const;
+/** Canonical enum of all built-in node types. */
+export enum CoreNodeType {
+  Cron = "cron",
+  Webhook = "webhook",
+  TaskEvent = "task_event",
+  Manual = "manual",
+  Agent = "agent",
+  App = "app",
+  Condition = "condition",
+  Approval = "approval",
+  Loop = "loop",
+  Code = "code",
+  Notify = "notify",
+  Output = "output",
+}
+
+/** O(1) membership check for built-in types. */
+export const CORE_NODE_TYPES = new Set<string>(Object.values(CoreNodeType));
+
+/** Backward-compat arrays derived from the enum. */
+export const TRIGGER_NODE_TYPES = [
+  CoreNodeType.Cron,
+  CoreNodeType.Webhook,
+  CoreNodeType.TaskEvent,
+  CoreNodeType.Manual,
+] as const;
 
 export type TriggerNodeType = (typeof TRIGGER_NODE_TYPES)[number];
 
 export const PROCESSING_NODE_TYPES = [
-  "agent",
-  "app",
-  "condition",
-  "approval",
-  "loop",
-  "code",
+  CoreNodeType.Agent,
+  CoreNodeType.App,
+  CoreNodeType.Condition,
+  CoreNodeType.Approval,
+  CoreNodeType.Loop,
+  CoreNodeType.Code,
 ] as const;
 
 export type ProcessingNodeType = (typeof PROCESSING_NODE_TYPES)[number];
 
-export const ACTION_NODE_TYPES = ["notify", "output"] as const;
+export const ACTION_NODE_TYPES = [CoreNodeType.Notify, CoreNodeType.Output] as const;
 
 export type ActionNodeType = (typeof ACTION_NODE_TYPES)[number];
 
@@ -45,27 +70,23 @@ export const VALID_ACTION_NODE_TYPES = new Set<string>(ACTION_NODE_TYPES);
 // ===========================================================================
 
 export type CronTriggerConfig = {
-  kind: "cron";
   schedule: string;
   timezone?: string;
 };
 
 export type WebhookTriggerConfig = {
-  kind: "webhook";
   path: string;
   secret?: string;
   method?: "GET" | "POST" | "PUT";
 };
 
 export type TaskEventTriggerConfig = {
-  kind: "task_event";
   eventFilter: string;
   taskType?: string;
   taskStatus?: string;
 };
 
 export type ManualTriggerConfig = {
-  kind: "manual";
   label?: string;
 };
 
@@ -74,52 +95,43 @@ export type ManualTriggerConfig = {
 // ===========================================================================
 
 export type AgentNodeConfig = {
-  kind: "agent";
-  agentId?: string;
-  model?: string;
   prompt: string;
-  systemPrompt?: string;
-  skills: string[];
-  policyPreset?: string;
-  credentials: string[];
-  repoPath?: string;
-  sessionTarget: "main" | "isolated";
-  thinking?: string;
+  model?: string;
+  session?: "main" | "isolated";
   timeout?: number;
+  thinking?: string;
+  credentials?: string[];
+  tools?: string[];
+  apps?: string[];
 };
 
 export type AppNodeConfig = {
-  kind: "app";
   appId: string;
   prompt: string;
-  sessionTarget: "main" | "isolated";
-  lifecycle: "keep-alive" | "ephemeral";
+  session?: "main" | "isolated";
+  lifecycle?: "keep-alive" | "ephemeral";
   timeout?: number;
 };
 
 export type ConditionConfig = {
-  kind: "condition";
   expression: string;
   trueLabel?: string;
   falseLabel?: string;
 };
 
 export type ApprovalConfig = {
-  kind: "approval";
-  approverIds?: string[];
   message: string;
-  timeoutSec?: number;
+  approverIds?: string[];
+  timeout?: number;
   timeoutAction?: "deny" | "skip" | "escalate";
 };
 
 export type LoopConfig = {
-  kind: "loop";
   maxIterations: number;
-  condition: string;
+  condition?: string;
 };
 
 export type CodeNodeConfig = {
-  kind: "code";
   description: string;
   language?: string;
   maxRetries?: number;
@@ -131,15 +143,13 @@ export type CodeNodeConfig = {
 // ===========================================================================
 
 export type NotifyConfig = {
-  kind: "notify";
-  channels: string[];
-  template: string;
+  channels?: string[];
+  message?: string;
   priority?: "critical" | "high" | "medium" | "low";
 };
 
 export type OutputConfig = {
-  kind: "output";
-  format: "json" | "markdown" | "text";
+  format?: "json" | "markdown" | "text";
   destination?: "log" | "file" | "variable";
   path?: string;
 };
