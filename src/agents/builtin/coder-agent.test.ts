@@ -274,7 +274,7 @@ describe("ARCHITECT_AGENT_DEF", () => {
     expect(ARCHITECT_AGENT_DEF.tools).toContain("task");
     expect(ARCHITECT_AGENT_DEF.tools).toContain("cron");
     expect(ARCHITECT_AGENT_DEF.tools).toContain("credential");
-    expect(ARCHITECT_AGENT_DEF.tools).toContain("code");
+    expect(ARCHITECT_AGENT_DEF.tools).toContain("execute_code");
     expect(ARCHITECT_AGENT_DEF.tools).toContain("maestro_session");
   });
 
