@@ -3,6 +3,8 @@
 // ---------------------------------------------------------------------------
 
 import { Type } from "@sinclair/typebox";
+import { randomUUID } from "node:crypto";
+import { CoreNodeType, CORE_NODE_TYPES } from "../../pipeline/types.js";
 import { stringEnum } from "../schema/typebox.js";
 import { type AnyAgentTool, jsonResult, readStringParam } from "./common.js";
 import { callGatewayTool } from "./gateway.js";
@@ -21,11 +23,46 @@ const PIPELINE_ACTIONS = [
   "list_node_types",
 ] as const;
 
+// ---------------------------------------------------------------------------
+// Flat node schema – agents write config fields at top level
+// ---------------------------------------------------------------------------
+
 const NodeInputSchema = Type.Object({
-  type: Type.String({ description: "Node type (agent, code, condition, notify, etc.)" }),
-  label: Type.String(),
-  config: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+  type: Type.String({
+    description:
+      "Node type: cron, webhook, task_event, manual, agent, app, condition, approval, loop, code, notify, output",
+  }),
+  label: Type.Optional(Type.String()),
   position: Type.Optional(Type.Object({ x: Type.Number(), y: Type.Number() })),
+  // All node config fields as optional top-level (agent picks what applies)
+  prompt: Type.Optional(Type.String({ description: "Prompt for agent/app nodes" })),
+  model: Type.Optional(Type.String()),
+  session: Type.Optional(Type.String({ description: "'main' or 'isolated'" })),
+  timeout: Type.Optional(Type.Number()),
+  thinking: Type.Optional(Type.String()),
+  credentials: Type.Optional(Type.Array(Type.String())),
+  tools: Type.Optional(Type.Array(Type.String())),
+  apps: Type.Optional(Type.Array(Type.String())),
+  appId: Type.Optional(Type.String()),
+  lifecycle: Type.Optional(Type.String()),
+  schedule: Type.Optional(Type.String()),
+  timezone: Type.Optional(Type.String()),
+  path: Type.Optional(Type.String()),
+  method: Type.Optional(Type.String()),
+  secret: Type.Optional(Type.String()),
+  eventFilter: Type.Optional(Type.String()),
+  expression: Type.Optional(Type.String()),
+  message: Type.Optional(Type.String()),
+  timeoutAction: Type.Optional(Type.String()),
+  maxIterations: Type.Optional(Type.Number()),
+  condition: Type.Optional(Type.String()),
+  description: Type.Optional(Type.String({ description: "Description for code nodes" })),
+  language: Type.Optional(Type.String()),
+  maxRetries: Type.Optional(Type.Number()),
+  channels: Type.Optional(Type.Array(Type.String())),
+  priority: Type.Optional(Type.String()),
+  format: Type.Optional(Type.String()),
+  destination: Type.Optional(Type.String()),
 });
 
 const EdgeInputSchema = Type.Object({
@@ -58,14 +95,118 @@ const PipelineToolSchema = Type.Object({
   limit: Type.Optional(Type.Number()),
 });
 
+// ---------------------------------------------------------------------------
+// Helpers – config extraction from flat fields
+// ---------------------------------------------------------------------------
+
+function pick(obj: Record<string, unknown>, keys: string[]): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const k of keys) {
+    if (obj[k] !== undefined) {
+      result[k] = obj[k];
+    }
+  }
+  return result;
+}
+
+function extractConfig(type: string, n: Record<string, unknown>): Record<string, unknown> {
+  switch (type) {
+    case CoreNodeType.Cron:
+      return pick(n, ["schedule", "timezone"]);
+    case CoreNodeType.Webhook:
+      return pick(n, ["path", "method", "secret"]);
+    case CoreNodeType.TaskEvent:
+      return pick(n, ["eventFilter", "taskType", "taskStatus"]);
+    case CoreNodeType.Manual:
+      return pick(n, ["label"]);
+    case CoreNodeType.Agent:
+      return pick(n, [
+        "prompt",
+        "model",
+        "session",
+        "timeout",
+        "thinking",
+        "credentials",
+        "tools",
+        "apps",
+      ]);
+    case CoreNodeType.App:
+      return pick(n, ["appId", "prompt", "session", "lifecycle", "timeout"]);
+    case CoreNodeType.Condition:
+      return pick(n, ["expression", "trueLabel", "falseLabel"]);
+    case CoreNodeType.Approval:
+      return pick(n, ["message", "timeout", "timeoutAction", "approverIds"]);
+    case CoreNodeType.Loop:
+      return pick(n, ["maxIterations", "condition"]);
+    case CoreNodeType.Code:
+      return pick(n, ["description", "language", "maxRetries", "timeout"]);
+    case CoreNodeType.Notify:
+      return pick(n, ["channels", "message", "priority"]);
+    case CoreNodeType.Output:
+      return pick(n, ["format", "destination", "path"]);
+    default:
+      return {};
+  }
+}
+
+const DEFAULT_LABELS: Record<string, string> = {
+  cron: "Cron Schedule",
+  webhook: "Webhook",
+  task_event: "Task Event",
+  manual: "Manual Trigger",
+  agent: "Agent",
+  app: "App",
+  condition: "Condition",
+  approval: "Approval",
+  loop: "Loop",
+  code: "Code",
+  notify: "Notify",
+  output: "Output",
+};
+
+/** Ensure a node from agent input has all required fields for the canvas. */
+function normalizeNode(n: Record<string, unknown>, index: number): Record<string, unknown> {
+  const type = n.type as string;
+  return {
+    id: n.id ?? randomUUID(),
+    type,
+    label: n.label ?? DEFAULT_LABELS[type] ?? type,
+    position: n.position ?? { x: 250 * index, y: 100 },
+    config: extractConfig(type, n),
+    state: { status: "idle", retryCount: 0 },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Auto-edge generation – linear flow when no explicit edges
+// ---------------------------------------------------------------------------
+
+function autoGenerateEdges(nodes: Record<string, unknown>[]): Record<string, unknown>[] {
+  const edges: Record<string, unknown>[] = [];
+  for (let i = 0; i < nodes.length - 1; i++) {
+    edges.push({
+      id: randomUUID(),
+      source: nodes[i].id as string,
+      target: nodes[i + 1].id as string,
+    });
+  }
+  return edges;
+}
+
+// ---------------------------------------------------------------------------
+// Tool factory
+// ---------------------------------------------------------------------------
+
 export function createPipelineTool(): AnyAgentTool {
   return {
     label: "Pipeline",
     name: "pipeline",
     description:
-      "Manage automation pipelines (visual DAG workflows). " +
-      "Create pipelines with trigger, agent, code, condition, and action nodes. " +
-      "Connect nodes with edges to define data flow. Run pipelines on demand.",
+      "Create and manage automation pipelines. " +
+      "Nodes: cron, webhook, task_event, manual (triggers); agent, app, condition, approval, loop, code (processing); notify, output (actions). " +
+      "For linear flows, provide nodes only — edges auto-generated. " +
+      "Use explicit edges only for branching (condition/approval). " +
+      "Minimal: { action: 'create', name: 'My Flow', nodes: [{ type: 'manual' }, { type: 'agent', prompt: 'Do X' }, { type: 'notify' }] }",
     parameters: PipelineToolSchema,
     execute: async (_toolCallId, args) => {
       const params = args as Record<string, unknown>;
@@ -75,14 +216,21 @@ export function createPipelineTool(): AnyAgentTool {
         case "create": {
           const name = readStringParam(params, "name", { required: true });
           const description = readStringParam(params, "description") ?? "";
-          const payload: Record<string, unknown> = { name, description };
-          if (params.nodes) {
-            payload.nodes = params.nodes;
-          }
-          if (params.edges) {
-            payload.edges = params.edges;
-          }
-          return jsonResult(await callGatewayTool("pipeline.create", {}, payload));
+          const rawNodes = params.nodes
+            ? (params.nodes as Record<string, unknown>[]).map(normalizeNode)
+            : [];
+          const edges = params.edges
+            ? (params.edges as Record<string, unknown>[])
+            : rawNodes.length > 1
+              ? autoGenerateEdges(rawNodes)
+              : [];
+          return jsonResult(
+            await callGatewayTool(
+              "pipeline.create",
+              {},
+              { name, description, nodes: rawNodes, edges },
+            ),
+          );
         }
         case "list": {
           return jsonResult(await callGatewayTool("pipeline.list", {}, {}));
@@ -122,7 +270,12 @@ export function createPipelineTool(): AnyAgentTool {
             string,
             unknown
           >;
-          const nodes = [...((current.nodes as unknown[]) ?? []), params.node];
+          const existingNodes = (current.nodes as unknown[]) ?? [];
+          const normalized = normalizeNode(
+            params.node as Record<string, unknown>,
+            existingNodes.length,
+          );
+          const nodes = [...existingNodes, normalized];
           return jsonResult(await callGatewayTool("pipeline.update", {}, { id, patch: { nodes } }));
         }
         case "remove_node": {
