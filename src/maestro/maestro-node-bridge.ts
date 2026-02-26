@@ -113,34 +113,42 @@ export class MaestroNodeBridge {
           this.log.info(`maestro-bridge: connected to Maestro as node "${this.nodeId}"`);
         })
         .catch(() => {
-          // Not responsive, will retry on next probe
+          // Discovery files exist but nothing is responding — stale from a
+          // previous run.  Fall through to headless server startup so we
+          // don't spin forever on dead ports.
+          this.startHeadlessIfNeeded();
         });
       return;
     }
 
     // No discovery files found — start headless server if not already started
-    if (!this.headlessServer && !this.headlessStarting) {
-      this.headlessStarting = true;
-      this.log.info("maestro-bridge: no Tauri desktop detected, starting headless API server…");
-      const server = new HeadlessApiServer(this.log);
-      server
-        .start()
-        .then(() => {
-          if (this.stopped) {
-            void server.stop();
-            return;
-          }
-          this.headlessServer = server;
-          this.headlessStarting = false;
-          this.log.info(`maestro-bridge: headless API server running on port ${server.listenPort}`);
-          // Now retry — discovery files are written, MaestroClient should connect
-          this.tryConnect();
-        })
-        .catch((err) => {
-          this.headlessStarting = false;
-          this.log.error(`maestro-bridge: failed to start headless API server: ${err}`);
-        });
+    this.startHeadlessIfNeeded();
+  }
+
+  private startHeadlessIfNeeded(): void {
+    if (this.headlessServer || this.headlessStarting || this.stopped) {
+      return;
     }
+    this.headlessStarting = true;
+    this.log.info("maestro-bridge: starting headless API server…");
+    const server = new HeadlessApiServer(this.log);
+    server
+      .start()
+      .then(() => {
+        if (this.stopped) {
+          void server.stop();
+          return;
+        }
+        this.headlessServer = server;
+        this.headlessStarting = false;
+        this.log.info(`maestro-bridge: headless API server running on port ${server.listenPort}`);
+        // Now retry — discovery files are written, MaestroClient should connect
+        this.tryConnect();
+      })
+      .catch((err) => {
+        this.headlessStarting = false;
+        this.log.error(`maestro-bridge: failed to start headless API server: ${err}`);
+      });
   }
 
   private registerNode(): void {
