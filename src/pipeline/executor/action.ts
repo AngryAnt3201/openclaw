@@ -2,7 +2,7 @@
 // Pipeline Executor – Action Nodes (notify, output)
 // ---------------------------------------------------------------------------
 
-import type { NotifyConfig, OutputConfig, PipelineNode } from "../types.js";
+import type { NotifyConfig, PipelineNode } from "../types.js";
 import type { ExecutorContext, NodeExecutionResult, NodeExecutorFn } from "./types.js";
 
 // ===========================================================================
@@ -65,56 +65,6 @@ export const executeNotifyNode: NodeExecutorFn = async (
     };
   } catch (err) {
     context.log?.error("Pipeline notify node failed:", err);
-    return {
-      status: "failure",
-      error: err instanceof Error ? err.message : String(err),
-      durationMs: Date.now() - startMs,
-    };
-  }
-};
-
-// ===========================================================================
-// Output Node
-// ===========================================================================
-
-export const executeOutputNode: NodeExecutorFn = async (
-  node: PipelineNode,
-  input: unknown,
-  _context: ExecutorContext,
-): Promise<NodeExecutionResult> => {
-  const startMs = Date.now();
-  const config = node.config as OutputConfig;
-
-  try {
-    let formattedOutput: unknown;
-
-    switch (config.format ?? "json") {
-      case "json":
-        formattedOutput = typeof input === "string" ? JSON.parse(input) : input;
-        break;
-      case "markdown":
-        formattedOutput =
-          typeof input === "string"
-            ? input
-            : `\`\`\`json\n${JSON.stringify(input, null, 2)}\n\`\`\``;
-        break;
-      case "text":
-      default:
-        formattedOutput = typeof input === "string" ? input : JSON.stringify(input);
-        break;
-    }
-
-    return {
-      status: "success",
-      output: {
-        data: formattedOutput,
-        format: config.format,
-        destination: config.destination ?? "log",
-        path: config.path,
-      },
-      durationMs: Date.now() - startMs,
-    };
-  } catch (err) {
     return {
       status: "failure",
       error: err instanceof Error ? err.message : String(err),

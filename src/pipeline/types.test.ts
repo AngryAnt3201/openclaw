@@ -11,7 +11,6 @@ import type {
   CronTriggerConfig,
   ConditionConfig,
   NotifyConfig,
-  OutputConfig,
   NodeDefinition,
   NodeConfigField,
   PortDefinition,
@@ -85,8 +84,7 @@ describe("Pipeline Core Types", () => {
 
     it("should expose action node types", () => {
       expect(ACTION_NODE_TYPES).toContain("notify");
-      expect(ACTION_NODE_TYPES).toContain("output");
-      expect(ACTION_NODE_TYPES).toHaveLength(2);
+      expect(ACTION_NODE_TYPES).toHaveLength(1);
     });
 
     it("should expose node categories", () => {
@@ -137,7 +135,6 @@ describe("Pipeline Core Types", () => {
 
     it("should allow O(1) validation of action node types", () => {
       expect(VALID_ACTION_NODE_TYPES.has("notify")).toBe(true);
-      expect(VALID_ACTION_NODE_TYPES.has("output")).toBe(true);
       expect(VALID_ACTION_NODE_TYPES.has("nonexistent")).toBe(false);
     });
   });
@@ -295,12 +292,11 @@ describe("Pipeline Core Types", () => {
 
     it("should construct ConditionConfig", () => {
       const config: ConditionConfig = {
-        expression: "input.status === 'success'",
-        trueLabel: "Continue",
-        falseLabel: "Skip",
+        question: "Does this need action?",
+        options: ["Needs Action", "Archive", "Spam"],
       };
-      expect(config.expression).toBe("input.status === 'success'");
-      expect(config.trueLabel).toBe("Continue");
+      expect(config.question).toBe("Does this need action?");
+      expect(config.options).toHaveLength(3);
     });
 
     it("should construct ApprovalConfig", () => {
@@ -331,16 +327,6 @@ describe("Pipeline Core Types", () => {
       };
       expect(config.channels).toHaveLength(2);
       expect(config.message).toBe("Pipeline {{name}} completed");
-    });
-
-    it("should construct OutputConfig", () => {
-      const config: OutputConfig = {
-        format: "json",
-        destination: "file",
-        path: "/tmp/results.json",
-      };
-      expect(config.format).toBe("json");
-      expect(config.destination).toBe("file");
     });
   });
 

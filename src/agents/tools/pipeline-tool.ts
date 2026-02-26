@@ -30,7 +30,7 @@ const PIPELINE_ACTIONS = [
 const NodeInputSchema = Type.Object({
   type: Type.String({
     description:
-      "Node type: cron, webhook, task_event, manual, agent, app, condition, approval, loop, code, notify, output",
+      "Node type: cron, webhook, task_event, manual, agent, app, condition, approval, loop, code, notify",
   }),
   label: Type.Optional(Type.String()),
   position: Type.Optional(Type.Object({ x: Type.Number(), y: Type.Number() })),
@@ -51,7 +51,10 @@ const NodeInputSchema = Type.Object({
   method: Type.Optional(Type.String()),
   secret: Type.Optional(Type.String()),
   eventFilter: Type.Optional(Type.String()),
-  expression: Type.Optional(Type.String()),
+  question: Type.Optional(Type.String({ description: "Question for condition router node" })),
+  options: Type.Optional(
+    Type.Array(Type.String(), { description: "Route options for condition node" }),
+  ),
   message: Type.Optional(Type.String()),
   timeoutAction: Type.Optional(Type.String()),
   maxIterations: Type.Optional(Type.Number()),
@@ -61,8 +64,6 @@ const NodeInputSchema = Type.Object({
   maxRetries: Type.Optional(Type.Number()),
   channels: Type.Optional(Type.Array(Type.String())),
   priority: Type.Optional(Type.String()),
-  format: Type.Optional(Type.String()),
-  destination: Type.Optional(Type.String()),
 });
 
 const EdgeInputSchema = Type.Object({
@@ -133,7 +134,7 @@ function extractConfig(type: string, n: Record<string, unknown>): Record<string,
     case CoreNodeType.App:
       return pick(n, ["appId", "prompt", "session", "lifecycle", "timeout"]);
     case CoreNodeType.Condition:
-      return pick(n, ["expression", "trueLabel", "falseLabel"]);
+      return pick(n, ["question", "options"]);
     case CoreNodeType.Approval:
       return pick(n, ["message", "timeout", "timeoutAction", "approverIds"]);
     case CoreNodeType.Loop:
@@ -141,9 +142,7 @@ function extractConfig(type: string, n: Record<string, unknown>): Record<string,
     case CoreNodeType.Code:
       return pick(n, ["description", "language", "maxRetries", "timeout"]);
     case CoreNodeType.Notify:
-      return pick(n, ["channels", "message", "priority"]);
-    case CoreNodeType.Output:
-      return pick(n, ["format", "destination", "path"]);
+      return pick(n, ["channels", "priority"]);
     default:
       return {};
   }
@@ -161,7 +160,6 @@ const DEFAULT_LABELS: Record<string, string> = {
   loop: "Loop",
   code: "Code",
   notify: "Notify",
-  output: "Output",
 };
 
 /** Ensure a node from agent input has all required fields for the canvas. */
@@ -203,7 +201,7 @@ export function createPipelineTool(): AnyAgentTool {
     name: "pipeline",
     description:
       "Create and manage automation pipelines. " +
-      "Nodes: cron, webhook, task_event, manual (triggers); agent, app, condition, approval, loop, code (processing); notify, output (actions). " +
+      "Nodes: cron, webhook, task_event, manual (triggers); agent, app, condition, approval, loop, code (processing); notify (actions). " +
       "For linear flows, provide nodes only — edges auto-generated. " +
       "Use explicit edges only for branching (condition/approval). " +
       "Minimal: { action: 'create', name: 'My Flow', nodes: [{ type: 'manual' }, { type: 'agent', prompt: 'Do X' }, { type: 'notify' }] }",

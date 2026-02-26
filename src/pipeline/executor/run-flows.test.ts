@@ -70,15 +70,10 @@ vi.mock("./action.js", () => ({
     output: { notified: true },
     durationMs: 20,
   }),
-  executeOutputNode: vi.fn().mockResolvedValue({
-    status: "success",
-    output: { formatted: "done" },
-    durationMs: 5,
-  }),
 }));
 
 import type { ExecutorContext } from "./types.js";
-import { executeNotifyNode, executeOutputNode } from "./action.js";
+import { executeNotifyNode } from "./action.js";
 import { executeAgentNode } from "./agent.js";
 import { executeAppNode } from "./app.js";
 import { executeApprovalNode } from "./approval.js";
@@ -94,7 +89,6 @@ const mockCode = vi.mocked(executeCodeNode);
 const mockCondition = vi.mocked(executeConditionNode);
 const mockLoop = vi.mocked(executeLoopNode);
 const mockNotify = vi.mocked(executeNotifyNode);
-const mockOutput = vi.mocked(executeOutputNode);
 
 // ---------------------------------------------------------------------------
 // Factories
@@ -197,7 +191,6 @@ beforeEach(() => {
     durationMs: 300,
   });
   mockNotify.mockResolvedValue({ status: "success", output: { notified: true }, durationMs: 20 });
-  mockOutput.mockResolvedValue({ status: "success", output: { formatted: "done" }, durationMs: 5 });
 });
 
 // ===========================================================================
@@ -271,29 +264,32 @@ describe("Flow: trigger → code → agent → notify", () => {
 });
 
 // ===========================================================================
-// FLOW 2: trigger → agent → condition → (true: notify, false: output)
+// FLOW 2: trigger → agent → condition → (Healthy: notify, Unhealthy: notify)
 // ===========================================================================
 
 describe("Flow: trigger → agent → condition → branches", () => {
   const nodes = [
     node("t", "cron"),
     node("a", "agent", { prompt: "check status" }),
-    node("cond", "condition", { expression: "input.healthy === true" }),
+    node("cond", "condition", {
+      question: "Is the system healthy?",
+      options: ["Healthy", "Unhealthy"],
+    }),
     node("yes", "notify", { channels: ["discord"], message: "All good" }),
-    node("no", "output", { format: "json", destination: "log" }),
+    node("no", "notify", { channels: ["slack"], message: "Alert" }),
   ];
   const edges = [
     edge("t", "a"),
     edge("a", "cond"),
-    edge("cond", "yes", { sourceHandle: "true" }),
-    edge("cond", "no", { sourceHandle: "false" }),
+    edge("cond", "yes", { sourceHandle: "Healthy" }),
+    edge("cond", "no", { sourceHandle: "Unhealthy" }),
   ];
 
-  it("condition true → notify executes, output skipped", async () => {
+  it("condition Healthy → yes-notify executes, no-notify skipped", async () => {
     mockCondition.mockResolvedValueOnce({
       status: "success",
-      output: { result: true },
-      outputHandle: "true",
+      output: { question: "Is the system healthy?", chosen: "Healthy" },
+      outputHandle: "Healthy",
       durationMs: 5,
     });
 
@@ -303,17 +299,16 @@ describe("Flow: trigger → agent → condition → branches", () => {
 
     expect(result.status).toBe("success");
     expect(mockNotify).toHaveBeenCalledTimes(1);
-    expect(mockOutput).not.toHaveBeenCalled();
 
     const skipped = events.filter((e) => e.type === "node_skipped");
     expect(skipped.map((e) => e.nodeId)).toContain("no");
   });
 
-  it("condition false → output executes, notify skipped", async () => {
+  it("condition Unhealthy → no-notify executes, yes-notify skipped", async () => {
     mockCondition.mockResolvedValueOnce({
       status: "success",
-      output: { result: false },
-      outputHandle: "false",
+      output: { question: "Is the system healthy?", chosen: "Unhealthy" },
+      outputHandle: "Unhealthy",
       durationMs: 5,
     });
 
@@ -322,8 +317,7 @@ describe("Flow: trigger → agent → condition → branches", () => {
     const result = await executePipeline(p, run(), ctx(), onEvent);
 
     expect(result.status).toBe("success");
-    expect(mockOutput).toHaveBeenCalledTimes(1);
-    expect(mockNotify).not.toHaveBeenCalled();
+    expect(mockNotify).toHaveBeenCalledTimes(1);
 
     const skipped = events.filter((e) => e.type === "node_skipped");
     expect(skipped.map((e) => e.nodeId)).toContain("yes");
@@ -331,7 +325,7 @@ describe("Flow: trigger → agent → condition → branches", () => {
 });
 
 // ===========================================================================
-// FLOW 3: trigger → approval → (approved: agent → notify, denied: output)
+// FLOW 3: trigger → approval → (approved: agent → notify, denied: notify)
 // ===========================================================================
 
 describe("Flow: trigger → approval gate → branches", () => {
@@ -340,7 +334,7 @@ describe("Flow: trigger → approval gate → branches", () => {
     node("gate", "approval", { message: "Deploy to prod?" }),
     node("deploy", "agent", { prompt: "deploy" }),
     node("done", "notify", { channels: ["slack"], message: "Deployed" }),
-    node("abort", "output", { format: "text", destination: "log" }),
+    node("abort", "notify", { channels: ["slack"], message: "Deployment denied" }),
   ];
   const edges = [
     edge("t", "gate"),
@@ -349,7 +343,7 @@ describe("Flow: trigger → approval gate → branches", () => {
     edge("gate", "abort", { sourceHandle: "denied" }),
   ];
 
-  it("approved → agent + notify execute, abort skipped", async () => {
+  it("approved → agent + done-notify execute, abort skipped", async () => {
     mockApproval.mockResolvedValueOnce({
       status: "success",
       output: { approved: true },
@@ -364,13 +358,12 @@ describe("Flow: trigger → approval gate → branches", () => {
     expect(result.status).toBe("success");
     expect(mockAgent).toHaveBeenCalledTimes(1);
     expect(mockNotify).toHaveBeenCalledTimes(1);
-    expect(mockOutput).not.toHaveBeenCalled();
 
     const skipped = events.filter((e) => e.type === "node_skipped");
     expect(skipped.map((e) => e.nodeId)).toContain("abort");
   });
 
-  it("denied → output executes, agent + notify skipped", async () => {
+  it("denied → abort-notify executes, agent + done-notify skipped", async () => {
     mockApproval.mockResolvedValueOnce({
       status: "success",
       output: { approved: false },
@@ -383,9 +376,8 @@ describe("Flow: trigger → approval gate → branches", () => {
     const result = await executePipeline(p, run(), ctx(), onEvent);
 
     expect(result.status).toBe("success");
-    expect(mockOutput).toHaveBeenCalledTimes(1);
+    expect(mockNotify).toHaveBeenCalledTimes(1);
     expect(mockAgent).not.toHaveBeenCalled();
-    expect(mockNotify).not.toHaveBeenCalled();
 
     const skippedIds = events.filter((e) => e.type === "node_skipped").map((e) => e.nodeId);
     expect(skippedIds).toContain("deploy");
@@ -394,11 +386,11 @@ describe("Flow: trigger → approval gate → branches", () => {
 });
 
 // ===========================================================================
-// FLOW 4: trigger → loop → output
+// FLOW 4: trigger → loop → notify
 // ===========================================================================
 
-describe("Flow: trigger → loop → output", () => {
-  it("loop output is passed as input to downstream output node", async () => {
+describe("Flow: trigger → loop → notify", () => {
+  it("loop output is passed as input to downstream notify node", async () => {
     const loopOutput = { iterations: 5, lastOutput: { data: "final" } };
     mockLoop.mockResolvedValueOnce({
       status: "success",
@@ -410,10 +402,10 @@ describe("Flow: trigger → loop → output", () => {
     const nodes = [
       node("t", "manual"),
       node("lp", "loop", { maxIterations: 5, condition: "" }),
-      node("o", "output", { format: "json" }),
+      node("n", "notify", { channels: ["slack"], message: "Loop done" }),
     ];
-    // Loop's "done" handle connects to output.
-    const edges = [edge("t", "lp"), edge("lp", "o", { sourceHandle: "done" })];
+    // Loop's "done" handle connects to notify.
+    const edges = [edge("t", "lp"), edge("lp", "n", { sourceHandle: "done" })];
     const p = pipeline(nodes, edges);
     const { onEvent } = collect();
 
@@ -421,10 +413,10 @@ describe("Flow: trigger → loop → output", () => {
 
     expect(result.status).toBe("success");
     expect(mockLoop).toHaveBeenCalledTimes(1);
-    expect(mockOutput).toHaveBeenCalledTimes(1);
+    expect(mockNotify).toHaveBeenCalledTimes(1);
 
-    const outputInput = mockOutput.mock.calls[0][1];
-    expect(outputInput).toEqual(loopOutput);
+    const notifyInput = mockNotify.mock.calls[0][1];
+    expect(notifyInput).toEqual(loopOutput);
   });
 });
 
@@ -475,9 +467,9 @@ describe("Flow: code failure cascades", () => {
 
 describe("Flow: diamond DAG (fan-out → fan-in)", () => {
   //   t → a1 ─┐
-  //       a2 ─┤→ o
+  //       a2 ─┤→ n
   //   t → a2 ─┘
-  it("fan-out to two agents, fan-in to output with merged inputs", async () => {
+  it("fan-out to two agents, fan-in to notify with merged inputs", async () => {
     const out1 = { branch: "alpha" };
     const out2 = { branch: "beta" };
     mockAgent
@@ -488,9 +480,9 @@ describe("Flow: diamond DAG (fan-out → fan-in)", () => {
       node("t", "manual"),
       node("a1", "agent", { prompt: "task A" }),
       node("a2", "agent", { prompt: "task B" }),
-      node("o", "output", { format: "json" }),
+      node("n", "notify", { channels: ["slack"], message: "Done" }),
     ];
-    const edges = [edge("t", "a1"), edge("t", "a2"), edge("a1", "o"), edge("a2", "o")];
+    const edges = [edge("t", "a1"), edge("t", "a2"), edge("a1", "n"), edge("a2", "n")];
     const p = pipeline(nodes, edges);
     const { onEvent } = collect();
 
@@ -498,11 +490,11 @@ describe("Flow: diamond DAG (fan-out → fan-in)", () => {
 
     expect(result.status).toBe("success");
     expect(mockAgent).toHaveBeenCalledTimes(2);
-    expect(mockOutput).toHaveBeenCalledTimes(1);
+    expect(mockNotify).toHaveBeenCalledTimes(1);
 
-    // Output should receive merged input from both agents.
-    const outputInput = mockOutput.mock.calls[0][1] as Record<string, unknown>;
-    expect(outputInput).toEqual({ a1: out1, a2: out2 });
+    // Notify should receive merged input from both agents.
+    const notifyInput = mockNotify.mock.calls[0][1] as Record<string, unknown>;
+    expect(notifyInput).toEqual({ a1: out1, a2: out2 });
   });
 
   it("if one fan-out branch fails, the fan-in node is skipped", async () => {
@@ -514,9 +506,9 @@ describe("Flow: diamond DAG (fan-out → fan-in)", () => {
       node("t", "manual"),
       node("a1", "agent", { prompt: "task A" }),
       node("a2", "agent", { prompt: "task B" }),
-      node("o", "output", { format: "json" }),
+      node("n", "notify", { channels: ["slack"], message: "Done" }),
     ];
-    const edges = [edge("t", "a1"), edge("t", "a2"), edge("a1", "o"), edge("a2", "o")];
+    const edges = [edge("t", "a1"), edge("t", "a2"), edge("a1", "n"), edge("a2", "n")];
     const p = pipeline(nodes, edges);
     const { onEvent, events } = collect();
 
@@ -524,8 +516,8 @@ describe("Flow: diamond DAG (fan-out → fan-in)", () => {
 
     expect(result.status).toBe("failed");
 
-    // Output node should be skipped because a2 failed and o is downstream.
-    const skipped = events.filter((e) => e.type === "node_skipped" && e.nodeId === "o");
+    // Notify node should be skipped because a2 failed and n is downstream.
+    const skipped = events.filter((e) => e.type === "node_skipped" && e.nodeId === "n");
     expect(skipped).toHaveLength(1);
   });
 });
@@ -596,8 +588,8 @@ describe("Flow: multiple trigger nodes", () => {
 // FLOW 9: app node in a chain
 // ===========================================================================
 
-describe("Flow: trigger → app → agent → output", () => {
-  it("app output flows to agent then to output", async () => {
+describe("Flow: trigger → app → agent → notify", () => {
+  it("app output flows to agent then to notify", async () => {
     const appOutput = { screenshot: "base64...", url: "http://localhost:3000" };
     mockApp.mockResolvedValueOnce({ status: "success", output: appOutput, durationMs: 200 });
 
@@ -608,9 +600,9 @@ describe("Flow: trigger → app → agent → output", () => {
       node("t", "manual"),
       node("app", "app", { appId: "my-app", prompt: "take screenshot" }),
       node("a", "agent", { prompt: "analyze screenshot" }),
-      node("o", "output", { format: "text" }),
+      node("n", "notify", { channels: ["slack"], message: "Report" }),
     ];
-    const edges = [edge("t", "app"), edge("app", "a"), edge("a", "o")];
+    const edges = [edge("t", "app"), edge("app", "a"), edge("a", "n")];
     const p = pipeline(nodes, edges);
     const { onEvent } = collect();
 
@@ -621,8 +613,8 @@ describe("Flow: trigger → app → agent → output", () => {
 
     // Agent received app output.
     expect(mockAgent.mock.calls[0][1]).toEqual(appOutput);
-    // Output received agent output.
-    expect(mockOutput.mock.calls[0][1]).toEqual(agentOutput);
+    // Notify received agent output.
+    expect(mockNotify.mock.calls[0][1]).toEqual(agentOutput);
   });
 });
 
@@ -632,35 +624,35 @@ describe("Flow: trigger → app → agent → output", () => {
 
 describe("Flow: nested conditions", () => {
   it("chained conditions — second condition only runs on taken branch", async () => {
-    // First condition → true → second condition → false → output
+    // First condition → Yes → second condition → Low → notify
     mockCondition
       .mockResolvedValueOnce({
         status: "success",
-        output: { c1: true },
-        outputHandle: "true",
+        output: { question: "Process?", chosen: "Yes" },
+        outputHandle: "Yes",
         durationMs: 5,
       })
       .mockResolvedValueOnce({
         status: "success",
-        output: { c2: false },
-        outputHandle: "false",
+        output: { question: "Priority?", chosen: "Low" },
+        outputHandle: "Low",
         durationMs: 5,
       });
 
     const nodes = [
       node("t", "manual"),
-      node("c1", "condition", { expression: "true" }),
-      node("c2", "condition", { expression: "input.level > 5" }),
-      node("high", "agent", { prompt: "high" }), // c2 true branch
-      node("low", "notify", { channels: ["slack"], message: "low" }), // c2 false branch
-      node("skip", "output", { format: "text" }), // c1 false branch
+      node("c1", "condition", { question: "Process?", options: ["Yes", "No"] }),
+      node("c2", "condition", { question: "Priority?", options: ["High", "Low"] }),
+      node("high", "agent", { prompt: "high" }), // c2 High branch
+      node("low", "notify", { channels: ["slack"], message: "low" }), // c2 Low branch
+      node("skip", "notify", { channels: ["slack"], message: "skipped" }), // c1 No branch
     ];
     const edges = [
       edge("t", "c1"),
-      edge("c1", "c2", { sourceHandle: "true" }),
-      edge("c1", "skip", { sourceHandle: "false" }),
-      edge("c2", "high", { sourceHandle: "true" }),
-      edge("c2", "low", { sourceHandle: "false" }),
+      edge("c1", "c2", { sourceHandle: "Yes" }),
+      edge("c1", "skip", { sourceHandle: "No" }),
+      edge("c2", "high", { sourceHandle: "High" }),
+      edge("c2", "low", { sourceHandle: "Low" }),
     ];
     const p = pipeline(nodes, edges);
     const { onEvent, events } = collect();
@@ -669,11 +661,10 @@ describe("Flow: nested conditions", () => {
 
     expect(result.status).toBe("success");
 
-    // c1 → true, so c2 executes. c2 → false, so "low" executes.
+    // c1 → Yes, so c2 executes. c2 → Low, so "low" executes.
     expect(mockCondition).toHaveBeenCalledTimes(2);
     expect(mockNotify).toHaveBeenCalledTimes(1); // "low" branch
     expect(mockAgent).not.toHaveBeenCalled(); // "high" skipped
-    expect(mockOutput).not.toHaveBeenCalled(); // "skip" skipped
 
     const skippedIds = events.filter((e) => e.type === "node_skipped").map((e) => e.nodeId);
     expect(skippedIds).toContain("skip");
@@ -797,7 +788,9 @@ describe("Flow: long chain data propagation", () => {
     mockAgent
       .mockResolvedValueOnce({ status: "success", output: outputs[1], durationMs: 10 })
       .mockResolvedValueOnce({ status: "success", output: outputs[2], durationMs: 10 });
-    mockNotify.mockResolvedValueOnce({ status: "success", output: outputs[3], durationMs: 10 });
+    mockNotify
+      .mockResolvedValueOnce({ status: "success", output: outputs[3], durationMs: 10 })
+      .mockResolvedValueOnce({ status: "success", output: { notified: true }, durationMs: 10 });
 
     const nodes = [
       node("t", "manual"),
@@ -805,7 +798,7 @@ describe("Flow: long chain data propagation", () => {
       node("n2", "agent", { prompt: "parse" }),
       node("n3", "agent", { prompt: "analyze" }),
       node("n4", "notify", { channels: ["slack"], message: "report" }),
-      node("n5", "output", { format: "json" }),
+      node("n5", "notify", { channels: ["slack"], message: "final" }),
     ];
     const edges = [
       edge("t", "n1"),
@@ -827,7 +820,7 @@ describe("Flow: long chain data propagation", () => {
     expect(mockAgent.mock.calls[0][1]).toEqual(outputs[0]); // n2 gets n1's output.
     expect(mockAgent.mock.calls[1][1]).toEqual(outputs[1]); // n3 gets n2's output.
     expect(mockNotify.mock.calls[0][1]).toEqual(outputs[2]); // n4 gets n3's output.
-    expect(mockOutput.mock.calls[0][1]).toEqual(outputs[3]); // n5 gets n4's output.
+    expect(mockNotify.mock.calls[1][1]).toEqual(outputs[3]); // n5 gets n4's output.
   });
 });
 
@@ -836,32 +829,32 @@ describe("Flow: long chain data propagation", () => {
 // ===========================================================================
 
 describe("Flow: condition with deep chains on both branches", () => {
-  it("true branch chain executes, false branch chain is fully skipped", async () => {
+  it("Proceed branch chain executes, Skip branch chain is fully skipped", async () => {
     mockCondition.mockResolvedValueOnce({
       status: "success",
-      output: { result: true },
-      outputHandle: "true",
+      output: { question: "Continue?", chosen: "Proceed" },
+      outputHandle: "Proceed",
       durationMs: 5,
     });
 
     const nodes = [
       node("t", "manual"),
-      node("cond", "condition", { expression: "true" }),
-      // True branch: a1 → a2 → n1
+      node("cond", "condition", { question: "Continue?", options: ["Proceed", "Skip"] }),
+      // Proceed branch: a1 → a2 → n1
       node("a1", "agent", { prompt: "step 1" }),
       node("a2", "agent", { prompt: "step 2" }),
       node("n1", "notify", { channels: ["slack"], message: "done" }),
-      // False branch: c1 → o1
+      // Skip branch: c1 → n2
       node("c1", "code", { description: "fallback" }),
-      node("o1", "output", { format: "text" }),
+      node("n2", "notify", { channels: ["slack"], message: "skipped" }),
     ];
     const edges = [
       edge("t", "cond"),
-      edge("cond", "a1", { sourceHandle: "true" }),
+      edge("cond", "a1", { sourceHandle: "Proceed" }),
       edge("a1", "a2"),
       edge("a2", "n1"),
-      edge("cond", "c1", { sourceHandle: "false" }),
-      edge("c1", "o1"),
+      edge("cond", "c1", { sourceHandle: "Skip" }),
+      edge("c1", "n2"),
     ];
     const p = pipeline(nodes, edges);
     const { onEvent, events } = collect();
@@ -870,17 +863,16 @@ describe("Flow: condition with deep chains on both branches", () => {
 
     expect(result.status).toBe("success");
 
-    // True branch executed.
+    // Proceed branch executed.
     expect(mockAgent).toHaveBeenCalledTimes(2);
     expect(mockNotify).toHaveBeenCalledTimes(1);
 
-    // False branch fully skipped.
+    // Skip branch fully skipped.
     expect(mockCode).not.toHaveBeenCalled();
-    expect(mockOutput).not.toHaveBeenCalled();
 
     const skippedIds = events.filter((e) => e.type === "node_skipped").map((e) => e.nodeId);
     expect(skippedIds).toContain("c1");
-    expect(skippedIds).toContain("o1");
+    expect(skippedIds).toContain("n2");
   });
 });
 
@@ -934,9 +926,9 @@ describe("Flow: run result structure", () => {
     const nodes = [
       node("t", "manual"),
       node("a", "agent", { prompt: "go" }),
-      node("o", "output", { format: "json" }),
+      node("n", "notify", { channels: ["slack"], message: "done" }),
     ];
-    const edges = [edge("t", "a"), edge("a", "o")];
+    const edges = [edge("t", "a"), edge("a", "n")];
     const p = pipeline(nodes, edges, "my-pipeline");
     const r = run("my-pipeline");
     const { onEvent } = collect();
@@ -969,23 +961,23 @@ describe("Flow: run result structure", () => {
     const nodes = [
       node("t", "manual"),
       node("a", "agent", { prompt: "go" }),
-      node("o", "output", { format: "json" }),
+      node("n", "notify", { channels: ["slack"], message: "done" }),
     ];
-    const edges = [edge("t", "a"), edge("a", "o")];
+    const edges = [edge("t", "a"), edge("a", "n")];
     const p = pipeline(nodes, edges);
     const { onEvent } = collect();
 
     const result = await executePipeline(p, run(), ctx(), onEvent);
 
     expect(result.status).toBe("failed");
-    // Agent result + skipped output result.
+    // Agent result + skipped notify result.
     expect(result.nodeResults).toHaveLength(2);
 
     const agentResult = result.nodeResults.find((r) => r.nodeId === "a");
     expect(agentResult!.status).toBe("failed");
     expect(agentResult!.error).toBe("timeout");
 
-    const outputResult = result.nodeResults.find((r) => r.nodeId === "o");
-    expect(outputResult!.status).toBe("skipped");
+    const notifyResult = result.nodeResults.find((r) => r.nodeId === "n");
+    expect(notifyResult!.status).toBe("skipped");
   });
 });

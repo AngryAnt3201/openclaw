@@ -34,7 +34,7 @@ export class NodeRegistry {
     return [...this.defs.values()].filter((d) => d.category === category);
   }
 
-  /** Register all 12 built-in node types. */
+  /** Register all 11 built-in node types. */
   registerBuiltins(): void {
     for (const def of BUILTIN_NODE_DEFINITIONS) {
       this.register(def);
@@ -47,11 +47,11 @@ export class NodeRegistry {
 // ===========================================================================
 
 /**
- * The 12 built-in node definitions, grouped by category.
+ * The 11 built-in node definitions, grouped by category.
  *
  * Trigger nodes (4): cron, webhook, task_event, manual
  * Processing nodes (6): agent, app, condition, approval, loop, code
- * Action nodes (2): notify, output
+ * Action nodes (1): notify
  */
 export const BUILTIN_NODE_DEFINITIONS: readonly NodeDefinition[] = [
   // -------------------------------------------------------------------------
@@ -184,17 +184,28 @@ export const BUILTIN_NODE_DEFINITIONS: readonly NodeDefinition[] = [
   {
     type: "condition",
     category: "processing",
-    label: "Condition",
-    description: "Branch pipeline flow based on an expression.",
+    label: "Router",
+    description: "LLM-powered N-way router: ask a question, branch on the answer.",
     icon: "git-branch",
     configFields: [
-      { key: "expression", label: "Expression", type: "code", required: true },
-      { key: "outputs", label: "Output Labels", type: "string", defaultValue: "true,false" },
+      {
+        key: "question",
+        label: "Question",
+        type: "string",
+        required: true,
+        placeholder: "Does this email require action?",
+      },
+      {
+        key: "options",
+        label: "Options (comma-separated)",
+        type: "string",
+        required: true,
+        placeholder: "Needs Action, Archive, Spam",
+      },
     ],
     ports: [
       { id: "in", label: "Input", type: "input" },
-      { id: "true", label: "True", type: "output" },
-      { id: "false", label: "False", type: "output" },
+      // Dynamic output ports are created at runtime based on options
     ],
   },
   {
@@ -290,30 +301,5 @@ export const BUILTIN_NODE_DEFINITIONS: readonly NodeDefinition[] = [
       { id: "in", label: "Input", type: "input" },
       { id: "out", label: "Output", type: "output" },
     ],
-  },
-  {
-    type: "output",
-    category: "action",
-    label: "Output",
-    description: "Write pipeline results to a variable, file, or log.",
-    icon: "download",
-    configFields: [
-      {
-        key: "destination",
-        label: "Target",
-        type: "select",
-        required: true,
-        options: ["variable", "file", "log"],
-      },
-      { key: "path", label: "Key / Path", type: "string" },
-      {
-        key: "format",
-        label: "Format",
-        type: "select",
-        options: ["json", "text", "markdown"],
-        defaultValue: "json",
-      },
-    ],
-    ports: [{ id: "in", label: "Input", type: "input" }],
   },
 ];

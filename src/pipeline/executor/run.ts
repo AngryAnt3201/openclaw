@@ -15,7 +15,7 @@ import type {
 import type { ExecutorContext, NodeExecutionResult, NodeExecutorFn } from "./types.js";
 import { PipelineEngine } from "../engine.js";
 import { VALID_TRIGGER_NODE_TYPES } from "../types.js";
-import { executeNotifyNode, executeOutputNode } from "./action.js";
+import { executeNotifyNode } from "./action.js";
 import { executeAgentNode } from "./agent.js";
 import { executeAppNode } from "./app.js";
 import { executeApprovalNode } from "./approval.js";
@@ -66,7 +66,6 @@ const NODE_EXECUTORS: Record<string, NodeExecutorFn> = {
   condition: executeConditionNode,
   loop: executeLoopNode,
   notify: executeNotifyNode,
-  output: executeOutputNode,
 };
 
 // ---------------------------------------------------------------------------

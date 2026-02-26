@@ -128,13 +128,13 @@ describe("NodeRegistry", () => {
       expect(processing.length).toBeGreaterThanOrEqual(4);
     });
 
-    it("provides at least 2 action nodes", () => {
+    it("provides at least 1 action node", () => {
       const actions = registry.listByCategory("action");
-      expect(actions.length).toBeGreaterThanOrEqual(2);
+      expect(actions.length).toBeGreaterThanOrEqual(1);
     });
 
     it("registers exactly 11 built-in types", () => {
-      expect(registry.list()).toHaveLength(12);
+      expect(registry.list()).toHaveLength(11);
     });
 
     it("every definition has a non-empty label and description", () => {
@@ -164,18 +164,18 @@ describe("NodeRegistry", () => {
       expect(outputIds).toContain("failure");
     });
 
-    it("condition node has true and false output ports", () => {
+    it("condition node has question and options config fields", () => {
       const cond = registry.get("condition");
       expect(cond).toBeDefined();
-      const outputIds = cond!.ports.filter((p) => p.type === "output").map((p) => p.id);
-      expect(outputIds).toContain("true");
-      expect(outputIds).toContain("false");
+      const fieldKeys = cond!.configFields.map((f) => f.key);
+      expect(fieldKeys).toContain("question");
+      expect(fieldKeys).toContain("options");
     });
 
     it("can be called multiple times without duplicating entries", () => {
       registry.registerBuiltins();
       registry.registerBuiltins();
-      expect(registry.list()).toHaveLength(12);
+      expect(registry.list()).toHaveLength(11);
     });
 
     it("includes the expected built-in types", () => {
@@ -193,7 +193,6 @@ describe("NodeRegistry", () => {
         "loop",
         "manual",
         "notify",
-        "output",
         "task_event",
         "webhook",
       ]);
@@ -222,7 +221,7 @@ describe("NodeRegistry", () => {
   // -----------------------------------------------------------------------
 
   it("exports BUILTIN_NODE_DEFINITIONS as a frozen array of 11 items", () => {
-    expect(BUILTIN_NODE_DEFINITIONS).toHaveLength(12);
+    expect(BUILTIN_NODE_DEFINITIONS).toHaveLength(11);
   });
 
   // -----------------------------------------------------------------------
@@ -234,7 +233,7 @@ describe("NodeRegistry", () => {
     const custom = makeDef({ type: "custom:my_plugin", category: "action", label: "My Plugin" });
     registry.register(custom);
 
-    expect(registry.list()).toHaveLength(13);
+    expect(registry.list()).toHaveLength(12);
     expect(registry.get("custom:my_plugin")?.label).toBe("My Plugin");
     // Builtins still intact
     expect(registry.get("agent")).toBeDefined();
@@ -245,7 +244,7 @@ describe("NodeRegistry", () => {
     const override = makeDef({ type: "agent", category: "processing", label: "Custom Agent" });
     registry.register(override);
 
-    expect(registry.list()).toHaveLength(12);
+    expect(registry.list()).toHaveLength(11);
     expect(registry.get("agent")?.label).toBe("Custom Agent");
   });
 });

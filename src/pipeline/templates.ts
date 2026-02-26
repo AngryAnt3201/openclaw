@@ -170,12 +170,11 @@ const emailTriageNodes: PipelineNode[] = [
   {
     id: "email-condition",
     type: "condition",
-    label: "Needs Action?",
+    label: "Route Email",
     position: { x: 600, y: 220 },
     config: {
-      expression: 'output.category === "action-required"',
-      trueLabel: "Yes",
-      falseLabel: "No",
+      question: "What should be done with this email?",
+      options: ["Needs Action", "Archive"],
     },
     state: idleState(),
   },
@@ -219,16 +218,14 @@ const emailTriageEdges: PipelineEdge[] = [
   {
     id: "email-e3",
     source: "email-condition",
-    sourceHandle: "true",
+    sourceHandle: "Needs Action",
     target: "email-notify",
-    condition: "true",
   },
   {
     id: "email-e4",
     source: "email-condition",
-    sourceHandle: "false",
+    sourceHandle: "Archive",
     target: "email-archive",
-    condition: "false",
   },
 ];
 
@@ -320,25 +317,12 @@ const scheduledReportNodes: PipelineNode[] = [
     state: idleState(),
   },
   {
-    id: "report-output",
-    type: "output",
-    label: "Save Report",
-    position: { x: 640, y: 160 },
-    config: {
-      format: "markdown",
-      destination: "file",
-      path: "reports/weekly-{{date}}.md",
-    },
-    state: idleState(),
-  },
-  {
     id: "report-notify-slack",
     type: "notify",
     label: "Slack Summary",
-    position: { x: 640, y: 320 },
+    position: { x: 640, y: 240 },
     config: {
       channels: ["slack"],
-      message: "Weekly Report Ready\n\n{{output.summary}}\n\nFull report saved to file.",
       priority: "medium",
     },
     state: idleState(),
@@ -353,11 +337,6 @@ const scheduledReportEdges: PipelineEdge[] = [
   },
   {
     id: "report-e2",
-    source: "report-agent",
-    target: "report-output",
-  },
-  {
-    id: "report-e3",
     source: "report-agent",
     target: "report-notify-slack",
   },

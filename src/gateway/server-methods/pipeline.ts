@@ -336,6 +336,105 @@ export const pipelineHandlers: GatewayRequestHandlers = {
   },
 
   // =========================================================================
+  // PIPELINE CLASSIFY (LLM router for condition nodes)
+  // =========================================================================
+
+  "pipeline.classify": async ({ params, respond, context }) => {
+    const p = params as { question?: string; options?: string[]; input?: string };
+
+    if (!p.question || !p.options || p.options.length < 2) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "question and options (>= 2) are required"),
+      );
+      return;
+    }
+
+    try {
+      const { resolveApiKeyForProvider } = await import("../../agents/model-auth.js");
+      const { default: Anthropic } = await import("@anthropic-ai/sdk");
+
+      const auth = await resolveApiKeyForProvider({ provider: "anthropic" });
+      if (!auth.apiKey) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "no Anthropic API key available"),
+        );
+        return;
+      }
+
+      const client = new Anthropic({ apiKey: auth.apiKey });
+
+      const routeTool = {
+        name: "route",
+        description: "Select which option best matches the input based on the question.",
+        input_schema: {
+          type: "object" as const,
+          properties: {
+            option: {
+              type: "string" as const,
+              enum: p.options,
+              description: "The chosen option",
+            },
+          },
+          required: ["option"] as string[],
+        },
+      };
+
+      const userMessage = [
+        `Question: ${p.question}`,
+        `Options: ${p.options.join(", ")}`,
+        "",
+        "Input to classify:",
+        p.input ?? "(no input)",
+        "",
+        "Use the route tool to select the best matching option.",
+      ].join("\n");
+
+      const response = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 128,
+        tools: [routeTool],
+        tool_choice: { type: "tool", name: "route" },
+        messages: [{ role: "user", content: userMessage }],
+      });
+
+      // Extract the tool_use block.
+      const toolBlock = response.content.find(
+        (b: {
+          type: string;
+        }): b is { type: "tool_use"; id: string; name: string; input: unknown } =>
+          b.type === "tool_use",
+      );
+
+      if (!toolBlock) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "LLM did not return a route tool call"),
+        );
+        return;
+      }
+
+      const chosen = (toolBlock.input as { option: string }).option;
+      respond(true, { option: chosen }, undefined);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      context.logGateway?.error?.(`[pipeline.classify] error: ${errMsg}`);
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          `classify failed: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+    }
+  },
+
+  // =========================================================================
   // NODE REGISTRY
   // =========================================================================
 

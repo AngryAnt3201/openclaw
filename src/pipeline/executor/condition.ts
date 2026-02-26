@@ -1,9 +1,9 @@
 // ---------------------------------------------------------------------------
-// Pipeline Executor – Condition Node
+// Pipeline Executor – Condition Node (LLM Router)
 // ---------------------------------------------------------------------------
-// Evaluates a simple expression and returns an outputHandle of "true" or
-// "false" to drive downstream edge selection. Deliberately avoids eval() in
-// favour of a small safe expression evaluator.
+// Classifies upstream input against a set of named options using an LLM
+// `route` tool with enum-constrained structured output. Returns the chosen
+// option as `outputHandle` so the DAG engine follows the matching branch.
 // ---------------------------------------------------------------------------
 
 import type { ConditionConfig, PipelineNode } from "../types.js";
@@ -16,27 +16,57 @@ import type { NodeExecutionResult, NodeExecutorFn } from "./types.js";
 export const executeConditionNode: NodeExecutorFn = async (
   node: PipelineNode,
   input: unknown,
-  _context,
+  context,
 ): Promise<NodeExecutionResult> => {
   const startMs = Date.now();
   const config = node.config as ConditionConfig;
 
-  if (!config.expression) {
+  if (!config.question) {
     return {
       status: "failure",
-      error: "Condition node requires an expression",
+      error: "Condition node requires a question",
+      durationMs: Date.now() - startMs,
+    };
+  }
+
+  if (!config.options || config.options.length < 2) {
+    return {
+      status: "failure",
+      error: "Condition node requires at least 2 options",
+      durationMs: Date.now() - startMs,
+    };
+  }
+
+  if (!context.callGatewayRpc) {
+    return {
+      status: "failure",
+      error: "callGatewayRpc not available in executor context",
       durationMs: Date.now() - startMs,
     };
   }
 
   try {
-    const result = evaluateExpression(config.expression, input);
-    const boolResult = Boolean(result);
+    const result = (await context.callGatewayRpc("pipeline.classify", {
+      question: config.question,
+      options: config.options,
+      input: summariseInput(input),
+    })) as { option: string };
+
+    const chosen = result.option;
+
+    // Validate that the returned option is one we expect.
+    if (!config.options.includes(chosen)) {
+      return {
+        status: "failure",
+        error: `LLM returned unknown option "${chosen}" (expected one of: ${config.options.join(", ")})`,
+        durationMs: Date.now() - startMs,
+      };
+    }
 
     return {
       status: "success",
-      output: { expression: config.expression, result: boolResult },
-      outputHandle: boolResult ? "true" : "false",
+      output: { question: config.question, chosen },
+      outputHandle: chosen,
       durationMs: Date.now() - startMs,
     };
   } catch (err) {
@@ -49,135 +79,17 @@ export const executeConditionNode: NodeExecutorFn = async (
 };
 
 // ---------------------------------------------------------------------------
-// Safe expression evaluator (no eval / Function constructor)
+// Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Evaluate a simple expression string against the `input` value.
- *
- * Supported expression forms:
- *   - `"true"` / `"false"` — boolean literal
- *   - `"input"` — truthy check on the entire input
- *   - `"input.some.path"` — resolve a dot-path on input
- *   - `"input.some.path === value"` — equality comparison
- *   - `"input.some.path !== value"` — inequality comparison
- *   - `"input.some.path > value"` — numeric greater-than
- *   - `"input.some.path < value"` — numeric less-than
- *   - `"input.some.path >= value"` — numeric greater-or-equal
- *   - `"input.some.path <= value"` — numeric less-or-equal
- */
-function evaluateExpression(expression: string, input: unknown): unknown {
-  const expr = expression.trim();
-
-  // Literal booleans
-  if (expr === "true") {
-    return true;
+/** Produce a concise string summary of upstream input for the LLM prompt. */
+function summariseInput(input: unknown): string {
+  if (input === undefined || input === null) {
+    return "(no input)";
   }
-  if (expr === "false") {
-    return false;
+  if (typeof input === "string") {
+    return input.slice(0, 2000);
   }
-
-  // Comparison operators (order matters — check multi-char ops first)
-  const comparisonOps = ["!==", "===", ">=", "<=", ">", "<"] as const;
-
-  for (const op of comparisonOps) {
-    const idx = expr.indexOf(op);
-    if (idx === -1) {
-      continue;
-    }
-
-    const left = expr.slice(0, idx).trim();
-    const right = expr.slice(idx + op.length).trim();
-    const leftValue = resolveValue(left, input);
-    const rightValue = parseValue(right);
-
-    switch (op) {
-      case "===":
-        return leftValue === rightValue;
-      case "!==":
-        return leftValue !== rightValue;
-      case ">":
-        return Number(leftValue) > Number(rightValue);
-      case "<":
-        return Number(leftValue) < Number(rightValue);
-      case ">=":
-        return Number(leftValue) >= Number(rightValue);
-      case "<=":
-        return Number(leftValue) <= Number(rightValue);
-    }
-  }
-
-  // Simple path or literal — resolve and return truthiness
-  return resolveValue(expr, input);
-}
-
-/**
- * Resolve a value reference. If it starts with "input." or is "input",
- * walk the JSON path on the input object. Otherwise treat as literal.
- */
-function resolveValue(token: string, input: unknown): unknown {
-  if (token === "input") {
-    return input;
-  }
-  if (token.startsWith("input.")) {
-    return resolvePath(input, token.slice("input.".length));
-  }
-  return parseValue(token);
-}
-
-/**
- * Walk a dot-separated path into an object. Returns `undefined` for
- * missing segments.
- */
-function resolvePath(obj: unknown, dotPath: string): unknown {
-  const segments = dotPath.split(".");
-  let current: unknown = obj;
-
-  for (const seg of segments) {
-    if (current === null || current === undefined) {
-      return undefined;
-    }
-    if (typeof current !== "object") {
-      return undefined;
-    }
-    current = (current as Record<string, unknown>)[seg];
-  }
-
-  return current;
-}
-
-/**
- * Parse a literal value from a string: numbers, booleans, quoted strings,
- * null/undefined.
- */
-function parseValue(token: string): unknown {
-  if (token === "null") {
-    return null;
-  }
-  if (token === "undefined") {
-    return undefined;
-  }
-  if (token === "true") {
-    return true;
-  }
-  if (token === "false") {
-    return false;
-  }
-
-  // Quoted string (single or double)
-  if (
-    (token.startsWith('"') && token.endsWith('"')) ||
-    (token.startsWith("'") && token.endsWith("'"))
-  ) {
-    return token.slice(1, -1);
-  }
-
-  // Numeric
-  const num = Number(token);
-  if (!Number.isNaN(num) && token !== "") {
-    return num;
-  }
-
-  // Fallback: return as string
-  return token;
+  const json = JSON.stringify(input, null, 2);
+  return json.length > 2000 ? json.slice(0, 1997) + "..." : json;
 }

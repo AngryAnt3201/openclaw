@@ -22,7 +22,6 @@ export enum CoreNodeType {
   Loop = "loop",
   Code = "code",
   Notify = "notify",
-  Output = "output",
 }
 
 /** O(1) membership check for built-in types. */
@@ -49,7 +48,7 @@ export const PROCESSING_NODE_TYPES = [
 
 export type ProcessingNodeType = (typeof PROCESSING_NODE_TYPES)[number];
 
-export const ACTION_NODE_TYPES = [CoreNodeType.Notify, CoreNodeType.Output] as const;
+export const ACTION_NODE_TYPES = [CoreNodeType.Notify] as const;
 
 export type ActionNodeType = (typeof ACTION_NODE_TYPES)[number];
 
@@ -114,9 +113,8 @@ export type AppNodeConfig = {
 };
 
 export type ConditionConfig = {
-  expression: string;
-  trueLabel?: string;
-  falseLabel?: string;
+  question: string;
+  options: string[];
 };
 
 export type ApprovalConfig = {
@@ -148,12 +146,6 @@ export type NotifyConfig = {
   priority?: "critical" | "high" | "medium" | "low";
 };
 
-export type OutputConfig = {
-  format?: "json" | "markdown" | "text";
-  destination?: "log" | "file" | "variable";
-  path?: string;
-};
-
 // ===========================================================================
 // NODE CONFIG UNION
 // ===========================================================================
@@ -169,8 +161,7 @@ export type NodeConfig =
   | ApprovalConfig
   | LoopConfig
   | CodeNodeConfig
-  | NotifyConfig
-  | OutputConfig;
+  | NotifyConfig;
 
 // ===========================================================================
 // NODE STATE

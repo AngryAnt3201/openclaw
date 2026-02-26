@@ -29,15 +29,10 @@ vi.mock("./action.js", () => ({
     output: { notified: true },
     durationMs: 20,
   }),
-  executeOutputNode: vi.fn().mockResolvedValue({
-    status: "success",
-    output: { formatted: "done" },
-    durationMs: 5,
-  }),
 }));
 
 import type { ExecutorContext } from "./types.js";
-import { executeNotifyNode, executeOutputNode } from "./action.js";
+import { executeNotifyNode } from "./action.js";
 import { executeAgentNode } from "./agent.js";
 import { executeConditionNode } from "./condition.js";
 import { executePipeline } from "./run.js";
@@ -45,7 +40,6 @@ import { executePipeline } from "./run.js";
 const mockAgent = vi.mocked(executeAgentNode);
 const mockCondition = vi.mocked(executeConditionNode);
 const mockNotify = vi.mocked(executeNotifyNode);
-const mockOutput = vi.mocked(executeOutputNode);
 
 // ---------------------------------------------------------------------------
 // Helpers — minimal node / edge / pipeline / run factories
@@ -151,11 +145,6 @@ beforeEach(() => {
     output: { notified: true },
     durationMs: 20,
   });
-  mockOutput.mockResolvedValue({
-    status: "success",
-    output: { formatted: "done" },
-    durationMs: 5,
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -163,23 +152,23 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("Linear execution", () => {
-  it("executes a simple linear pipeline (trigger -> agent -> output)", async () => {
-    const nodes = [makeNode("t1", "cron"), makeNode("a1", "agent"), makeNode("o1", "output")];
-    const edges = [makeEdge("t1", "a1"), makeEdge("a1", "o1")];
+  it("executes a simple linear pipeline (trigger -> agent -> notify)", async () => {
+    const nodes = [makeNode("t1", "cron"), makeNode("a1", "agent"), makeNode("n1", "notify")];
+    const edges = [makeEdge("t1", "a1"), makeEdge("a1", "n1")];
     const pipeline = makePipeline(nodes, edges);
     const run = makeRun();
     const { onEvent, events } = collectEvents();
 
     const result = await executePipeline(pipeline, run, makeContext(), onEvent);
 
-    // Trigger is skipped (no executor call), agent and output are executed.
+    // Trigger is skipped (no executor call), agent and notify are executed.
     expect(mockAgent).toHaveBeenCalledTimes(1);
-    expect(mockOutput).toHaveBeenCalledTimes(1);
+    expect(mockNotify).toHaveBeenCalledTimes(1);
     expect(result.status).toBe("success");
-    // Two node results: agent and output (trigger is silently skipped via continue).
+    // Two node results: agent and notify (trigger is silently skipped via continue).
     expect(result.nodeResults).toHaveLength(2);
     expect(result.nodeResults[0].nodeId).toBe("a1");
-    expect(result.nodeResults[1].nodeId).toBe("o1");
+    expect(result.nodeResults[1].nodeId).toBe("n1");
   });
 
   it("passes upstream node output as input to downstream nodes", async () => {
@@ -190,23 +179,23 @@ describe("Linear execution", () => {
       durationMs: 50,
     });
 
-    const nodes = [makeNode("t1", "manual"), makeNode("a1", "agent"), makeNode("o1", "output")];
-    const edges = [makeEdge("t1", "a1"), makeEdge("a1", "o1")];
+    const nodes = [makeNode("t1", "manual"), makeNode("a1", "agent"), makeNode("n1", "notify")];
+    const edges = [makeEdge("t1", "a1"), makeEdge("a1", "n1")];
     const pipeline = makePipeline(nodes, edges);
     const run = makeRun();
     const { onEvent } = collectEvents();
 
     await executePipeline(pipeline, run, makeContext(), onEvent);
 
-    // The output node should receive the agent node's output as input.
-    expect(mockOutput).toHaveBeenCalledTimes(1);
-    const outputCallInput = mockOutput.mock.calls[0][1];
-    expect(outputCallInput).toEqual(agentOutput);
+    // The notify node should receive the agent node's output as input.
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+    const notifyCallInput = mockNotify.mock.calls[0][1];
+    expect(notifyCallInput).toEqual(agentOutput);
   });
 
   it("returns completed run with 'success' status when all nodes succeed", async () => {
-    const nodes = [makeNode("t1", "cron"), makeNode("a1", "agent"), makeNode("o1", "output")];
-    const edges = [makeEdge("t1", "a1"), makeEdge("a1", "o1")];
+    const nodes = [makeNode("t1", "cron"), makeNode("a1", "agent"), makeNode("n1", "notify")];
+    const edges = [makeEdge("t1", "a1"), makeEdge("a1", "n1")];
     const pipeline = makePipeline(nodes, edges);
     const run = makeRun();
     const { onEvent } = collectEvents();
@@ -225,8 +214,8 @@ describe("Linear execution", () => {
 
 describe("Event emission", () => {
   it("emits node_started then node_completed events for each executed node", async () => {
-    const nodes = [makeNode("t1", "manual"), makeNode("a1", "agent"), makeNode("o1", "output")];
-    const edges = [makeEdge("t1", "a1"), makeEdge("a1", "o1")];
+    const nodes = [makeNode("t1", "manual"), makeNode("a1", "agent"), makeNode("n1", "notify")];
+    const edges = [makeEdge("t1", "a1"), makeEdge("a1", "n1")];
     const pipeline = makePipeline(nodes, edges);
     const run = makeRun();
     const { onEvent, events } = collectEvents();
@@ -238,10 +227,10 @@ describe("Event emission", () => {
     expect(agentEvents[0].type).toBe("node_started");
     expect(agentEvents[1].type).toBe("node_completed");
 
-    // For output node: node_started then node_completed.
-    const outputEvents = events.filter((e) => e.nodeId === "o1");
-    expect(outputEvents[0].type).toBe("node_started");
-    expect(outputEvents[1].type).toBe("node_completed");
+    // For notify node: node_started then node_completed.
+    const notifyEvents = events.filter((e) => e.nodeId === "n1");
+    expect(notifyEvents[0].type).toBe("node_started");
+    expect(notifyEvents[1].type).toBe("node_completed");
   });
 
   it("emits run_completed event at the end with 'success' status", async () => {
@@ -334,23 +323,22 @@ describe("Node failure handling", () => {
       makeNode("t1", "manual"),
       makeNode("a1", "agent"),
       makeNode("n1", "notify"),
-      makeNode("o1", "output"),
+      makeNode("n2", "notify"),
     ];
-    const edges = [makeEdge("t1", "a1"), makeEdge("a1", "n1"), makeEdge("n1", "o1")];
+    const edges = [makeEdge("t1", "a1"), makeEdge("a1", "n1"), makeEdge("n1", "n2")];
     const pipeline = makePipeline(nodes, edges);
     const run = makeRun();
     const { onEvent, events } = collectEvents();
 
     const result = await executePipeline(pipeline, run, makeContext(), onEvent);
 
-    // Downstream nodes n1 and o1 should be skipped.
+    // Downstream nodes n1 and n2 should be skipped.
     const skippedEvents = events.filter((e) => e.type === "node_skipped");
     const skippedIds = skippedEvents.map((e) => e.nodeId).toSorted();
-    expect(skippedIds).toEqual(["n1", "o1"]);
+    expect(skippedIds).toEqual(["n1", "n2"]);
 
-    // Notify and output executors should NOT have been called.
+    // Notify executors should NOT have been called.
     expect(mockNotify).not.toHaveBeenCalled();
-    expect(mockOutput).not.toHaveBeenCalled();
   });
 
   it("run completes with 'failed' status when any node fails", async () => {
@@ -377,8 +365,8 @@ describe("Node failure handling", () => {
   it("node executor throwing an error is caught and treated as failure", async () => {
     mockAgent.mockRejectedValueOnce(new Error("unexpected crash"));
 
-    const nodes = [makeNode("t1", "manual"), makeNode("a1", "agent"), makeNode("o1", "output")];
-    const edges = [makeEdge("t1", "a1"), makeEdge("a1", "o1")];
+    const nodes = [makeNode("t1", "manual"), makeNode("a1", "agent"), makeNode("n1", "notify")];
+    const edges = [makeEdge("t1", "a1"), makeEdge("a1", "n1")];
     const pipeline = makePipeline(nodes, edges);
     const run = makeRun();
     const { onEvent, events } = collectEvents();
@@ -391,8 +379,8 @@ describe("Node failure handling", () => {
     expect(failedEvent).toBeDefined();
     expect(failedEvent!.error).toBe("unexpected crash");
 
-    // Downstream output should be skipped.
-    const skippedEvent = events.find((e) => e.type === "node_skipped" && e.nodeId === "o1");
+    // Downstream notify should be skipped.
+    const skippedEvent = events.find((e) => e.type === "node_skipped" && e.nodeId === "n1");
     expect(skippedEvent).toBeDefined();
   });
 });
@@ -483,7 +471,7 @@ describe("Condition branching", () => {
       makeNode("c1", "condition"),
       makeNode("yes", "agent"),
       makeNode("no", "notify"),
-      makeNode("no2", "output"), // downstream of false branch
+      makeNode("no2", "notify"), // downstream of false branch
     ];
     const edges = [
       makeEdge("t1", "c1"),
@@ -525,13 +513,13 @@ describe("Multiple upstream inputs", () => {
       makeNode("t1", "manual"),
       makeNode("a1", "agent"),
       makeNode("a2", "agent"),
-      makeNode("o1", "output"),
+      makeNode("n1", "notify"),
     ];
     const edges = [
       makeEdge("t1", "a1"),
       makeEdge("t1", "a2"),
-      makeEdge("a1", "o1"),
-      makeEdge("a2", "o1"),
+      makeEdge("a1", "n1"),
+      makeEdge("a2", "n1"),
     ];
     const pipeline = makePipeline(nodes, edges);
     const run = makeRun();
@@ -539,10 +527,10 @@ describe("Multiple upstream inputs", () => {
 
     await executePipeline(pipeline, run, makeContext(), onEvent);
 
-    // Output node should receive a merged object { a1: ..., a2: ... }.
-    expect(mockOutput).toHaveBeenCalledTimes(1);
-    const outputInput = mockOutput.mock.calls[0][1];
-    expect(outputInput).toEqual({
+    // Notify node should receive a merged object { a1: ..., a2: ... }.
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+    const notifyInput = mockNotify.mock.calls[0][1];
+    expect(notifyInput).toEqual({
       a1: agentOutput1,
       a2: agentOutput2,
     });
@@ -556,17 +544,17 @@ describe("Multiple upstream inputs", () => {
       durationMs: 50,
     });
 
-    const nodes = [makeNode("t1", "manual"), makeNode("a1", "agent"), makeNode("o1", "output")];
-    const edges = [makeEdge("t1", "a1"), makeEdge("a1", "o1")];
+    const nodes = [makeNode("t1", "manual"), makeNode("a1", "agent"), makeNode("n1", "notify")];
+    const edges = [makeEdge("t1", "a1"), makeEdge("a1", "n1")];
     const pipeline = makePipeline(nodes, edges);
     const run = makeRun();
     const { onEvent } = collectEvents();
 
     await executePipeline(pipeline, run, makeContext(), onEvent);
 
-    const outputInput = mockOutput.mock.calls[0][1];
+    const notifyInput = mockNotify.mock.calls[0][1];
     // Should be the raw output, not wrapped in { a1: ... }.
-    expect(outputInput).toEqual(agentOutput);
+    expect(notifyInput).toEqual(agentOutput);
   });
 });
 
@@ -625,8 +613,6 @@ describe("Edge cases", () => {
     expect(mockAgent).not.toHaveBeenCalled();
     expect(mockCondition).not.toHaveBeenCalled();
     expect(mockNotify).not.toHaveBeenCalled();
-    expect(mockOutput).not.toHaveBeenCalled();
-
     // No nodeResults since triggers are silently skipped via continue.
     expect(result.nodeResults).toHaveLength(0);
 
@@ -640,9 +626,9 @@ describe("Edge cases", () => {
     const nodes = [
       makeNode("t1", "manual"),
       makeNode("x1", "unknown_custom_type"),
-      makeNode("o1", "output"),
+      makeNode("n1", "notify"),
     ];
-    const edges = [makeEdge("t1", "x1"), makeEdge("x1", "o1")];
+    const edges = [makeEdge("t1", "x1"), makeEdge("x1", "n1")];
     const pipeline = makePipeline(nodes, edges);
     const run = makeRun();
     const { onEvent, events } = collectEvents();
@@ -655,8 +641,8 @@ describe("Edge cases", () => {
     expect(skippedEvent!.reason).toContain("No executor");
     expect(skippedEvent!.reason).toContain("unknown_custom_type");
 
-    // Downstream output node should still execute (no-executor skip is not a failure).
-    expect(mockOutput).toHaveBeenCalledTimes(1);
+    // Downstream notify node should still execute (no-executor skip is not a failure).
+    expect(mockNotify).toHaveBeenCalledTimes(1);
     expect(result.status).toBe("success");
   });
 });

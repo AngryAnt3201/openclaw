@@ -1,11 +1,11 @@
 // ---------------------------------------------------------------------------
-// Pipeline Executor – Action Node Unit Tests (Notify + Output)
+// Pipeline Executor – Action Node Unit Tests (Notify)
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi } from "vitest";
 import type { PipelineNode, NodeConfig } from "../types.js";
 import type { ExecutorContext } from "./types.js";
-import { executeNotifyNode, executeOutputNode } from "./action.js";
+import { executeNotifyNode } from "./action.js";
 
 // ---------------------------------------------------------------------------
 // Factories
@@ -20,21 +20,6 @@ function makeNotifyNode(config: Record<string, unknown> = {}): PipelineNode {
       channels: ["slack"],
       message: "Hello {{input}}",
       priority: "medium",
-      ...config,
-    } as NodeConfig,
-    position: { x: 0, y: 0 },
-    state: { status: "idle" as const, retryCount: 0 },
-  };
-}
-
-function makeOutputNode(config: Record<string, unknown> = {}): PipelineNode {
-  return {
-    id: "output-1",
-    type: "output",
-    label: "Test Output",
-    config: {
-      format: "json",
-      destination: "log",
       ...config,
     } as NodeConfig,
     position: { x: 0, y: 0 },
@@ -152,116 +137,5 @@ describe("executeNotifyNode", () => {
       unknown
     >;
     expect(rpcArgs.priority).toBe("medium");
-  });
-});
-
-// ===========================================================================
-// Output Node
-// ===========================================================================
-
-describe("executeOutputNode", () => {
-  it("json format — object input passes through", async () => {
-    const input = { data: [1, 2, 3] };
-    const result = await executeOutputNode(
-      makeOutputNode({ format: "json" }),
-      input,
-      makeContext(),
-    );
-
-    expect(result.status).toBe("success");
-    expect((result.output as Record<string, unknown>).data).toEqual(input);
-    expect((result.output as Record<string, unknown>).format).toBe("json");
-  });
-
-  it("json format — string input is parsed as JSON", async () => {
-    const result = await executeOutputNode(
-      makeOutputNode({ format: "json" }),
-      '{"key":"value"}',
-      makeContext(),
-    );
-
-    expect(result.status).toBe("success");
-    expect((result.output as Record<string, unknown>).data).toEqual({ key: "value" });
-  });
-
-  it("text format — object input is stringified", async () => {
-    const result = await executeOutputNode(
-      makeOutputNode({ format: "text" }),
-      { key: "value" },
-      makeContext(),
-    );
-
-    expect(result.status).toBe("success");
-    const data = (result.output as Record<string, unknown>).data as string;
-    expect(data).toContain("key");
-    expect(data).toContain("value");
-  });
-
-  it("text format — string input passes through", async () => {
-    const result = await executeOutputNode(
-      makeOutputNode({ format: "text" }),
-      "raw text",
-      makeContext(),
-    );
-
-    expect(result.status).toBe("success");
-    expect((result.output as Record<string, unknown>).data).toBe("raw text");
-  });
-
-  it("markdown format — string input passes through", async () => {
-    const result = await executeOutputNode(
-      makeOutputNode({ format: "markdown" }),
-      "# Title\n\nContent",
-      makeContext(),
-    );
-
-    expect(result.status).toBe("success");
-    expect((result.output as Record<string, unknown>).data).toBe("# Title\n\nContent");
-  });
-
-  it("markdown format — object input is wrapped in code block", async () => {
-    const result = await executeOutputNode(
-      makeOutputNode({ format: "markdown" }),
-      { key: "value" },
-      makeContext(),
-    );
-
-    expect(result.status).toBe("success");
-    const data = (result.output as Record<string, unknown>).data as string;
-    expect(data).toContain("```json");
-    expect(data).toContain("key");
-  });
-
-  it("output includes destination and path", async () => {
-    const result = await executeOutputNode(
-      makeOutputNode({ format: "text", destination: "file", path: "/tmp/out.json" }),
-      "some data",
-      makeContext(),
-    );
-
-    const output = result.output as Record<string, unknown>;
-    expect(output.destination).toBe("file");
-    expect(output.path).toBe("/tmp/out.json");
-  });
-
-  it("defaults destination to 'log' when not specified", async () => {
-    const result = await executeOutputNode(
-      makeOutputNode({ format: "text", destination: undefined }),
-      "some data",
-      makeContext(),
-    );
-
-    expect((result.output as Record<string, unknown>).destination).toBe("log");
-  });
-
-  it("invalid JSON string in json format falls through to raw value", async () => {
-    const result = await executeOutputNode(
-      makeOutputNode({ format: "json" }),
-      "not json",
-      makeContext(),
-    );
-
-    // JSON.parse("not json") throws, which is caught.
-    expect(result.status).toBe("failure");
   });
 });

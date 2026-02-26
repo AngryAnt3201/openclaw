@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Pipeline Executor – Condition Node Unit Tests
+// Pipeline Executor – Condition Node (LLM Router) Unit Tests
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi } from "vitest";
@@ -11,18 +11,24 @@ import { executeConditionNode } from "./condition.js";
 // Factories
 // ---------------------------------------------------------------------------
 
-function makeNode(expression: string): PipelineNode {
+function makeNode(question: string, options: string[]): PipelineNode {
   return {
     id: "cond-1",
     type: "condition",
-    label: "Test Condition",
-    config: { expression } as NodeConfig,
+    label: "Test Router",
+    config: { question, options } as NodeConfig,
     position: { x: 0, y: 0 },
     state: { status: "idle" as const, retryCount: 0 },
   };
 }
 
-const ctx: ExecutorContext = { log: { info: vi.fn(), error: vi.fn() } };
+function makeContext(overrides: Partial<ExecutorContext> = {}): ExecutorContext {
+  return {
+    callGatewayRpc: vi.fn().mockResolvedValue({ option: "Archive" }),
+    log: { info: vi.fn(), error: vi.fn() },
+    ...overrides,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -31,151 +37,168 @@ const ctx: ExecutorContext = { log: { info: vi.fn(), error: vi.fn() } };
 describe("executeConditionNode", () => {
   // --- Validation ---
 
-  it("returns failure when expression is empty", async () => {
-    const result = await executeConditionNode(makeNode(""), undefined, ctx);
+  it("returns failure when question is empty", async () => {
+    const result = await executeConditionNode(makeNode("", ["A", "B"]), undefined, makeContext());
     expect(result.status).toBe("failure");
-    expect(result.error).toContain("expression");
+    expect(result.error).toContain("question");
   });
 
-  // --- Boolean literals ---
+  it("returns failure when options has fewer than 2 items", async () => {
+    const result = await executeConditionNode(
+      makeNode("Which?", ["Only"]),
+      undefined,
+      makeContext(),
+    );
+    expect(result.status).toBe("failure");
+    expect(result.error).toContain("2 options");
+  });
 
-  it("expression 'true' → outputHandle 'true'", async () => {
-    const result = await executeConditionNode(makeNode("true"), undefined, ctx);
+  it("returns failure when options is empty", async () => {
+    const result = await executeConditionNode(makeNode("Which?", []), undefined, makeContext());
+    expect(result.status).toBe("failure");
+    expect(result.error).toContain("2 options");
+  });
+
+  it("returns failure when callGatewayRpc is not available", async () => {
+    const result = await executeConditionNode(
+      makeNode("Which?", ["A", "B"]),
+      undefined,
+      makeContext({ callGatewayRpc: undefined }),
+    );
+    expect(result.status).toBe("failure");
+    expect(result.error).toContain("callGatewayRpc");
+  });
+
+  // --- Successful classification ---
+
+  it("calls pipeline.classify RPC with correct params", async () => {
+    const ctx = makeContext();
+    await executeConditionNode(makeNode("Is this spam?", ["Yes", "No"]), "hello world", ctx);
+
+    expect(ctx.callGatewayRpc).toHaveBeenCalledWith("pipeline.classify", {
+      question: "Is this spam?",
+      options: ["Yes", "No"],
+      input: "hello world",
+    });
+  });
+
+  it("returns chosen option as outputHandle", async () => {
+    const ctx = makeContext({
+      callGatewayRpc: vi.fn().mockResolvedValue({ option: "Needs Action" }),
+    });
+    const result = await executeConditionNode(
+      makeNode("What to do?", ["Needs Action", "Archive", "Spam"]),
+      "urgent email",
+      ctx,
+    );
+
     expect(result.status).toBe("success");
-    expect(result.outputHandle).toBe("true");
+    expect(result.outputHandle).toBe("Needs Action");
   });
 
-  it("expression 'false' → outputHandle 'false'", async () => {
-    const result = await executeConditionNode(makeNode("false"), undefined, ctx);
-    expect(result.status).toBe("success");
-    expect(result.outputHandle).toBe("false");
-  });
-
-  // --- Input-based expressions ---
-
-  it("'input' with truthy input → true", async () => {
-    const result = await executeConditionNode(makeNode("input"), { data: 1 }, ctx);
-    expect(result.outputHandle).toBe("true");
-  });
-
-  it("'input' with null input → false", async () => {
-    const result = await executeConditionNode(makeNode("input"), null, ctx);
-    expect(result.outputHandle).toBe("false");
-  });
-
-  it("'input' with 0 input → false", async () => {
-    const result = await executeConditionNode(makeNode("input"), 0, ctx);
-    expect(result.outputHandle).toBe("false");
-  });
-
-  // --- Dot-path access ---
-
-  it("'input.status' resolves nested property", async () => {
-    const result = await executeConditionNode(makeNode("input.status"), { status: "active" }, ctx);
-    expect(result.outputHandle).toBe("true");
-  });
-
-  it("'input.deep.nested' resolves deep path", async () => {
+  it("output includes question and chosen option", async () => {
+    const ctx = makeContext({
+      callGatewayRpc: vi.fn().mockResolvedValue({ option: "Archive" }),
+    });
     const result = await executeConditionNode(
-      makeNode("input.deep.nested"),
-      { deep: { nested: true } },
+      makeNode("Route this?", ["Archive", "Delete"]),
+      "some input",
       ctx,
     );
-    expect(result.outputHandle).toBe("true");
+
+    expect(result.output).toEqual({ question: "Route this?", chosen: "Archive" });
   });
 
-  it("missing path returns undefined → false", async () => {
-    const result = await executeConditionNode(makeNode("input.missing.path"), { data: 1 }, ctx);
-    expect(result.outputHandle).toBe("false");
+  it("returns failure when LLM returns unknown option", async () => {
+    const ctx = makeContext({
+      callGatewayRpc: vi.fn().mockResolvedValue({ option: "Unknown" }),
+    });
+    const result = await executeConditionNode(makeNode("Route?", ["A", "B"]), "input", ctx);
+
+    expect(result.status).toBe("failure");
+    expect(result.error).toContain("Unknown");
+    expect(result.error).toContain("A, B");
   });
 
-  // --- Equality comparisons ---
+  // --- Input summarization ---
 
-  it("'input.status === \"active\"' with matching value → true", async () => {
-    const result = await executeConditionNode(
-      makeNode('input.status === "active"'),
-      { status: "active" },
+  it("summarizes object input as JSON for the RPC call", async () => {
+    const ctx = makeContext();
+    await executeConditionNode(
+      makeNode("Classify?", ["Good", "Bad"]),
+      { score: 42, label: "test" },
       ctx,
     );
-    expect(result.outputHandle).toBe("true");
+
+    const rpcArgs = (ctx.callGatewayRpc as ReturnType<typeof vi.fn>).mock.calls[0][1] as Record<
+      string,
+      unknown
+    >;
+    expect(rpcArgs.input).toContain("42");
+    expect(rpcArgs.input).toContain("test");
   });
 
-  it("'input.status === \"active\"' with non-matching value → false", async () => {
+  it("handles null input gracefully", async () => {
+    const ctx = makeContext();
+    await executeConditionNode(makeNode("Route?", ["A", "B"]), null, ctx);
+
+    const rpcArgs = (ctx.callGatewayRpc as ReturnType<typeof vi.fn>).mock.calls[0][1] as Record<
+      string,
+      unknown
+    >;
+    expect(rpcArgs.input).toBe("(no input)");
+  });
+
+  it("handles undefined input gracefully", async () => {
+    const ctx = makeContext();
+    await executeConditionNode(makeNode("Route?", ["A", "B"]), undefined, ctx);
+
+    const rpcArgs = (ctx.callGatewayRpc as ReturnType<typeof vi.fn>).mock.calls[0][1] as Record<
+      string,
+      unknown
+    >;
+    expect(rpcArgs.input).toBe("(no input)");
+  });
+
+  // --- Error handling ---
+
+  it("returns failure when RPC throws", async () => {
+    const ctx = makeContext({
+      callGatewayRpc: vi.fn().mockRejectedValue(new Error("network error")),
+    });
+    const result = await executeConditionNode(makeNode("Route?", ["A", "B"]), "input", ctx);
+
+    expect(result.status).toBe("failure");
+    expect(result.error).toBe("network error");
+  });
+
+  // --- Duration tracking ---
+
+  it("includes durationMs in result", async () => {
     const result = await executeConditionNode(
-      makeNode('input.status === "active"'),
-      { status: "inactive" },
-      ctx,
+      makeNode("Route?", ["A", "B"]),
+      "input",
+      makeContext({ callGatewayRpc: vi.fn().mockResolvedValue({ option: "A" }) }),
     );
-    expect(result.outputHandle).toBe("false");
-  });
 
-  it("'input.count !== 0' with count=5 → true", async () => {
-    const result = await executeConditionNode(makeNode("input.count !== 0"), { count: 5 }, ctx);
-    expect(result.outputHandle).toBe("true");
-  });
-
-  it("'input.count !== 0' with count=0 → false", async () => {
-    const result = await executeConditionNode(makeNode("input.count !== 0"), { count: 0 }, ctx);
-    expect(result.outputHandle).toBe("false");
-  });
-
-  // --- Numeric comparisons ---
-
-  it("'input.score > 50' with score=80 → true", async () => {
-    const result = await executeConditionNode(makeNode("input.score > 50"), { score: 80 }, ctx);
-    expect(result.outputHandle).toBe("true");
-  });
-
-  it("'input.score > 50' with score=30 → false", async () => {
-    const result = await executeConditionNode(makeNode("input.score > 50"), { score: 30 }, ctx);
-    expect(result.outputHandle).toBe("false");
-  });
-
-  it("'input.score < 100' with score=80 → true", async () => {
-    const result = await executeConditionNode(makeNode("input.score < 100"), { score: 80 }, ctx);
-    expect(result.outputHandle).toBe("true");
-  });
-
-  it("'input.score >= 80' with score=80 → true (boundary)", async () => {
-    const result = await executeConditionNode(makeNode("input.score >= 80"), { score: 80 }, ctx);
-    expect(result.outputHandle).toBe("true");
-  });
-
-  it("'input.score <= 80' with score=80 → true (boundary)", async () => {
-    const result = await executeConditionNode(makeNode("input.score <= 80"), { score: 80 }, ctx);
-    expect(result.outputHandle).toBe("true");
-  });
-
-  // --- Boolean comparisons ---
-
-  it("'input.ready === true' with ready=true → true", async () => {
-    const result = await executeConditionNode(
-      makeNode("input.ready === true"),
-      { ready: true },
-      ctx,
-    );
-    expect(result.outputHandle).toBe("true");
-  });
-
-  it("'input.ready === false' with ready=false → true", async () => {
-    const result = await executeConditionNode(
-      makeNode("input.ready === false"),
-      { ready: false },
-      ctx,
-    );
-    expect(result.outputHandle).toBe("true");
-  });
-
-  // --- Output structure ---
-
-  it("output includes expression and boolean result", async () => {
-    const result = await executeConditionNode(makeNode("true"), undefined, ctx);
-    expect(result.output).toEqual({ expression: "true", result: true });
-  });
-
-  it("output includes durationMs", async () => {
-    const result = await executeConditionNode(makeNode("true"), undefined, ctx);
     expect(result.durationMs).toBeDefined();
     expect(typeof result.durationMs).toBe("number");
+  });
+
+  // --- N-way routing ---
+
+  it("supports 3+ options for N-way routing", async () => {
+    const options = ["Critical", "Normal", "Low", "Spam"];
+    const ctx = makeContext({
+      callGatewayRpc: vi.fn().mockResolvedValue({ option: "Critical" }),
+    });
+    const result = await executeConditionNode(
+      makeNode("Classify priority?", options),
+      "urgent request",
+      ctx,
+    );
+
+    expect(result.status).toBe("success");
+    expect(result.outputHandle).toBe("Critical");
   });
 });
