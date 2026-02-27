@@ -226,9 +226,14 @@ export const groupHandlers: GatewayRequestHandlers = {
     const cfg = loadConfig();
     const groupMembers = group.agents.join(", ");
 
+    // Extract @mentions from params to target specific agents
+    const mentions = Array.isArray(params.mentions) ? (params.mentions as string[]) : undefined;
+    const hasMentions = mentions && mentions.length > 0;
+
     // Build group system instruction so agents know they can stay silent
-    const activationNote =
-      group.activation === "mention"
+    const activationNote = hasMentions
+      ? "You were directly mentioned by the user — respond to their message."
+      : group.activation === "mention"
         ? "Only respond if directly mentioned by name. Otherwise, respond with NO_REPLY."
         : "If you have nothing meaningful to add, respond with exactly NO_REPLY (nothing else).";
 
@@ -236,6 +241,10 @@ export const groupHandlers: GatewayRequestHandlers = {
     // Sequential dispatch — each agent sees previous agents' responses
     // -----------------------------------------------------------------------
     for (const agentId of group.agents) {
+      // Skip agents not mentioned when mentions are specified
+      if (hasMentions && !mentions.includes(agentId)) {
+        continue;
+      }
       try {
         const sessionKey = `agent:${agentId}:group:${groupId}`;
 
