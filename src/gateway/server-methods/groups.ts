@@ -221,25 +221,9 @@ export const groupHandlers: GatewayRequestHandlers = {
     });
 
     // -----------------------------------------------------------------------
-    // Dispatch to each agent in the group concurrently
+    // Dispatch to each agent sequentially — each sees prior responses
     // -----------------------------------------------------------------------
     const cfg = loadConfig();
-
-    // Load recent transcript for context injection
-    const historyMessages = await context.groupService.getTranscript(groupId, {
-      limit: group.historyLimit,
-    });
-
-    // Build transcript context text: each message formatted as [from: Name]: content
-    const transcriptLines = historyMessages.map((m) => {
-      const label = m.role === "agent" ? (m.agentName ?? m.agentId ?? "Agent") : "User";
-      return `[from: ${label}]: ${m.content}`;
-    });
-    const transcriptContext =
-      transcriptLines.length > 0
-        ? `--- Group Transcript (${group.label}) ---\n${transcriptLines.join("\n")}\n--- End Transcript ---\n\n`
-        : "";
-
     const groupMembers = group.agents.join(", ");
 
     // Build group system instruction so agents know they can stay silent
@@ -248,10 +232,25 @@ export const groupHandlers: GatewayRequestHandlers = {
         ? "Only respond if directly mentioned by name. Otherwise, respond with NO_REPLY."
         : "If you have nothing meaningful to add, respond with exactly NO_REPLY (nothing else).";
 
-    // Dispatch to all agents concurrently — one failure should not block others
-    const results = await Promise.allSettled(
-      group.agents.map(async (agentId) => {
+    // -----------------------------------------------------------------------
+    // Sequential dispatch — each agent sees previous agents' responses
+    // -----------------------------------------------------------------------
+    for (const agentId of group.agents) {
+      try {
         const sessionKey = `agent:${agentId}:group:${groupId}`;
+
+        // Reload transcript each round so agent sees earlier responses
+        const freshHistory = await context.groupService.getTranscript(groupId, {
+          limit: group.historyLimit,
+        });
+        const freshLines = freshHistory.map((m) => {
+          const label = m.role === "agent" ? (m.agentName ?? m.agentId ?? "Agent") : "User";
+          return `[from: ${label}]: ${m.content}`;
+        });
+        const freshTranscript =
+          freshLines.length > 0
+            ? `--- Group Transcript (${group.label}) ---\n${freshLines.join("\n")}\n--- End Transcript ---\n\n`
+            : "";
 
         // Resolve agent name for the system instruction
         const builtInCfg = getBuiltInAgentConfig(agentId);
@@ -263,7 +262,7 @@ export const groupHandlers: GatewayRequestHandlers = {
 
         const ctx: MsgContext = {
           Body: message,
-          BodyForAgent: `${groupInstruction}${transcriptContext}${message}`,
+          BodyForAgent: `${groupInstruction}${freshTranscript}${message}`,
           BodyForCommands: message,
           RawBody: message,
           CommandBody: message,
@@ -308,7 +307,7 @@ export const groupHandlers: GatewayRequestHandlers = {
 
         // Filter NO_REPLY — if response is empty or "NO_REPLY", skip
         if (!responseText || responseText.toUpperCase() === "NO_REPLY") {
-          return; // skip, no message to append
+          continue; // skip, no message to append
         }
 
         // Resolve agent metadata (name, color, icon) for attribution
@@ -328,19 +327,14 @@ export const groupHandlers: GatewayRequestHandlers = {
           agentIcon,
         });
 
-        // Broadcast the agent reply to all connected clients
+        // Broadcast the agent reply immediately — frontend sees it before next agent starts
         context.broadcast("group.chat.final", {
           groupId,
           message: agentMessage,
         });
-      }),
-    );
-
-    // Log per-agent errors without crashing
-    for (const result of results) {
-      if (result.status === "rejected") {
+      } catch (err) {
         context.logGateway.warn(
-          `group dispatch agent failure: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
+          `group dispatch agent failure for ${agentId}: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     }
