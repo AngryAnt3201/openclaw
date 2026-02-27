@@ -23,7 +23,6 @@ import {
   readTranscript,
   writeTranscript,
   resolveTranscriptPath,
-  emptyTranscript,
 } from "./store.js";
 
 // ---------------------------------------------------------------------------

@@ -8,7 +8,6 @@ import * as path from "node:path";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { GroupServiceDeps } from "./service.js";
 import { GroupService } from "./service.js";
-import { readGroupStore } from "./store.js";
 
 let tmpDir: string;
 let storePath: string;
