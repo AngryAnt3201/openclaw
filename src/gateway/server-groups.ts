@@ -19,7 +19,11 @@ export function buildGatewayGroupService(params: {
   broadcast: (event: string, payload: unknown, opts?: { dropIfSlow?: boolean }) => void;
 }): GatewayGroupState {
   const groupLogger = getChildLogger({ module: "groups" });
-  const storePath = resolveGroupStorePath((params.cfg as any).groups?.store);
+  const storePath = resolveGroupStorePath(
+    (params.cfg as unknown as Record<string, Record<string, unknown>>).groups?.store as
+      | string
+      | undefined,
+  );
 
   const groupService = new GroupService({
     storePath,

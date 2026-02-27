@@ -61,7 +61,7 @@ export const groupHandlers: GatewayRequestHandlers = {
   // -------------------------------------------------------------------------
   // group.list
   // -------------------------------------------------------------------------
-  "group.list": async ({ params, respond, context }) => {
+  "group.list": async ({ params: _params, respond, context }) => {
     if (!context.groupService) {
       respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, "group service not available"));
       return;
