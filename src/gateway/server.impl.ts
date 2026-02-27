@@ -43,6 +43,7 @@ import {
   setSkillsRemoteRegistry,
 } from "../infra/skills-remote.js";
 import { scheduleGatewayUpdateCheck } from "../infra/update-startup.js";
+import { syncTaskToKB } from "../knowledge-base/sync/task-sync.js";
 import { AppPortProxy, resolveExternalBindIp } from "../launcher/port-proxy.js";
 import { AppProcessManager } from "../launcher/process-manager.js";
 import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/diagnostic.js";
@@ -59,6 +60,8 @@ import { buildGatewayCredentialService } from "./server-credentials.js";
 import { buildGatewayCronService } from "./server-cron.js";
 import { buildGatewayDeviceService } from "./server-devices-registry.js";
 import { startGatewayDiscovery } from "./server-discovery-runtime.js";
+import { buildGatewayGroupService } from "./server-groups.js";
+import { buildGatewayKBService } from "./server-knowledge-base.js";
 import { applyGatewayLaneConcurrency } from "./server-lanes.js";
 import { buildGatewayLauncherService } from "./server-launcher.js";
 import { startGatewayMaintenanceTimers } from "./server-maintenance.js";
@@ -72,6 +75,7 @@ import { createNodeSubscriptionManager } from "./server-node-subscriptions.js";
 import { buildGatewayNotificationService } from "./server-notifications.js";
 import { buildGatewayPipelineService } from "./server-pipeline.js";
 import { loadGatewayPlugins } from "./server-plugins.js";
+import { buildGatewayProjectService } from "./server-projects.js";
 import { createGatewayReloadHandlers } from "./server-reload-handlers.js";
 import { resolveGatewayRuntimeConfig } from "./server-runtime-config.js";
 import { createGatewayRuntimeState } from "./server-runtime-state.js";
@@ -81,10 +85,7 @@ import { startGatewaySidecars } from "./server-startup.js";
 import { startGatewayTailscaleExposure } from "./server-tailscale.js";
 import { buildGatewayTaskService } from "./server-tasks.js";
 import { buildGatewayVaultService } from "./server-vault.js";
-import { buildGatewayKBService } from "./server-knowledge-base.js";
-import { syncTaskToKB } from "../knowledge-base/sync/task-sync.js";
 import { buildGatewayWidgetService } from "./server-widgets.js";
-import { buildGatewayProjectService } from "./server-projects.js";
 import { createWizardSessionTracker } from "./server-wizard-sessions.js";
 import { attachGatewayWsHandlers } from "./server-ws-runtime.js";
 import {
@@ -563,6 +564,13 @@ export async function startGatewayServer(
   });
   const { widgetService, storePath: widgetStorePath } = widgetState;
 
+  const groupState = buildGatewayGroupService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+  });
+  const { groupService, storePath: groupStorePath } = groupState;
+
   const projectState = buildGatewayProjectService({ cfg: cfgAtStart, deps, broadcast });
   const { projectService, storePath: projectStorePath } = projectState;
 
@@ -704,6 +712,8 @@ export async function startGatewayServer(
       pipelineStorePath,
       widgetService,
       widgetStorePath,
+      groupService,
+      groupStorePath,
       loadGatewayModelCatalog,
       getHealthCache,
       refreshHealthSnapshot: refreshGatewayHealthSnapshot,

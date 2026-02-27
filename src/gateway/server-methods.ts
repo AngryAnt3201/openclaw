@@ -17,7 +17,9 @@ import { deviceHandlers } from "./server-methods/devices.js";
 import { execApprovalsHandlers } from "./server-methods/exec-approvals.js";
 import { fileHandlers } from "./server-methods/files.js";
 import { githubHandlers } from "./server-methods/github.js";
+import { groupHandlers } from "./server-methods/groups.js";
 import { healthHandlers } from "./server-methods/health.js";
+import { knowledgeBaseHandlers } from "./server-methods/knowledge-base.js";
 import { launcherHandlers } from "./server-methods/launcher.js";
 import { logsHandlers } from "./server-methods/logs.js";
 import { modelsHandlers } from "./server-methods/models.js";
@@ -25,6 +27,7 @@ import { nodeHandlers } from "./server-methods/nodes.js";
 import { notificationHandlers } from "./server-methods/notifications.js";
 import { pipelineHandlers } from "./server-methods/pipeline.js";
 import { pluginsHandlers } from "./server-methods/plugins.js";
+import { projectHandlers } from "./server-methods/projects.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
 import { skillsHandlers } from "./server-methods/skills.js";
@@ -39,8 +42,6 @@ import { voicewakeHandlers } from "./server-methods/voicewake.js";
 import { webHandlers } from "./server-methods/web.js";
 import { widgetHandlers } from "./server-methods/widgets.js";
 import { wizardHandlers } from "./server-methods/wizard.js";
-import { knowledgeBaseHandlers } from "./server-methods/knowledge-base.js";
-import { projectHandlers } from "./server-methods/projects.js";
 
 const ADMIN_SCOPE = "operator.admin";
 const READ_SCOPE = "operator.read";
@@ -122,6 +123,9 @@ const READ_METHODS = new Set([
   "node.list",
   "node.describe",
   "chat.history",
+  "group.list",
+  "group.get",
+  "group.history",
 ]);
 const WRITE_METHODS = new Set([
   "send",
@@ -193,6 +197,11 @@ const WRITE_METHODS = new Set([
   "credential.rule.remove",
   "credential.checkout",
   "credential.import",
+  "group.create",
+  "group.update",
+  "group.delete",
+  "group.send",
+  "group.abort",
 ]);
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
@@ -307,6 +316,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...pipelineHandlers,
   ...widgetHandlers,
   ...fileHandlers,
+  ...groupHandlers,
   ...knowledgeBaseHandlers,
   ...projectHandlers,
 };
