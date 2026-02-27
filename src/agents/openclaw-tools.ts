@@ -12,7 +12,9 @@ import { createCronTool } from "./tools/cron-tool.js";
 import { createDeviceTool } from "./tools/device-tool.js";
 import { createGatewayTool } from "./tools/gateway-tool.js";
 import { createGitHubTool } from "./tools/github-tool.js";
+import { createGroupTool } from "./tools/group-tool.js";
 import { createImageTool } from "./tools/image-tool.js";
+import { createKBTool } from "./tools/kb-tool.js";
 import { createLauncherTool } from "./tools/launcher-tool.js";
 import { createMaestroAppTool } from "./tools/maestro-app-tool.js";
 import { createMaestroSessionTool } from "./tools/maestro-session-tool.js";
@@ -28,7 +30,6 @@ import { createSessionsSpawnTool } from "./tools/sessions-spawn-tool.js";
 import { createTaskTool } from "./tools/task-tool.js";
 import { createTtsTool } from "./tools/tts-tool.js";
 import { createVaultTool } from "./tools/vault-tool.js";
-import { createKBTool } from "./tools/kb-tool.js";
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
 import { createWidgetTool } from "./tools/widget-tool.js";
 
@@ -186,6 +187,9 @@ export async function createOpenClawTools(options?: {
       agentSessionKey: options?.agentSessionKey,
     }),
     createWidgetTool({
+      agentSessionKey: options?.agentSessionKey,
+    }),
+    createGroupTool({
       agentSessionKey: options?.agentSessionKey,
     }),
     createPipelineTool(),

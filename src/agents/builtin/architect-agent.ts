@@ -35,6 +35,7 @@ export const ARCHITECT_AGENT_DEF: BuiltInAgentDef = {
     "nodes",
     "github",
     "message",
+    "group",
   ],
   subagents: { allowAgents: ["coder", "*"] },
   sandbox: "off",

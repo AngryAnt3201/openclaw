@@ -37,6 +37,7 @@ export const MIRANDA_AGENT_DEF: BuiltInAgentDef = {
     "nodes",
     "image",
     "tts",
+    "group",
   ],
   subagents: { allowAgents: ["coder", "architect"] },
   sandbox: "off",
