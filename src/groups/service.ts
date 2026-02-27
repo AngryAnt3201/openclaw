@@ -217,7 +217,7 @@ export class GroupService {
         // Transcript dir may not exist — ignore
       }
 
-      this.emit("group.deleted", { id: groupId });
+      this.emit("group.deleted", { groupId });
       this.state.deps.log.info(`group deleted: ${groupId}`);
 
       return true;
