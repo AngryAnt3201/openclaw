@@ -35,6 +35,14 @@ const WidgetToolSchema = Type.Object({
   streamId: Type.Optional(Type.String()),
   streamName: Type.Optional(Type.String()),
   value: Type.Optional(Type.Any()),
+  // iframe config (for define action with type: "iframe")
+  iframeConfig: Type.Optional(
+    Type.Object({
+      mode: stringEnum(["url", "inline"] as const),
+      url: Type.Optional(Type.String()),
+      html: Type.Optional(Type.String()),
+    }),
+  ),
 });
 
 export function createWidgetTool(opts?: { agentSessionKey?: string }): AnyAgentTool {
@@ -65,6 +73,13 @@ export function createWidgetTool(opts?: { agentSessionKey?: string }): AnyAgentT
           if (params.schema !== undefined) {
             payload.schema = params.schema;
           }
+          if (params.iframeConfig !== undefined) {
+            // Merge iframeConfig into schema for iframe widget definitions
+            payload.schema = {
+              ...((payload.schema as Record<string, unknown>) ?? {}),
+              iframe: params.iframeConfig,
+            };
+          }
           const result = await callGatewayTool("widget.registry.create", gatewayOpts, payload);
           return jsonResult(result);
         }
@@ -76,6 +91,9 @@ export function createWidgetTool(opts?: { agentSessionKey?: string }): AnyAgentT
           }
           if (params.config !== undefined) {
             payload.config = params.config;
+          }
+          if (opts?.agentSessionKey) {
+            payload.spawnedBy = opts.agentSessionKey;
           }
           const result = await callGatewayTool("widget.instance.spawn", gatewayOpts, payload);
           return jsonResult(result);

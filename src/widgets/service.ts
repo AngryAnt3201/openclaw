@@ -17,6 +17,7 @@ import type {
   WidgetInstancePatch,
   WidgetCategory,
   WidgetType,
+  WidgetActionPayload,
   DataSource,
   DataSourceCreateInput,
 } from "./types.js";
@@ -358,6 +359,44 @@ export class WidgetService {
       this.emit("widget.data.pushed", { instanceId, data });
       return true;
     });
+  }
+
+  // =========================================================================
+  // Actions
+  // =========================================================================
+
+  async triggerAction(
+    instanceId: string,
+    actionName: string,
+    payload: Record<string, unknown>,
+    triggeredBy: "user" | "iframe",
+  ): Promise<{ instance: WidgetInstance; definition: WidgetDefinition } | null> {
+    const instances = await readWidgetInstances(this.file("instances.json"));
+    const instance = instances.instances.find((i) => i.id === instanceId);
+    if (!instance) {
+      return null;
+    }
+
+    const registry = await readWidgetRegistry(this.file("registry.json"));
+    const definition = registry.definitions.find((d) => d.id === instance.definitionId);
+    if (!definition) {
+      return null;
+    }
+
+    const actionPayload: WidgetActionPayload = {
+      instanceId,
+      definitionId: instance.definitionId,
+      actionName,
+      payload,
+      triggeredBy,
+    };
+
+    this.emit("widget.action.triggered", actionPayload);
+    this.state.deps.log.info(
+      `widget action triggered: ${actionName} on ${instanceId} (by ${triggeredBy})`,
+    );
+
+    return { instance, definition };
   }
 
   // =========================================================================

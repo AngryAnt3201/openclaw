@@ -31,6 +31,7 @@ export const WIDGET_TYPES = [
   "image-viewer",
   "status-card",
   "custom",
+  "iframe",
 ] as const;
 
 export type WidgetType = (typeof WIDGET_TYPES)[number];
@@ -79,6 +80,10 @@ export const WIDGET_FIELD_TYPES = [
   "badge",
   "sparkline",
   "icon",
+  "button",
+  "input",
+  "toggle",
+  "select",
 ] as const;
 
 export type WidgetFieldType = (typeof WIDGET_FIELD_TYPES)[number];
@@ -88,6 +93,9 @@ export type WidgetField = {
   label: string;
   type: WidgetFieldType;
   format?: string;
+  action?: string;
+  placeholder?: string;
+  options?: Array<{ label: string; value: string }>;
 };
 
 export type WidgetSlot = {
@@ -96,10 +104,32 @@ export type WidgetSlot = {
   fields: WidgetField[];
 };
 
+export type WidgetAction = {
+  name: string;
+  label: string;
+  description?: string;
+};
+
+export type IframeWidgetConfig = {
+  mode: "url" | "inline";
+  url?: string;
+  html?: string;
+};
+
+export type WidgetActionPayload = {
+  instanceId: string;
+  definitionId: string;
+  actionName: string;
+  payload: Record<string, unknown>;
+  triggeredBy: "user" | "iframe";
+};
+
 export type WidgetSchema = {
   layout: WidgetSchemaLayout;
   fields?: WidgetField[];
   slots?: WidgetSlot[];
+  actions?: WidgetAction[];
+  iframe?: IframeWidgetConfig;
 };
 
 // ---------------------------------------------------------------------------
@@ -257,6 +287,7 @@ export const WIDGET_EVENT_TYPES = [
   "widget.stream.created",
   "widget.stream.pushed",
   "widget.stream.deleted",
+  "widget.action.triggered",
 ] as const;
 
 export type WidgetEventType = (typeof WIDGET_EVENT_TYPES)[number];
@@ -307,4 +338,5 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
   "image-viewer": { minW: 200, maxW: 480, minH: 160, maxH: 400, defaultW: 320, defaultH: 280 },
   "status-card": { minW: 160, maxW: 360, minH: 60, maxH: 200, defaultW: 220, defaultH: 120 },
   custom: { minW: 160, maxW: 480, minH: 60, maxH: 400, defaultW: 280, defaultH: 200 },
+  iframe: { minW: 200, maxW: 480, minH: 160, maxH: 400, defaultW: 360, defaultH: 300 },
 };

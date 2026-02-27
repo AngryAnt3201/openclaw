@@ -6,8 +6,11 @@ import type {
   WidgetDefinitionFilter,
   WidgetInstanceFilter,
   WidgetInstancePatch,
+  WidgetInstance,
 } from "../../widgets/types.js";
 import type { GatewayRequestHandlers } from "./types.js";
+import { requestHeartbeatNow } from "../../infra/heartbeat-wake.js";
+import { enqueueSystemEvent } from "../../infra/system-events.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 
 function requireString(params: Record<string, unknown>, key: string): string | null {
@@ -16,6 +19,22 @@ function requireString(params: Record<string, unknown>, key: string): string | n
     return val.trim();
   }
   return null;
+}
+
+function wakeAgentForWidgetAction(
+  instance: WidgetInstance,
+  actionName: string,
+  payload: Record<string, unknown>,
+): void {
+  const sessionKey = instance.spawnedBy;
+  if (!sessionKey) {
+    return;
+  }
+  enqueueSystemEvent(
+    `Widget action "${actionName}" triggered on widget ${instance.id}. Payload: ${JSON.stringify(payload)}. Process this and update widget data.`,
+    { sessionKey },
+  );
+  requestHeartbeatNow({ reason: `widget:action:${instance.id}` });
 }
 
 export const widgetHandlers: GatewayRequestHandlers = {
@@ -361,5 +380,50 @@ export const widgetHandlers: GatewayRequestHandlers = {
       return;
     }
     respond(true, { deleted: true }, undefined);
+  },
+
+  // =========================================================================
+  // Actions
+  // =========================================================================
+
+  // -------------------------------------------------------------------------
+  // widget.action.trigger
+  // -------------------------------------------------------------------------
+  "widget.action.trigger": async ({ params, respond, context }) => {
+    if (!context.widgetService) {
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, "widget service not available"));
+      return;
+    }
+    const instanceId = requireString(params, "instanceId") ?? requireString(params, "id");
+    if (!instanceId) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing instanceId"));
+      return;
+    }
+    const actionName = requireString(params, "actionName");
+    if (!actionName) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing actionName"));
+      return;
+    }
+    const payload = (params.payload as Record<string, unknown>) ?? {};
+    const triggeredBy = (params.triggeredBy as "user" | "iframe") ?? "user";
+
+    const result = await context.widgetService.triggerAction(
+      instanceId,
+      actionName,
+      payload,
+      triggeredBy,
+    );
+    if (!result) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, `instance not found: ${instanceId}`),
+      );
+      return;
+    }
+
+    wakeAgentForWidgetAction(result.instance, actionName, payload);
+
+    respond(true, { triggered: true, instanceId, actionName }, undefined);
   },
 };
