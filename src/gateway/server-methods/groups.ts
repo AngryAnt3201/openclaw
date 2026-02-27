@@ -242,14 +242,28 @@ export const groupHandlers: GatewayRequestHandlers = {
 
     const groupMembers = group.agents.join(", ");
 
+    // Build group system instruction so agents know they can stay silent
+    const activationNote =
+      group.activation === "mention"
+        ? "Only respond if directly mentioned by name. Otherwise, respond with NO_REPLY."
+        : "If you have nothing meaningful to add, respond with exactly NO_REPLY (nothing else).";
+
     // Dispatch to all agents concurrently — one failure should not block others
     const results = await Promise.allSettled(
       group.agents.map(async (agentId) => {
         const sessionKey = `agent:${agentId}:group:${groupId}`;
 
+        // Resolve agent name for the system instruction
+        const builtInCfg = getBuiltInAgentConfig(agentId);
+        const selfName = builtInCfg?.name ?? agentId;
+
+        const groupInstruction =
+          `[Group Chat: "${group.label}" | Participants: ${groupMembers} | You are: ${selfName}]\n` +
+          `${activationNote}\n\n`;
+
         const ctx: MsgContext = {
           Body: message,
-          BodyForAgent: `${transcriptContext}${message}`,
+          BodyForAgent: `${groupInstruction}${transcriptContext}${message}`,
           BodyForCommands: message,
           RawBody: message,
           CommandBody: message,
