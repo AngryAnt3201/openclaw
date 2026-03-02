@@ -14,7 +14,8 @@ function makeTriggerDeps() {
   const notificationService = makeMockNotificationService();
   const logs: string[] = [];
   const deps = {
-    notificationService: notificationService as any,
+    notificationService:
+      notificationService as unknown as import("./service.js").NotificationService,
     log: {
       info: (msg: string) => logs.push(`INFO: ${msg}`),
       warn: (msg: string) => logs.push(`WARN: ${msg}`),

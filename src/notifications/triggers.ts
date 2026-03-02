@@ -8,7 +8,7 @@
 
 import type { Task } from "../tasks/types.js";
 import type { NotificationService } from "./service.js";
-import type { NotificationCreateInput, NotificationPriority } from "./types.js";
+import type { NotificationPriority } from "./types.js";
 
 export type TriggerDeps = {
   notificationService: NotificationService;
