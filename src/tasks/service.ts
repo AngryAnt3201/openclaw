@@ -136,6 +136,7 @@ export class TaskService {
         permissions: input.permissions,
         cronBinding: input.cronBinding,
         refs: input.refs,
+        metadata: input.metadata,
         createdAtMs: now,
         updatedAtMs: now,
       };
@@ -227,6 +228,9 @@ export class TaskService {
       }
       if (patch.refs !== undefined) {
         task.refs = patch.refs;
+      }
+      if (patch.metadata !== undefined) {
+        task.metadata = patch.metadata;
       }
       task.updatedAtMs = this.now();
 

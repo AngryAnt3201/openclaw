@@ -108,6 +108,36 @@ describe("TaskService.create", () => {
     await tmp.cleanup();
   });
 
+  it("preserves metadata on create", async () => {
+    const tmp = await makeTmpStore();
+    const { service } = makeService(tmp.storePath);
+
+    const meta = { credentialId: "cred-1", agentId: "agent-1", reason: "need API key" };
+    const task = await service.create({
+      title: "Credential access",
+      type: "approval_gate",
+      metadata: meta,
+    });
+
+    expect(task.metadata).toEqual(meta);
+
+    // Verify persisted
+    const store = await readTaskStore(tmp.storePath);
+    expect(store.tasks[0]!.metadata).toEqual(meta);
+
+    await tmp.cleanup();
+  });
+
+  it("creates a task without metadata (undefined)", async () => {
+    const tmp = await makeTmpStore();
+    const { service } = makeService(tmp.storePath);
+
+    const task = await service.create({ title: "No metadata" });
+    expect(task.metadata).toBeUndefined();
+
+    await tmp.cleanup();
+  });
+
   it("creates multiple tasks with unique IDs", async () => {
     const tmp = await makeTmpStore();
     const { service } = makeService(tmp.storePath);
@@ -151,6 +181,33 @@ describe("TaskService.update", () => {
     expect(updated!.progress).toBe(50);
     expect(updated!.progressMessage).toBe("Halfway there");
     expect(updated!.updatedAtMs).toBe(1000000);
+
+    await tmp.cleanup();
+  });
+
+  it("updates metadata field", async () => {
+    const tmp = await makeTmpStore();
+    const { service } = makeService(tmp.storePath);
+
+    const task = await service.create({
+      title: "Gate",
+      type: "approval_gate",
+      metadata: { credentialId: "cred-1" },
+    });
+
+    const updated = await service.update(task.id, {
+      metadata: { credentialId: "cred-1", agentId: "agent-1", extra: true },
+    });
+
+    expect(updated!.metadata).toEqual({
+      credentialId: "cred-1",
+      agentId: "agent-1",
+      extra: true,
+    });
+
+    // Verify persisted
+    const store = await readTaskStore(tmp.storePath);
+    expect(store.tasks[0]!.metadata).toEqual(updated!.metadata);
 
     await tmp.cleanup();
   });

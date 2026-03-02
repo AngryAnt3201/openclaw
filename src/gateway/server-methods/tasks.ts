@@ -214,6 +214,18 @@ export const taskHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing taskId"));
       return;
     }
+
+    // Pre-read the task to capture type/metadata before approve() clears approval state
+    const originalTask = await context.taskService.get(taskId);
+    if (!originalTask) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, `task not found: ${taskId}`),
+      );
+      return;
+    }
+
     const task = await context.taskService.approve(taskId);
     if (!task) {
       respond(
@@ -224,11 +236,35 @@ export const taskHandlers: GatewayRequestHandlers = {
       return;
     }
 
-    // Wake the agent so it resumes the approved action immediately.
-    wakeAgentForTask(
-      task.sessionKey,
-      `Task "${task.title}" — action approved by user. Proceed with the previously requested operation.`,
-    );
+    // Auto-grant credential access for approval_gate tasks with credential metadata
+    const meta = originalTask.metadata as
+      | { credentialId?: string; agentId?: string; reason?: string }
+      | undefined;
+    if (
+      originalTask.type === "approval_gate" &&
+      meta?.credentialId &&
+      meta?.agentId &&
+      context.credentialService
+    ) {
+      await context.credentialService.grantAccess(meta.credentialId, meta.agentId);
+      await context.taskService.update(taskId, {
+        status: "complete",
+        result: {
+          success: true,
+          summary: `Credential access granted to ${meta.agentId} for ${meta.credentialId}.`,
+        },
+      });
+      wakeAgentForTask(
+        task.sessionKey,
+        `Task "${task.title}" — credential access GRANTED. You now have access to the requested credential.`,
+      );
+    } else {
+      // Wake the agent so it resumes the approved action immediately.
+      wakeAgentForTask(
+        task.sessionKey,
+        `Task "${task.title}" — action approved by user. Proceed with the previously requested operation.`,
+      );
+    }
 
     respond(true, task, undefined);
   },
@@ -242,6 +278,18 @@ export const taskHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing taskId"));
       return;
     }
+
+    // Pre-read the task to capture type/metadata before reject() changes state
+    const originalTask = await context.taskService.get(taskId);
+    if (!originalTask) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, `task not found: ${taskId}`),
+      );
+      return;
+    }
+
     const reason = requireString(params, "reason") ?? undefined;
     const task = await context.taskService.reject(taskId, reason);
     if (!task) {
@@ -253,11 +301,29 @@ export const taskHandlers: GatewayRequestHandlers = {
       return;
     }
 
-    // Wake the agent so it handles the rejection (find alternative or stop).
-    wakeAgentForTask(
-      task.sessionKey,
-      `Task "${task.title}" — action rejected by user${reason ? `: ${reason}` : ""}. Find an alternative approach or stop.`,
-    );
+    // Auto-fail credential approval_gate tasks
+    const meta = originalTask.metadata as
+      | { credentialId?: string; agentId?: string; reason?: string }
+      | undefined;
+    if (originalTask.type === "approval_gate" && meta?.credentialId) {
+      await context.taskService.update(taskId, {
+        status: "failed",
+        result: {
+          success: false,
+          error: `Credential access denied${reason ? `: ${reason}` : "."}`,
+        },
+      });
+      wakeAgentForTask(
+        task.sessionKey,
+        `Task "${task.title}" — credential access DENIED${reason ? `: ${reason}` : ""}. Do not retry this credential request.`,
+      );
+    } else {
+      // Wake the agent so it handles the rejection (find alternative or stop).
+      wakeAgentForTask(
+        task.sessionKey,
+        `Task "${task.title}" — action rejected by user${reason ? `: ${reason}` : ""}. Find an alternative approach or stop.`,
+      );
+    }
 
     respond(true, task, undefined);
   },

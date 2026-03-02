@@ -287,6 +287,9 @@ export type Task = {
   // Inline app references
   refs?: AppReference[];
 
+  // Arbitrary metadata (e.g. credential approval context)
+  metadata?: Record<string, unknown>;
+
   // Timestamps
   createdAtMs: number;
   updatedAtMs: number;
@@ -309,6 +312,7 @@ export type TaskCreateInput = {
   app?: TaskApp;
   cronBinding?: CronBinding;
   refs?: AppReference[];
+  metadata?: Record<string, unknown>;
 };
 
 // ---------------------------------------------------------------------------
@@ -335,6 +339,7 @@ export type TaskPatch = {
   permissions?: TaskPolicy;
   subTasks?: SubTask[];
   refs?: AppReference[];
+  metadata?: Record<string, unknown>;
 };
 
 // ---------------------------------------------------------------------------

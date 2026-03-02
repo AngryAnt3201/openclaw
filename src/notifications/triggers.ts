@@ -64,6 +64,19 @@ export function createNotificationTriggers(deps: TriggerDeps) {
           agentId: task.agentId,
           source: "task.approval_required",
         });
+      } else if (event === "task.created") {
+        const task = payload as Task;
+        if (task.type === "approval_gate") {
+          await notificationService.create({
+            type: "approval_request",
+            title: "Credential access requested",
+            body: `"${task.title}" — an agent is requesting credential access.`,
+            priority: "critical",
+            taskId: task.id,
+            agentId: task.agentId,
+            source: "task.credential_approval",
+          });
+        }
       } else if (event === "task.input_required") {
         const task = payload as Task;
         await notificationService.create({
