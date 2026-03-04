@@ -10,6 +10,7 @@ import { createCodeTool } from "./tools/code-tool.js";
 import { createCredentialTool } from "./tools/credential-tool.js";
 import { createCronTool } from "./tools/cron-tool.js";
 import { createDeviceTool } from "./tools/device-tool.js";
+import { createFileTool } from "./tools/file-tool.js";
 import { createGatewayTool } from "./tools/gateway-tool.js";
 import { createGitHubTool } from "./tools/github-tool.js";
 import { createGroupTool } from "./tools/group-tool.js";
@@ -179,6 +180,9 @@ export async function createOpenClawTools(options?: {
       agentSessionKey: options?.agentSessionKey,
     }),
     createDeviceTool({
+      agentSessionKey: options?.agentSessionKey,
+    }),
+    createFileTool({
       agentSessionKey: options?.agentSessionKey,
     }),
     createGitHubTool({

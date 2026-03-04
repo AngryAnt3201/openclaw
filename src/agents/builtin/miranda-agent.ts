@@ -26,6 +26,7 @@ export const MIRANDA_AGENT_DEF: BuiltInAgentDef = {
     "browser",
     "message",
     "vault",
+    "file",
     "task",
     "cron",
     "credential",
