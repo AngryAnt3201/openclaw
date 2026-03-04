@@ -101,10 +101,10 @@ async function executeIsolatedSession(
 
   const timeoutSec = config.timeout ?? DEFAULT_TIMEOUT_SEC;
 
-  // Resolve workspace directory if configured
+  // Resolve workspace directory if configured (auto-activates if needed)
   const workspaceDir =
     config.workspace && context.resolveWorkspaceDir
-      ? context.resolveWorkspaceDir(config.workspace)
+      ? await context.resolveWorkspaceDir(config.workspace)
       : undefined;
 
   const result = await context.runIsolatedAgentJob({

@@ -13,6 +13,7 @@ import { type OpenClawConfig, loadConfig } from "../../config/config.js";
 import { applyLinkUnderstanding } from "../../link-understanding/apply.js";
 import { applyMediaUnderstanding } from "../../media-understanding/apply.js";
 import { defaultRuntime } from "../../runtime.js";
+import { resolveWorkspaceDirForSession } from "../../workspaces/resolve-hook.js";
 import { resolveCommandAuthorization } from "../command-auth.js";
 import { SILENT_REPLY_TOKEN } from "../tokens.js";
 import { resolveDefaultModel } from "./directive-handling.js";
@@ -93,7 +94,12 @@ export async function getReplyFromConfig(
     }
   }
 
-  const workspaceDirRaw = resolveAgentWorkspaceDir(cfg, agentId) ?? DEFAULT_AGENT_WORKSPACE_DIR;
+  // Try remote workspace resolution first (auto-activates if bound)
+  const remoteWorkspaceDir = agentSessionKey
+    ? await resolveWorkspaceDirForSession(agentSessionKey, agentId)
+    : null;
+  const workspaceDirRaw =
+    remoteWorkspaceDir ?? resolveAgentWorkspaceDir(cfg, agentId) ?? DEFAULT_AGENT_WORKSPACE_DIR;
   const workspace = await ensureAgentWorkspace({
     dir: workspaceDirRaw,
     ensureBootstrapFiles: !agentCfg?.skipBootstrap && !isFastTestEnv,

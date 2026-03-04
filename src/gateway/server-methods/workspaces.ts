@@ -420,6 +420,24 @@ export const workspaceHandlers: GatewayRequestHandlers = {
     }
     const agentId = requireString(params, "agentId") ?? undefined;
     const workspace = await context.workspaceService.resolveForSession(sessionKey, agentId);
-    respond(true, { workspace: workspace ?? null }, undefined);
+    if (!workspace) {
+      respond(true, { workspace: null, workspaceDir: null }, undefined);
+      return;
+    }
+
+    // Auto-activate the workspace if not already active
+    let workspaceDir: string | null = null;
+    if (context.workspaceRuntime) {
+      const state = context.workspaceRuntime.getState(workspace.id);
+      if (!state || state.status !== "active") {
+        try {
+          await context.workspaceRuntime.activate(workspace);
+        } catch {
+          /* activation errors logged internally */
+        }
+      }
+      workspaceDir = context.workspaceRuntime.resolvePrimaryDir(workspace.id);
+    }
+    respond(true, { workspace, workspaceDir }, undefined);
   },
 };

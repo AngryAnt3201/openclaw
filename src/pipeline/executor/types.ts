@@ -26,8 +26,8 @@ export type ExecutorContext = {
     info: (...args: unknown[]) => void;
     error: (...args: unknown[]) => void;
   };
-  /** Resolve a workspace ID to its primary local mount path. */
-  resolveWorkspaceDir?: (workspaceId: string) => string | null;
+  /** Resolve a workspace ID to its primary local mount path (auto-activates). */
+  resolveWorkspaceDir?: (workspaceId: string) => Promise<string | null> | string | null;
 };
 
 // ---------------------------------------------------------------------------

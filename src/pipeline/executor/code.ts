@@ -65,10 +65,10 @@ export const executeCodeNode: NodeExecutorFn = async (
 
     const prompt = parts.join("\n\n");
 
-    // Resolve workspace directory if configured
+    // Resolve workspace directory if configured (auto-activates if needed)
     const workspaceDir =
       config.workspace && context.resolveWorkspaceDir
-        ? context.resolveWorkspaceDir(config.workspace)
+        ? await context.resolveWorkspaceDir(config.workspace)
         : undefined;
 
     const result = await context.runIsolatedAgentJob({

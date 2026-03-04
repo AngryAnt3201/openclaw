@@ -290,8 +290,19 @@ export const pipelineHandlers: GatewayRequestHandlers = {
         error: (...args: unknown[]) =>
           context.logGateway?.error(`[pipeline:run] ${args.map(String).join(" ")}`),
       },
-      resolveWorkspaceDir: (workspaceId: string) => {
-        return context.workspaceRuntime?.resolvePrimaryDir(workspaceId) ?? null;
+      resolveWorkspaceDir: async (workspaceId: string) => {
+        if (!context.workspaceRuntime || !context.workspaceService) {
+          return null;
+        }
+        // Auto-activate if not already active
+        const state = context.workspaceRuntime.getState(workspaceId);
+        if (!state || state.status !== "active") {
+          const ws = await context.workspaceService.get(workspaceId);
+          if (ws) {
+            await context.workspaceRuntime.activate(ws);
+          }
+        }
+        return context.workspaceRuntime.resolvePrimaryDir(workspaceId) ?? null;
       },
     };
 

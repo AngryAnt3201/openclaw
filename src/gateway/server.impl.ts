@@ -50,6 +50,7 @@ import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/di
 import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js";
 import { MaestroNodeBridge } from "../maestro/maestro-node-bridge.js";
 import { runOnboardingWizard } from "../wizard/onboarding.js";
+import { registerWorkspaceResolveHook } from "../workspaces/resolve-hook.js";
 import { startGatewayConfigReloader } from "./config-reload.js";
 import { ExecApprovalManager } from "./exec-approval-manager.js";
 import { NodeRegistry } from "./node-registry.js";
@@ -581,6 +582,19 @@ export async function startGatewayServer(
     broadcast,
   });
   const { workspaceService, workspaceRuntime, storePath: workspaceStorePath } = workspaceState;
+
+  // Register workspace resolve hook so agents auto-activate workspaces
+  registerWorkspaceResolveHook(async (sessionKey, agentId) => {
+    const ws = await workspaceService.resolveForSession(sessionKey, agentId);
+    if (!ws) {
+      return null;
+    }
+    const state = workspaceRuntime.getState(ws.id);
+    if (!state || state.status !== "active") {
+      await workspaceRuntime.activate(ws);
+    }
+    return workspaceRuntime.resolvePrimaryDir(ws.id);
+  });
 
   const channelManager = createChannelManager({
     loadConfig,

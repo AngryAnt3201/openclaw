@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { existsSync } from "node:fs";
+import * as os from "node:os";
 import type { Workspace, WorkspaceDirectory, WorkspaceRuntimeState, MountState } from "./types.js";
 import { mountSshfs, unmountSshfs, type SshfsMount } from "./sshfs.js";
 
@@ -37,10 +38,11 @@ export class WorkspaceRuntime {
 
   /**
    * Activate a workspace: mount SSHFS dirs, validate local dirs.
+   * Called automatically when an agent resolves a workspace — no manual step needed.
    */
   async activate(workspace: Workspace): Promise<WorkspaceRuntimeState> {
     const existing = this.states.get(workspace.id);
-    if (existing && existing.status === "active") {
+    if (existing && (existing.status === "active" || existing.status === "activating")) {
       return existing;
     }
 
@@ -192,7 +194,7 @@ export class WorkspaceRuntime {
   // =========================================================================
 
   private async mountDirectory(dir: WorkspaceDirectory, workspace: Workspace): Promise<MountState> {
-    if (dir.mountMethod === "local") {
+    if (dir.mountMethod === "local" || dir.deviceId === "local") {
       // Local directory — just validate it exists
       if (existsSync(dir.remotePath)) {
         return {
@@ -221,12 +223,29 @@ export class WorkspaceRuntime {
       };
     }
 
-    // SSHFS mount
-    try {
-      // Look up device for SSH credentials
-      // For now, extract from deviceId (assumes format user@host or just host)
-      const { sshUser, sshHost, sshKeyPath } = this.parseDeviceConnection(dir.deviceId);
+    // Check if the remote host IS this machine (gateway) — skip SSHFS, use path directly
+    const { sshUser, sshHost, sshKeyPath } = this.parseDeviceConnection(dir.deviceId);
+    if (this.isLocalHost(sshHost)) {
+      this.deps.log.info(`directory ${dir.label} is on this machine — using path directly`);
+      if (existsSync(dir.remotePath)) {
+        return {
+          directoryId: dir.id,
+          mountPoint: dir.remotePath,
+          mountId: `local-${dir.id}`,
+          status: "mounted",
+        };
+      }
+      return {
+        directoryId: dir.id,
+        mountPoint: dir.remotePath,
+        mountId: `local-${dir.id}`,
+        status: "error",
+        errorMessage: `Directory does not exist on gateway: ${dir.remotePath}`,
+      };
+    }
 
+    // SSHFS mount for truly remote directories
+    try {
       const mount = await mountSshfs({
         sshHost,
         sshUser,
@@ -273,5 +292,40 @@ export class WorkspaceRuntime {
       return { sshUser: user!, sshHost: host! };
     }
     return { sshUser: "root", sshHost: deviceId };
+  }
+
+  /**
+   * Check if a host refers to this machine (the gateway).
+   * Matches localhost, loopback, the machine's hostname, and any local IP.
+   */
+  private isLocalHost(host: string): boolean {
+    const lower = host.toLowerCase();
+    if (lower === "localhost" || lower === "127.0.0.1" || lower === "::1") {
+      return true;
+    }
+
+    const hostname = os.hostname().toLowerCase();
+    if (lower === hostname) {
+      return true;
+    }
+
+    // Check against all local network interfaces
+    try {
+      const ifaces = os.networkInterfaces();
+      for (const addrs of Object.values(ifaces)) {
+        if (!addrs) {
+          continue;
+        }
+        for (const addr of addrs) {
+          if (addr.address === host) {
+            return true;
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+
+    return false;
   }
 }
