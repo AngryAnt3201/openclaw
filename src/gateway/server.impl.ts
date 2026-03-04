@@ -50,7 +50,10 @@ import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/di
 import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js";
 import { MaestroNodeBridge } from "../maestro/maestro-node-bridge.js";
 import { runOnboardingWizard } from "../wizard/onboarding.js";
-import { registerWorkspaceResolveHook } from "../workspaces/resolve-hook.js";
+import {
+  registerWorkspaceResolveHook,
+  registerWorkspaceAllowedPathsHook,
+} from "../workspaces/resolve-hook.js";
 import { startGatewayConfigReloader } from "./config-reload.js";
 import { ExecApprovalManager } from "./exec-approval-manager.js";
 import { NodeRegistry } from "./node-registry.js";
@@ -594,6 +597,15 @@ export async function startGatewayServer(
       await workspaceRuntime.activate(ws);
     }
     return workspaceRuntime.resolvePrimaryDir(ws.id);
+  });
+
+  // Register allowed-paths hook so the file tool is scoped to workspace dirs
+  registerWorkspaceAllowedPathsHook(async (sessionKey, agentId) => {
+    const ws = await workspaceService.resolveForSession(sessionKey, agentId);
+    if (!ws) {
+      return [];
+    }
+    return ws.directories.map((d) => d.remotePath);
   });
 
   const channelManager = createChannelManager({
