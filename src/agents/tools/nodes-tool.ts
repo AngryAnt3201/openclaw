@@ -1,6 +1,7 @@
 import type { AgentToolResult } from "@mariozechner/pi-agent-core";
 import { Type } from "@sinclair/typebox";
 import crypto from "node:crypto";
+import { normalize } from "node:path";
 import type { OpenClawConfig } from "../../config/config.js";
 import {
   type CameraFacing,
@@ -17,12 +18,23 @@ import {
 } from "../../cli/nodes-screen.js";
 import { parseDurationMs } from "../../cli/parse-duration.js";
 import { imageMimeFromFormat } from "../../media/mime.js";
+import { resolveAllowedFilePathsForSession } from "../../workspaces/resolve-hook.js";
 import { resolveSessionAgentId } from "../agent-scope.js";
 import { optionalStringEnum, stringEnum } from "../schema/typebox.js";
 import { sanitizeToolResultImages } from "../tool-images.js";
 import { type AnyAgentTool, jsonResult, readStringParam } from "./common.js";
 import { callGatewayTool, type GatewayCallOptions } from "./gateway.js";
 import { listNodes, resolveNodeIdFromList, resolveNodeId } from "./nodes-utils.js";
+
+const FILE_COMMANDS = new Set(["file.list", "file.read", "file.stat"]);
+
+function isPathAllowed(filePath: string, allowedRoots: string[]): boolean {
+  const n = normalize(filePath);
+  return allowedRoots.some((root) => {
+    const nr = normalize(root);
+    return n === nr || n.startsWith(nr + "/");
+  });
+}
 
 const NODES_TOOL_ACTIONS = [
   "status",
@@ -418,6 +430,19 @@ export function createNodesTool(options?: {
             }
             const cwd =
               typeof params.cwd === "string" && params.cwd.trim() ? params.cwd.trim() : undefined;
+
+            // Enforce workspace path restrictions for run cwd
+            if (sessionKey) {
+              const allowedPaths = await resolveAllowedFilePathsForSession(sessionKey);
+              if (allowedPaths.length > 0 && cwd && !isPathAllowed(cwd, allowedPaths)) {
+                return jsonResult({
+                  error: "Access denied — cwd is outside your workspace directories.",
+                  allowedRoots: allowedPaths,
+                  requestedCwd: cwd,
+                });
+              }
+            }
+
             const env = parseEnvPairs(params.env);
             const commandTimeoutMs = parseTimeoutMs(params.commandTimeoutMs);
             const invokeTimeoutMs = parseTimeoutMs(params.invokeTimeoutMs);
@@ -459,6 +484,27 @@ export function createNodesTool(options?: {
                 });
               }
             }
+
+            // Enforce workspace path restrictions for file commands
+            if (FILE_COMMANDS.has(invokeCommand) && sessionKey) {
+              const allowedPaths = await resolveAllowedFilePathsForSession(sessionKey);
+              const invokeP = invokeParams as Record<string, unknown>;
+              const filePath = typeof invokeP.path === "string" ? invokeP.path : "";
+              if (allowedPaths.length > 0 && filePath && !isPathAllowed(filePath, allowedPaths)) {
+                return jsonResult({
+                  error: "Access denied — path is outside your workspace directories.",
+                  allowedRoots: allowedPaths,
+                  requestedPath: filePath,
+                });
+              }
+              if (allowedPaths.length === 0) {
+                return jsonResult({
+                  error:
+                    "No workspace directories are bound to your session. Ask the user to assign a workspace first.",
+                });
+              }
+            }
+
             const invokeTimeoutMs = parseTimeoutMs(params.invokeTimeoutMs);
             const raw = await callGatewayTool("node.invoke", gatewayOpts, {
               nodeId,
