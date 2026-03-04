@@ -38,6 +38,7 @@ export const MIRANDA_AGENT_DEF: BuiltInAgentDef = {
     "image",
     "tts",
     "group",
+    "workspace",
   ],
   subagents: { allowAgents: ["coder", "architect"] },
   sandbox: "off",

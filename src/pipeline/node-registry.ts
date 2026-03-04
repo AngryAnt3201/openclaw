@@ -143,6 +143,7 @@ export const BUILTIN_NODE_DEFINITIONS: readonly NodeDefinition[] = [
         defaultValue: "off",
       },
       { key: "timeout", label: "Timeout (s)", type: "number", defaultValue: 300 },
+      { key: "workspace", label: "Workspace", type: "string", placeholder: "workspace-id" },
     ],
     ports: [
       { id: "in", label: "Input", type: "input" },
@@ -264,6 +265,7 @@ export const BUILTIN_NODE_DEFINITIONS: readonly NodeDefinition[] = [
       },
       { key: "maxRetries", label: "Max Retries", type: "number", defaultValue: 3 },
       { key: "timeout", label: "Timeout (s)", type: "number", defaultValue: 120 },
+      { key: "workspace", label: "Workspace", type: "string", placeholder: "workspace-id" },
     ],
     ports: [
       { id: "in", label: "Input", type: "input" },

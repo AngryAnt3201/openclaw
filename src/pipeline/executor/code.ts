@@ -13,6 +13,7 @@ interface CodeNodeConfig {
   language?: string;
   maxRetries?: number;
   timeout?: number;
+  workspace?: string;
 }
 
 export const executeCodeNode: NodeExecutorFn = async (
@@ -64,10 +65,17 @@ export const executeCodeNode: NodeExecutorFn = async (
 
     const prompt = parts.join("\n\n");
 
+    // Resolve workspace directory if configured
+    const workspaceDir =
+      config.workspace && context.resolveWorkspaceDir
+        ? context.resolveWorkspaceDir(config.workspace)
+        : undefined;
+
     const result = await context.runIsolatedAgentJob({
       message: prompt,
       tools: ["execute_code"],
       timeoutSeconds: config.timeout ?? 120,
+      ...(workspaceDir ? { workspaceDir } : {}),
     });
 
     const status = (result as Record<string, unknown>).status;

@@ -42,6 +42,7 @@ import { voicewakeHandlers } from "./server-methods/voicewake.js";
 import { webHandlers } from "./server-methods/web.js";
 import { widgetHandlers } from "./server-methods/widgets.js";
 import { wizardHandlers } from "./server-methods/wizard.js";
+import { workspaceHandlers } from "./server-methods/workspaces.js";
 
 const ADMIN_SCOPE = "operator.admin";
 const READ_SCOPE = "operator.read";
@@ -315,6 +316,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...agentProfileHandlers,
   ...pipelineHandlers,
   ...widgetHandlers,
+  ...workspaceHandlers,
   ...fileHandlers,
   ...groupHandlers,
   ...knowledgeBaseHandlers,

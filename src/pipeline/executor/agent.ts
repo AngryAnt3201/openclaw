@@ -101,6 +101,12 @@ async function executeIsolatedSession(
 
   const timeoutSec = config.timeout ?? DEFAULT_TIMEOUT_SEC;
 
+  // Resolve workspace directory if configured
+  const workspaceDir =
+    config.workspace && context.resolveWorkspaceDir
+      ? context.resolveWorkspaceDir(config.workspace)
+      : undefined;
+
   const result = await context.runIsolatedAgentJob({
     message: buildPromptWithInput(config.prompt, input),
     model: config.model,
@@ -110,6 +116,7 @@ async function executeIsolatedSession(
     thinking: config.thinking,
     timeoutSeconds: timeoutSec,
     previousOutput: input,
+    ...(workspaceDir ? { workspaceDir } : {}),
   });
 
   const isOk = result.status === "ok";

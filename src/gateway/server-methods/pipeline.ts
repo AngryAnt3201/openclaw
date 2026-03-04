@@ -290,6 +290,9 @@ export const pipelineHandlers: GatewayRequestHandlers = {
         error: (...args: unknown[]) =>
           context.logGateway?.error(`[pipeline:run] ${args.map(String).join(" ")}`),
       },
+      resolveWorkspaceDir: (workspaceId: string) => {
+        return context.workspaceRuntime?.resolvePrimaryDir(workspaceId) ?? null;
+      },
     };
 
     // Run execution asynchronously — broadcast events as they happen.

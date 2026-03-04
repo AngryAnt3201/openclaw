@@ -102,6 +102,7 @@ export type AgentNodeConfig = {
   credentials?: string[];
   tools?: string[];
   apps?: string[];
+  workspace?: string;
 };
 
 export type AppNodeConfig = {
@@ -134,6 +135,7 @@ export type CodeNodeConfig = {
   language?: string;
   maxRetries?: number;
   timeout?: number;
+  workspace?: string;
 };
 
 // ===========================================================================

@@ -32,6 +32,7 @@ import { createTtsTool } from "./tools/tts-tool.js";
 import { createVaultTool } from "./tools/vault-tool.js";
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
 import { createWidgetTool } from "./tools/widget-tool.js";
+import { createWorkspaceTool } from "./tools/workspace-tool.js";
 
 export async function createOpenClawTools(options?: {
   sandboxBrowserBridgeUrl?: string;
@@ -194,6 +195,7 @@ export async function createOpenClawTools(options?: {
     }),
     createPipelineTool(),
     createCodeTool(),
+    createWorkspaceTool(),
   ];
 
   const pluginTools = resolvePluginTools({

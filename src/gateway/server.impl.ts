@@ -87,6 +87,7 @@ import { buildGatewayTaskService } from "./server-tasks.js";
 import { buildGatewayVaultService } from "./server-vault.js";
 import { buildGatewayWidgetService } from "./server-widgets.js";
 import { createWizardSessionTracker } from "./server-wizard-sessions.js";
+import { buildGatewayWorkspaceService } from "./server-workspaces.js";
 import { attachGatewayWsHandlers } from "./server-ws-runtime.js";
 import {
   getHealthCache,
@@ -574,6 +575,13 @@ export async function startGatewayServer(
   const projectState = buildGatewayProjectService({ cfg: cfgAtStart, deps, broadcast });
   const { projectService, storePath: projectStorePath } = projectState;
 
+  const workspaceState = buildGatewayWorkspaceService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+  });
+  const { workspaceService, workspaceRuntime, storePath: workspaceStorePath } = workspaceState;
+
   const channelManager = createChannelManager({
     loadConfig,
     channelLogs,
@@ -712,6 +720,9 @@ export async function startGatewayServer(
       pipelineStorePath,
       widgetService,
       widgetStorePath,
+      workspaceService,
+      workspaceRuntime,
+      workspaceStorePath,
       groupService,
       groupStorePath,
       loadGatewayModelCatalog,
@@ -861,6 +872,7 @@ export async function startGatewayServer(
       await kbState.close();
       portProxy.destroyAll();
       processManager.shutdownAll();
+      await workspaceRuntime.deactivateAll();
       await close(opts);
     },
   };
