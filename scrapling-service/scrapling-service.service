@@ -1,0 +1,17 @@
+[Unit]
+Description=Scrapling Sidecar Service
+After=network.target openclaw-gateway.service
+
+[Service]
+Type=simple
+User=miranda
+WorkingDirectory=/home/miranda/scrapling-service
+ExecStart=/home/miranda/.local/bin/python -m scrapling_service.server
+Restart=on-failure
+RestartSec=5
+Environment=SCRAPLING_HOST=0.0.0.0
+Environment=SCRAPLING_PORT=18790
+Environment=SCRAPLING_SESSION_TTL=30
+
+[Install]
+WantedBy=multi-user.target
