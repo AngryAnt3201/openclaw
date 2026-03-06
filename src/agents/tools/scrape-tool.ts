@@ -46,7 +46,7 @@ const ScrapeToolSchema = Type.Object({
   ttl_minutes: Type.Optional(Type.Number({ description: "Session time-to-live in minutes" })),
 });
 
-export function createScrapeTool(opts?: { agentSessionKey?: string }): AnyAgentTool {
+export function createScrapeTool(_opts?: { agentSessionKey?: string }): AnyAgentTool {
   return {
     label: "Scrape",
     name: "scrape",
