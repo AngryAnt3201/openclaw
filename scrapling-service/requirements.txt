@@ -1,0 +1,4 @@
+scrapling>=0.4
+fastapi>=0.115
+uvicorn[standard]>=0.34
+click>=8.1
