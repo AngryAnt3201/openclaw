@@ -28,6 +28,7 @@ import { notificationHandlers } from "./server-methods/notifications.js";
 import { pipelineHandlers } from "./server-methods/pipeline.js";
 import { pluginsHandlers } from "./server-methods/plugins.js";
 import { projectHandlers } from "./server-methods/projects.js";
+import { scraplingHandlers } from "./server-methods/scrapling.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
 import { skillsHandlers } from "./server-methods/skills.js";
@@ -127,6 +128,9 @@ const READ_METHODS = new Set([
   "group.list",
   "group.get",
   "group.history",
+  "scrape.health",
+  "scrape.session.list",
+  "scrape.session.get",
 ]);
 const WRITE_METHODS = new Set([
   "send",
@@ -203,6 +207,11 @@ const WRITE_METHODS = new Set([
   "group.delete",
   "group.send",
   "group.abort",
+  "scrape.fetch",
+  "scrape.extract",
+  "scrape.login",
+  "scrape.session.create",
+  "scrape.session.destroy",
 ]);
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
@@ -321,6 +330,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...groupHandlers,
   ...knowledgeBaseHandlers,
   ...projectHandlers,
+  ...scraplingHandlers,
 };
 
 export async function handleGatewayRequest(
