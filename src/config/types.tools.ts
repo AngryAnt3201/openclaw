@@ -397,6 +397,22 @@ export type ToolsConfig = {
         timeoutSeconds?: number;
       };
     };
+    scrapling?: {
+      /** Enable Scrapling sidecar integration (default: false). */
+      enabled?: boolean;
+      /** Scrapling service base URL (default: http://localhost:18790). */
+      baseUrl?: string;
+      /** Default fetch mode: fast | stealth | dynamic (default: fast). */
+      defaultMode?: "fast" | "stealth" | "dynamic";
+      /** Request timeout in seconds (default: 30). */
+      timeoutSeconds?: number;
+      /** Session TTL in minutes (default: 30). */
+      sessionTtlMinutes?: number;
+      /** Use Scrapling as web_fetch fallback before Firecrawl (default: true). */
+      webFetchFallback?: boolean;
+      /** Default proxy for all Scrapling requests. */
+      proxy?: string;
+    };
   };
   media?: MediaToolsConfig;
   links?: LinkToolsConfig;
