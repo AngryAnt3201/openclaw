@@ -40,6 +40,7 @@ export const MIRANDA_AGENT_DEF: BuiltInAgentDef = {
     "tts",
     "group",
     "workspace",
+    "scrape",
   ],
   subagents: { allowAgents: ["coder", "architect"] },
   sandbox: "off",

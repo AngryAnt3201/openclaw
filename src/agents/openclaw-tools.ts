@@ -23,6 +23,7 @@ import { createMessageTool } from "./tools/message-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
 import { createPipelineTool } from "./tools/pipeline-tool.js";
 import { createPluginTool } from "./tools/plugin-tool.js";
+import { createScrapeTool } from "./tools/scrape-tool.js";
 import { createSessionStatusTool } from "./tools/session-status-tool.js";
 import { createSessionsHistoryTool } from "./tools/sessions-history-tool.js";
 import { createSessionsListTool } from "./tools/sessions-list-tool.js";
@@ -195,6 +196,9 @@ export async function createOpenClawTools(options?: {
       agentSessionKey: options?.agentSessionKey,
     }),
     createGroupTool({
+      agentSessionKey: options?.agentSessionKey,
+    }),
+    createScrapeTool({
       agentSessionKey: options?.agentSessionKey,
     }),
     createPipelineTool(),

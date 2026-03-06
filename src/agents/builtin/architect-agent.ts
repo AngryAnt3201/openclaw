@@ -37,6 +37,7 @@ export const ARCHITECT_AGENT_DEF: BuiltInAgentDef = {
     "message",
     "group",
     "workspace",
+    "scrape",
   ],
   subagents: { allowAgents: ["coder", "*"] },
   sandbox: "off",
