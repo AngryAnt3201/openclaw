@@ -209,10 +209,24 @@ export const ToolsWebFetchSchema = z
   .strict()
   .optional();
 
+export const ToolsWebScraplingSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    baseUrl: z.string().optional(),
+    defaultMode: z.enum(["fast", "stealth", "dynamic"]).optional(),
+    timeoutSeconds: z.number().int().positive().optional(),
+    sessionTtlMinutes: z.number().positive().optional(),
+    webFetchFallback: z.boolean().optional(),
+    proxy: z.string().optional(),
+  })
+  .strict()
+  .optional();
+
 export const ToolsWebSchema = z
   .object({
     search: ToolsWebSearchSchema,
     fetch: ToolsWebFetchSchema,
+    scrapling: ToolsWebScraplingSchema,
   })
   .strict()
   .optional();
