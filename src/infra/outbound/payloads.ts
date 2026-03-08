@@ -98,13 +98,44 @@ export function normalizeOutboundPayloadsForJson(payloads: ReplyPayload[]): Outb
   }));
 }
 
+// ---------------------------------------------------------------------------
+// URL / header redaction helpers
+// ---------------------------------------------------------------------------
+
+const SENSITIVE_PARAM_PATTERN =
+  /([?&](?:key|token|secret|api_key|apikey|access_token|auth|password|client_secret)=)([^&#\s]*)/gi;
+
+const AUTH_HEADER_PATTERN = /(Authorization:\s*(?:Bearer|Basic|Token)\s+)\S+/gi;
+
+/**
+ * Redact sensitive query parameters from a URL string.
+ * Replaces values of known API-key-like params with `[REDACTED]`.
+ */
+export function redactUrl(url: string): string {
+  return url.replace(SENSITIVE_PARAM_PATTERN, "$1[REDACTED]");
+}
+
+/**
+ * Redact Authorization header values in a text block.
+ */
+export function redactHeaders(text: string): string {
+  return text.replace(AUTH_HEADER_PATTERN, "$1[REDACTED]");
+}
+
+/**
+ * Apply all redaction rules to a string (URLs + headers).
+ */
+export function redactSensitive(text: string): string {
+  return redactHeaders(redactUrl(text));
+}
+
 export function formatOutboundPayloadLog(payload: NormalizedOutboundPayload): string {
   const lines: string[] = [];
   if (payload.text) {
-    lines.push(payload.text.trimEnd());
+    lines.push(redactSensitive(payload.text.trimEnd()));
   }
   for (const url of payload.mediaUrls) {
-    lines.push(`MEDIA:${url}`);
+    lines.push(`MEDIA:${redactUrl(url)}`);
   }
   return lines.join("\n");
 }

@@ -12,6 +12,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, openSync, writeSync, closeSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { z } from "zod";
 import type {
   CredentialStoreFile,
   CredentialStoreFileV2,
@@ -22,6 +23,82 @@ import type {
 } from "./types.js";
 import { resolveCredentialAuditPath } from "./constants.js";
 import { VALID_ACCOUNT_PROVIDERS } from "./types.js";
+
+// ---------------------------------------------------------------------------
+// Zod schemas for store validation
+// ---------------------------------------------------------------------------
+
+const CredentialSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    category: z.string(),
+    provider: z.string(),
+    secretRef: z.string(),
+    accessGrants: z.array(
+      z.object({
+        agentId: z.string(),
+        grantedAtMs: z.number(),
+        grantedBy: z.string(),
+      }),
+    ),
+    activeLeases: z.array(z.any()),
+    permissionRules: z.array(z.any()),
+    usageCount: z.number(),
+    usageHistory: z.array(z.any()),
+    createdAtMs: z.number(),
+    updatedAtMs: z.number(),
+    enabled: z.boolean(),
+  })
+  .passthrough();
+
+const EncryptedEnvelopeSchema = z.object({
+  algorithm: z.literal("aes-256-gcm"),
+  kdfParams: z.object({
+    salt: z.string(),
+    N: z.number(),
+    r: z.number(),
+    p: z.number(),
+    dkLen: z.number(),
+  }),
+  nonce: z.string(),
+  ciphertext: z.string(),
+  tag: z.string(),
+});
+
+const CredentialStoreFileV2Schema = z.object({
+  version: z.literal(2),
+  credentials: z.array(CredentialSchema),
+  secrets: z.record(z.string(), EncryptedEnvelopeSchema),
+  masterKeyCheck: z.string(),
+});
+
+const CredentialStoreFileV3Schema = z.object({
+  version: z.literal(3),
+  credentials: z.array(CredentialSchema),
+  secrets: z.record(z.string(), EncryptedEnvelopeSchema),
+  masterKeyCheck: z.string(),
+  accounts: z
+    .array(
+      z
+        .object({
+          id: z.string(),
+          name: z.string(),
+          provider: z.string(),
+        })
+        .passthrough(),
+    )
+    .optional(),
+  agentProfiles: z
+    .array(
+      z
+        .object({
+          agentId: z.string(),
+        })
+        .passthrough(),
+    )
+    .optional(),
+});
 
 // ---------------------------------------------------------------------------
 // Path resolution
@@ -156,7 +233,15 @@ export async function readCredentialStore(storePath: string): Promise<Credential
 
     // v3 — current format
     if (parsed.version === 3) {
-      const v3 = parsed as CredentialStoreFile;
+      const result = CredentialStoreFileV3Schema.safeParse(parsed);
+      if (!result.success) {
+        console.warn(
+          "[credential-store] v3 schema validation failed, returning default store:",
+          result.error.message,
+        );
+        return emptyStore();
+      }
+      const v3 = result.data as unknown as CredentialStoreFile;
       // Ensure arrays exist (defensive)
       if (!Array.isArray(v3.accounts)) {
         v3.accounts = [];
@@ -169,7 +254,15 @@ export async function readCredentialStore(storePath: string): Promise<Credential
 
     // v2 — auto-upgrade
     if (parsed.version === 2) {
-      const v2 = parsed as CredentialStoreFileV2;
+      const v2Result = CredentialStoreFileV2Schema.safeParse(parsed);
+      if (!v2Result.success) {
+        console.warn(
+          "[credential-store] v2 schema validation failed, returning default store:",
+          v2Result.error.message,
+        );
+        return emptyStore();
+      }
+      const v2 = v2Result.data as unknown as CredentialStoreFileV2;
       const upgraded = upgradeV2toV3(v2);
       // Persist the upgrade immediately
       await writeCredentialStore(storePath, upgraded);

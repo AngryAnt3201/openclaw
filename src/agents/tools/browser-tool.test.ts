@@ -245,6 +245,73 @@ describe("browser tool snapshot maxChars", () => {
   });
 });
 
+describe("browser tool proxy response validation", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    configMocks.loadConfig.mockReturnValue({ browser: {} });
+    nodesUtilsMocks.listNodes.mockResolvedValue([]);
+  });
+
+  it("rejects malformed proxy response missing result field", async () => {
+    nodesUtilsMocks.listNodes.mockResolvedValue([
+      {
+        nodeId: "node-1",
+        displayName: "Browser Node",
+        connected: true,
+        caps: ["browser"],
+        commands: ["browser.proxy"],
+      },
+    ]);
+    gatewayMocks.callGatewayTool.mockResolvedValue({
+      payload: { notResult: "bad" },
+    });
+    const tool = createBrowserTool();
+    await expect(tool.execute?.(null, { action: "status", target: "node" })).rejects.toThrow(
+      "browser proxy failed",
+    );
+  });
+
+  it("rejects malformed proxy response with invalid files array", async () => {
+    nodesUtilsMocks.listNodes.mockResolvedValue([
+      {
+        nodeId: "node-1",
+        displayName: "Browser Node",
+        connected: true,
+        caps: ["browser"],
+        commands: ["browser.proxy"],
+      },
+    ]);
+    gatewayMocks.callGatewayTool.mockResolvedValue({
+      payloadJSON: JSON.stringify({
+        result: { ok: true },
+        files: [{ noPath: true }],
+      }),
+    });
+    const tool = createBrowserTool();
+    await expect(tool.execute?.(null, { action: "status", target: "node" })).rejects.toThrow(
+      "browser proxy returned malformed data",
+    );
+  });
+
+  it("accepts valid proxy response with result field", async () => {
+    nodesUtilsMocks.listNodes.mockResolvedValue([
+      {
+        nodeId: "node-1",
+        displayName: "Browser Node",
+        connected: true,
+        caps: ["browser"],
+        commands: ["browser.proxy"],
+      },
+    ]);
+    gatewayMocks.callGatewayTool.mockResolvedValue({
+      payload: { result: { ok: true, running: true } },
+    });
+    const tool = createBrowserTool();
+    const result = await tool.execute?.(null, { action: "status", target: "node" });
+    expect(result).toBeDefined();
+  });
+});
+
 describe("browser tool snapshot labels", () => {
   afterEach(() => {
     vi.clearAllMocks();

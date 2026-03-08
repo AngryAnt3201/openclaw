@@ -61,6 +61,66 @@ describe("Credential Store", () => {
       expect(loaded.version).toBe(3);
       expect(loaded.credentials).toEqual([]);
     });
+
+    it("should return empty store when v3 schema validation fails", async () => {
+      // version 3 but credentials is not an array of valid objects
+      const bad = {
+        version: 3,
+        credentials: [{ notAnId: true }],
+        secrets: {},
+        masterKeyCheck: "x",
+        accounts: [],
+        agentProfiles: [],
+      };
+      await fs.writeFile(storePath, JSON.stringify(bad), "utf-8");
+      const loaded = await readCredentialStore(storePath);
+      expect(loaded.version).toBe(3);
+      expect(loaded.credentials).toEqual([]);
+    });
+
+    it("should return empty store when v2 schema validation fails", async () => {
+      const bad = {
+        version: 2,
+        credentials: "not-an-array",
+        secrets: {},
+        masterKeyCheck: "x",
+      };
+      await fs.writeFile(storePath, JSON.stringify(bad), "utf-8");
+      const loaded = await readCredentialStore(storePath);
+      expect(loaded.version).toBe(3);
+      expect(loaded.credentials).toEqual([]);
+    });
+
+    it("should pass valid v3 store through schema validation", async () => {
+      const store: CredentialStoreFile = {
+        version: 3,
+        credentials: [
+          {
+            id: "c1",
+            name: "Test",
+            category: "ai_provider",
+            provider: "anthropic",
+            secretRef: "c1",
+            accessGrants: [],
+            activeLeases: [],
+            permissionRules: [],
+            usageCount: 0,
+            usageHistory: [],
+            createdAtMs: 1000,
+            updatedAtMs: 1000,
+            enabled: true,
+          },
+        ],
+        secrets: {},
+        masterKeyCheck: "check",
+        accounts: [],
+        agentProfiles: [],
+      };
+      await fs.writeFile(storePath, JSON.stringify(store), "utf-8");
+      const loaded = await readCredentialStore(storePath);
+      expect(loaded.credentials).toHaveLength(1);
+      expect(loaded.credentials[0]!.id).toBe("c1");
+    });
   });
 
   describe("writeCredentialStore", () => {

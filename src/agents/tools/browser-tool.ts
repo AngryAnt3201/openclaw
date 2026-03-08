@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { z } from "zod";
 import {
   browserAct,
   browserArmDialog,
@@ -38,6 +39,17 @@ type BrowserProxyResult = {
   result: unknown;
   files?: BrowserProxyFile[];
 };
+
+const BrowserProxyFileSchema = z.object({
+  path: z.string(),
+  base64: z.string(),
+  mimeType: z.string().optional(),
+});
+
+const BrowserProxyResultSchema = z.object({
+  result: z.unknown(),
+  files: z.array(BrowserProxyFileSchema).optional(),
+});
 
 const DEFAULT_BROWSER_PROXY_TIMEOUT_MS = 20_000;
 
@@ -143,15 +155,19 @@ async function callBrowserProxy(params: {
       idempotencyKey: crypto.randomUUID(),
     },
   );
-  const parsed =
+  const rawParsed =
     payload?.payload ??
     (typeof payload?.payloadJSON === "string" && payload.payloadJSON
-      ? (JSON.parse(payload.payloadJSON) as BrowserProxyResult)
+      ? (JSON.parse(payload.payloadJSON) as unknown)
       : null);
-  if (!parsed || typeof parsed !== "object" || !("result" in parsed)) {
+  if (!rawParsed || typeof rawParsed !== "object" || !("result" in rawParsed)) {
     throw new Error("browser proxy failed");
   }
-  return parsed;
+  const validated = BrowserProxyResultSchema.safeParse(rawParsed);
+  if (!validated.success) {
+    throw new Error(`browser proxy returned malformed data: ${validated.error.message}`);
+  }
+  return validated.data as BrowserProxyResult;
 }
 
 async function persistProxyFiles(files: BrowserProxyFile[] | undefined) {
