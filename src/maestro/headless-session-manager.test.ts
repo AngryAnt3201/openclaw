@@ -93,7 +93,7 @@ describe("git commands use array arguments (no shell interpolation)", () => {
     execFileSyncMock.mockReturnValue("/usr/local/bin/claude\n");
 
     // Re-import to trigger findClaudeBinary in the constructor
-    const mod = await import("./headless-session-manager.js");
+    const _mod = await import("./headless-session-manager.js");
 
     // The constructor calls findClaudeBinary which calls execFileSync("which", [...])
     const whichCalls = execFileSyncMock.mock.calls.filter((call: unknown[]) => call[0] === "which");

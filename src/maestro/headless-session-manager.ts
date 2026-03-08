@@ -63,6 +63,7 @@ const MAX_BUFFER_BYTES = 2 * 1024 * 1024;
  * Shell metacharacters that must not appear in branch names or other
  * user-supplied arguments passed to child processes.
  */
+// eslint-disable-next-line no-control-regex
 const SHELL_META_RE = /[;|&$`\\!(){}<>'"#~\n\r\0]/;
 
 /**
