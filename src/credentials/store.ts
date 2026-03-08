@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, chmodSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, writeSync, closeSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type {
@@ -193,13 +193,13 @@ export async function writeCredentialStore(
 
   const tmpPath = storePath + ".tmp";
   const content = JSON.stringify(store, null, 2);
-  await fs.writeFile(tmpPath, content, "utf-8");
 
-  // Set restrictive permissions before renaming into place
+  // Open with 0o600 from the start to avoid a window where the file is world-readable
+  const fd = openSync(tmpPath, "w", 0o600);
   try {
-    chmodSync(tmpPath, 0o600);
-  } catch {
-    // chmod may fail on some platforms (e.g. Windows)
+    writeSync(fd, content, undefined, "utf-8");
+  } finally {
+    closeSync(fd);
   }
 
   await fs.rename(tmpPath, storePath);

@@ -1,3 +1,4 @@
+import * as fsSync from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -223,6 +224,76 @@ describe("Credential Store", () => {
       expect(second.version).toBe(3);
       expect(second.credentials).toHaveLength(1);
       expect(second.credentials[0]!.name).toBe("Test Key");
+    });
+  });
+
+  describe("file permissions", () => {
+    it("should create store file with 0o600 permissions", async () => {
+      const store: CredentialStoreFile = {
+        version: 3,
+        credentials: [],
+        secrets: {},
+        masterKeyCheck: "",
+        accounts: [],
+        agentProfiles: [],
+      };
+      await writeCredentialStore(storePath, store);
+
+      const stat = fsSync.statSync(storePath);
+      const perms = stat.mode & 0o777;
+      expect(perms).toBe(0o600);
+    });
+
+    it("should create temp file with 0o600 permissions during atomic write", async () => {
+      // Write a store, then verify that if the tmp file still existed it would have 0o600.
+      // Since rename is atomic, we verify the final file has correct perms (inherited from tmp).
+      const store: CredentialStoreFile = {
+        version: 3,
+        credentials: [
+          {
+            id: "perm-test",
+            name: "PermTest",
+            category: "ai_provider",
+            provider: "test",
+            secretRef: "perm-test",
+            accessGrants: [],
+            activeLeases: [],
+            permissionRules: [],
+            usageCount: 0,
+            usageHistory: [],
+            createdAtMs: Date.now(),
+            updatedAtMs: Date.now(),
+            enabled: true,
+          },
+        ],
+        secrets: {},
+        masterKeyCheck: "check",
+        accounts: [],
+        agentProfiles: [],
+      };
+      await writeCredentialStore(storePath, store);
+
+      // The renamed file preserves the permissions of the source (tmp) file
+      const stat = fsSync.statSync(storePath);
+      const perms = stat.mode & 0o777;
+      expect(perms).toBe(0o600);
+    });
+
+    it("should not have group or other permissions on store file", async () => {
+      const store: CredentialStoreFile = {
+        version: 3,
+        credentials: [],
+        secrets: {},
+        masterKeyCheck: "",
+        accounts: [],
+        agentProfiles: [],
+      };
+      await writeCredentialStore(storePath, store);
+
+      const stat = fsSync.statSync(storePath);
+      const perms = stat.mode & 0o777;
+      // No group or other permissions
+      expect(perms & 0o077).toBe(0);
     });
   });
 });

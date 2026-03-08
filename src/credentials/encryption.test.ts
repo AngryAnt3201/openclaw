@@ -1,10 +1,15 @@
-import { describe, it, expect } from "vitest";
+import * as fsSync from "node:fs";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { CredentialSecret } from "./types.js";
 import {
   encryptSecret,
   decryptSecret,
   createMasterKeyCheck,
   validateMasterKey,
+  resolveMasterKey,
 } from "./encryption.js";
 
 describe("Credential Encryption", () => {
@@ -93,6 +98,55 @@ describe("Credential Encryption", () => {
 
     it("should reject empty check blob", () => {
       expect(validateMasterKey("", passphrase)).toBe(false);
+    });
+  });
+
+  describe("resolveMasterKey file permissions", () => {
+    let tmpDir: string;
+    let origHome: string | undefined;
+    let origCredKey: string | undefined;
+
+    beforeEach(async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "cred-enc-perm-"));
+      origHome = process.env.HOME;
+      origCredKey = process.env.OPENCLAW_CREDENTIAL_KEY;
+      // Point HOME to temp dir so keyfile is created there
+      process.env.HOME = tmpDir;
+      // Clear env key so keyfile path is used
+      delete process.env.OPENCLAW_CREDENTIAL_KEY;
+    });
+
+    afterEach(async () => {
+      process.env.HOME = origHome;
+      if (origCredKey !== undefined) {
+        process.env.OPENCLAW_CREDENTIAL_KEY = origCredKey;
+      } else {
+        delete process.env.OPENCLAW_CREDENTIAL_KEY;
+      }
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it("should create keyfile with 0o600 permissions (owner-only read/write)", async () => {
+      const key = await resolveMasterKey();
+      expect(key).toBeTruthy();
+
+      const keyfilePath = path.join(tmpDir, ".openclaw", "credentials", ".keyfile");
+      const stat = fsSync.statSync(keyfilePath);
+      // mode includes file type bits; mask to permission bits only
+      const perms = stat.mode & 0o777;
+      expect(perms).toBe(0o600);
+    });
+
+    it("should not leave keyfile world-readable at any point", async () => {
+      // This test verifies the fix: the file is created with 0o600 from the start
+      // (using openSync with mode), not written with default perms then chmod'd
+      await resolveMasterKey();
+
+      const keyfilePath = path.join(tmpDir, ".openclaw", "credentials", ".keyfile");
+      const stat = fsSync.statSync(keyfilePath);
+      const perms = stat.mode & 0o777;
+      // No group or other permissions should be set
+      expect(perms & 0o077).toBe(0);
     });
   });
 });

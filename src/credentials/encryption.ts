@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import * as crypto from "node:crypto";
-import { existsSync, mkdirSync, chmodSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, writeSync, closeSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { CredentialSecret, EncryptedEnvelope } from "./types.js";
@@ -122,8 +122,14 @@ export async function resolveMasterKey(): Promise<string> {
   }
 
   const generated = crypto.randomBytes(48).toString("base64");
-  await fs.writeFile(keyfilePath, generated, "utf-8");
-  chmodSync(keyfilePath, 0o600);
+
+  // Open with 0o600 from the start to avoid a window where the file is world-readable
+  const fd = openSync(keyfilePath, "w", 0o600);
+  try {
+    writeSync(fd, generated, undefined, "utf-8");
+  } finally {
+    closeSync(fd);
+  }
 
   return generated;
 }
