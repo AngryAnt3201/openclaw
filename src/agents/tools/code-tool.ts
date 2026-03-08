@@ -3,19 +3,22 @@
 // ---------------------------------------------------------------------------
 
 import { Type } from "@sinclair/typebox";
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import { writeFile, unlink, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type AnyAgentTool, jsonResult, readStringParam, readNumberParam } from "./common.js";
 
-const LANGUAGE_RUNNERS: Record<string, { ext: string; cmd: (f: string) => string }> = {
-  javascript: { ext: ".mjs", cmd: (f) => `node ${f}` },
-  typescript: { ext: ".ts", cmd: (f) => `npx tsx ${f}` },
-  python: { ext: ".py", cmd: (f) => `python3 ${f}` },
-  bash: { ext: ".sh", cmd: (f) => `bash ${f}` },
-  ruby: { ext: ".rb", cmd: (f) => `ruby ${f}` },
-  go: { ext: ".go", cmd: (f) => `go run ${f}` },
+const LANGUAGE_RUNNERS: Record<
+  string,
+  { ext: string; bin: string; args: (f: string) => string[] }
+> = {
+  javascript: { ext: ".mjs", bin: "node", args: (f) => [f] },
+  typescript: { ext: ".ts", bin: "npx", args: (f) => ["tsx", f] },
+  python: { ext: ".py", bin: "python3", args: (f) => [f] },
+  bash: { ext: ".sh", bin: "bash", args: (f) => [f] },
+  ruby: { ext: ".rb", bin: "ruby", args: (f) => [f] },
+  go: { ext: ".go", bin: "go", args: (f) => ["run", f] },
 };
 
 const CodeToolSchema = Type.Object({
@@ -59,7 +62,7 @@ export function createCodeTool(): AnyAgentTool {
       // Write code to temp file.
       const tmpDir = await mkdtemp(join(tmpdir(), "openclaw-code-"));
       const filePath = join(tmpDir, `script${runner.ext}`);
-      await writeFile(filePath, code, "utf-8");
+      await writeFile(filePath, code, { encoding: "utf-8", mode: 0o600 });
 
       try {
         const result = await new Promise<{
@@ -72,8 +75,9 @@ export function createCodeTool(): AnyAgentTool {
             ...(variables ? { PIPELINE_VARS: JSON.stringify(variables) } : {}),
           };
 
-          exec(
-            runner.cmd(filePath),
+          execFile(
+            runner.bin,
+            runner.args(filePath),
             {
               timeout: timeout * 1000,
               maxBuffer: 1024 * 1024, // 1MB
