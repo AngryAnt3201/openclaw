@@ -12,8 +12,7 @@
  * incrementally (cursor-based, same contract as api_server.rs).
  */
 
-import { spawn, type ChildProcess } from "node:child_process";
-import { execSync } from "node:child_process";
+import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -60,13 +59,32 @@ type Logger = { info(msg: string): void; warn(msg: string): void; error(msg: str
 /** Max output buffer per session (2 MB). Older output is trimmed. */
 const MAX_BUFFER_BYTES = 2 * 1024 * 1024;
 
+/**
+ * Shell metacharacters that must not appear in branch names or other
+ * user-supplied arguments passed to child processes.
+ */
+const SHELL_META_RE = /[;|&$`\\!(){}<>'"#~\n\r\0]/;
+
+/**
+ * Validate that a branch name does not contain shell metacharacters.
+ * Throws if the name is unsafe.
+ */
+export function validateBranchName(branch: string): void {
+  if (!branch || branch.trim().length === 0) {
+    throw new Error("Branch name must not be empty");
+  }
+  if (SHELL_META_RE.test(branch)) {
+    throw new Error(`Branch name contains disallowed shell metacharacters: ${branch}`);
+  }
+}
+
 /** Resolve the `claude` binary. */
 function findClaudeBinary(): string {
   const candidates = [process.env.CLAUDE_BIN, "claude"].filter(Boolean) as string[];
 
   for (const candidate of candidates) {
     try {
-      const resolved = execSync(`which ${candidate}`, { encoding: "utf-8" }).trim();
+      const resolved = execFileSync("which", [candidate], { encoding: "utf-8" }).trim();
       if (resolved) {
         return resolved;
       }
@@ -88,7 +106,11 @@ function findClaudeBinary(): string {
 
 function isGitRepo(dir: string): boolean {
   try {
-    execSync("git rev-parse --is-inside-work-tree", { cwd: dir, encoding: "utf-8", stdio: "pipe" });
+    execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
+      cwd: dir,
+      encoding: "utf-8",
+      stdio: "pipe",
+    });
     return true;
   } catch {
     return false;
@@ -97,7 +119,11 @@ function isGitRepo(dir: string): boolean {
 
 function branchExists(dir: string, branch: string): boolean {
   try {
-    execSync(`git rev-parse --verify "${branch}"`, { cwd: dir, encoding: "utf-8", stdio: "pipe" });
+    execFileSync("git", ["rev-parse", "--verify", branch], {
+      cwd: dir,
+      encoding: "utf-8",
+      stdio: "pipe",
+    });
     return true;
   } catch {
     return false;
@@ -105,6 +131,8 @@ function branchExists(dir: string, branch: string): boolean {
 }
 
 function prepareWorktree(projectPath: string, branch: string, log: Logger): string | null {
+  validateBranchName(branch);
+
   if (!isGitRepo(projectPath)) {
     log.warn(`headless-session: ${projectPath} is not a git repo, skipping worktree`);
     return null;
@@ -124,10 +152,14 @@ function prepareWorktree(projectPath: string, branch: string, log: Logger): stri
 
     if (!branchExists(projectPath, branch)) {
       log.info(`headless-session: creating branch ${branch}`);
-      execSync(`git branch "${branch}"`, { cwd: projectPath, encoding: "utf-8", stdio: "pipe" });
+      execFileSync("git", ["branch", branch], {
+        cwd: projectPath,
+        encoding: "utf-8",
+        stdio: "pipe",
+      });
     }
 
-    execSync(`git worktree add "${worktreePath}" "${branch}"`, {
+    execFileSync("git", ["worktree", "add", worktreePath, branch], {
       cwd: projectPath,
       encoding: "utf-8",
       stdio: "pipe",
