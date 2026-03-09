@@ -28,6 +28,11 @@ import { PRIORITY_ORDER } from "./types.js";
 // Dependencies (injected at construction)
 // ---------------------------------------------------------------------------
 
+export type InboundActionExecutor = (
+  message: InboundMessage,
+  route: InboundRoute,
+) => Promise<InboundProcessingResult | null>;
+
 export type InboundServiceDeps = {
   storePath: string;
   log: {
@@ -37,6 +42,8 @@ export type InboundServiceDeps = {
   };
   broadcast: (event: string, payload: unknown) => void;
   nowMs?: () => number;
+  /** Optional executor for auto-execute route actions. */
+  executeAction?: InboundActionExecutor;
 };
 
 // ---------------------------------------------------------------------------
@@ -152,6 +159,24 @@ export class InboundService {
       if (matched) {
         if (matched.autoExecute) {
           message.status = "processing";
+          // Execute the action after persisting (fire-and-forget outside lock)
+          const executeAfter = this.state.deps.executeAction;
+          if (executeAfter) {
+            const msgCopy = { ...message };
+            const routeCopy = { ...matched };
+            // Schedule outside the lock
+            queueMicrotask(() => {
+              void executeAfter(msgCopy, routeCopy)
+                .then(async (result) => {
+                  if (result) {
+                    await this.markProcessed(msgCopy.id, result);
+                  }
+                })
+                .catch((err) => {
+                  this.state.deps.log.error(`inbound action execution failed: ${String(err)}`);
+                });
+            });
+          }
         } else {
           message.pendingAction = {
             routeId: matched.id,

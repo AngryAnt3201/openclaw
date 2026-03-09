@@ -23,6 +23,7 @@ import {
   writeConfigFile,
 } from "../config/config.js";
 import { applyPluginAutoEnable } from "../config/plugin-auto-enable.js";
+import { clearInboundBridge } from "../inbound/bridge.js";
 import { clearAgentRunContext, onAgentEvent } from "../infra/agent-events.js";
 import {
   ensureControlUiAssetsBuilt,
@@ -591,6 +592,7 @@ export async function startGatewayServer(
     cfg: cfgAtStart,
     deps,
     broadcast,
+    getTaskService: () => taskService,
   });
   const { inboundService, storePath: inboundStorePath } = inboundState;
 
@@ -917,6 +919,7 @@ export async function startGatewayServer(
       portProxy.destroyAll();
       processManager.shutdownAll();
       clearInterval(inboundPruneInterval);
+      clearInboundBridge();
       await workspaceRuntime.deactivateAll();
       await close(opts);
     },

@@ -17,6 +17,11 @@ import { loadConfig } from "../config/config.js";
 import { writeConfigFile } from "../config/io.js";
 import { loadSessionStore, resolveStorePath } from "../config/sessions.js";
 import { danger, logVerbose, warn } from "../globals.js";
+import {
+  isInboundBridgeActive,
+  forwardToInbound,
+  normalizeTelegramMessage,
+} from "../inbound/bridge.js";
 import { readChannelAllowFromStore } from "../pairing/pairing-store.js";
 import { resolveAgentRoute } from "../routing/resolve-route.js";
 import { resolveThreadSessionKeys } from "../routing/session-key.js";
@@ -97,6 +102,42 @@ export const registerTelegramHandlers = ({
       return !hasControlCommand(text, cfg, { botUsername: entry.botUsername });
     },
     onFlush: async (entries) => {
+      // Forward to inbound system (best-effort, non-blocking)
+      if (isInboundBridgeActive()) {
+        const lastEntry = entries.at(-1);
+        if (lastEntry) {
+          const combinedText =
+            entries.length === 1
+              ? (lastEntry.msg.text ?? lastEntry.msg.caption ?? "")
+              : entries
+                  .map((e) => e.msg.text ?? e.msg.caption ?? "")
+                  .filter(Boolean)
+                  .join("\n");
+          if (combinedText.trim()) {
+            forwardToInbound(
+              normalizeTelegramMessage({
+                messageId: lastEntry.msg.message_id,
+                text: combinedText,
+                chatId: lastEntry.msg.chat.id,
+                chatType: lastEntry.msg.chat.type,
+                senderId: lastEntry.msg.from?.id ?? 0,
+                senderName:
+                  lastEntry.msg.from?.first_name ?? lastEntry.msg.from?.username ?? "unknown",
+                senderUsername: lastEntry.msg.from?.username,
+                accountId,
+                media:
+                  lastEntry.allMedia?.length > 0
+                    ? lastEntry.allMedia.map((m: any) => ({
+                        path: m.path,
+                        contentType: m.contentType,
+                      }))
+                    : undefined,
+              }),
+            );
+          }
+        }
+      }
+
       const last = entries.at(-1);
       if (!last) {
         return;

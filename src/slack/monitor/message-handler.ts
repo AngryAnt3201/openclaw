@@ -6,6 +6,11 @@ import {
   createInboundDebouncer,
   resolveInboundDebounceMs,
 } from "../../auto-reply/inbound-debounce.js";
+import {
+  isInboundBridgeActive,
+  forwardToInbound,
+  normalizeSlackMessage,
+} from "../../inbound/bridge.js";
 import { dispatchPreparedSlackMessage } from "./message-handler/dispatch.js";
 import { prepareSlackMessage } from "./message-handler/prepare.js";
 import { createSlackThreadTsResolver } from "./thread-resolution.js";
@@ -53,6 +58,43 @@ export function createSlackMessageHandler(params: {
       return !hasControlCommand(text, ctx.cfg);
     },
     onFlush: async (entries) => {
+      // Forward to inbound system (best-effort, non-blocking)
+      if (isInboundBridgeActive()) {
+        const lastEntry = entries.at(-1);
+        if (lastEntry) {
+          const combinedText =
+            entries.length === 1
+              ? (lastEntry.message.text ?? "")
+              : entries
+                  .map((e) => e.message.text ?? "")
+                  .filter(Boolean)
+                  .join("\n");
+          if (combinedText.trim()) {
+            forwardToInbound(
+              normalizeSlackMessage({
+                messageTs: lastEntry.message.ts ?? "",
+                text: combinedText,
+                channelId: lastEntry.message.channel ?? "",
+                userId: lastEntry.message.user,
+                username: lastEntry.message.username,
+                botId: (lastEntry.message as any).bot_id,
+                threadTs: lastEntry.message.thread_ts,
+                accountId: ctx.accountId,
+                files: Array.isArray((lastEntry.message as any).files)
+                  ? (lastEntry.message as any).files.map((f: any) => ({
+                      id: f.id ?? String(Math.random()),
+                      name: f.name ?? "file",
+                      mimetype: f.mimetype,
+                      url_private: f.url_private,
+                      size: f.size,
+                    }))
+                  : undefined,
+              }),
+            );
+          }
+        }
+      }
+
       const last = entries.at(-1);
       if (!last) {
         return;

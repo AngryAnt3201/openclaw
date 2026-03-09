@@ -10,6 +10,11 @@ import {
   resolveInboundDebounceMs,
 } from "../../auto-reply/inbound-debounce.js";
 import { danger } from "../../globals.js";
+import {
+  isInboundBridgeActive,
+  forwardToInbound,
+  normalizeDiscordMessage,
+} from "../../inbound/bridge.js";
 import { preflightDiscordMessage } from "./message-handler.preflight.js";
 import { processDiscordMessage } from "./message-handler.process.js";
 import { resolveDiscordMessageText } from "./message-utils.js";
@@ -70,6 +75,42 @@ export function createDiscordMessageHandler(params: {
       return !hasControlCommand(baseText, params.cfg);
     },
     onFlush: async (entries) => {
+      // Forward to inbound system (best-effort, non-blocking)
+      if (isInboundBridgeActive()) {
+        const last = entries.at(-1);
+        if (last) {
+          const msg = last.data.message;
+          const combinedContent =
+            entries.length === 1
+              ? (msg.content ?? "")
+              : entries
+                  .map((e) => e.data.message.content ?? "")
+                  .filter(Boolean)
+                  .join("\n");
+          if (combinedContent.trim()) {
+            forwardToInbound(
+              normalizeDiscordMessage({
+                messageId: msg.id,
+                content: combinedContent,
+                authorId: last.data.author?.id ?? "unknown",
+                authorName: last.data.author?.globalName ?? last.data.author?.username ?? "unknown",
+                channelId: msg.channelId,
+                attachments: Array.isArray(msg.attachments)
+                  ? msg.attachments.map((a: any) => ({
+                      id: a.id ?? String(Math.random()),
+                      filename: a.filename ?? "attachment",
+                      content_type: a.content_type,
+                      url: a.url,
+                      size: a.size,
+                    }))
+                  : undefined,
+                accountId: params.accountId,
+              }),
+            );
+          }
+        }
+      }
+
       const last = entries.at(-1);
       if (!last) {
         return;
