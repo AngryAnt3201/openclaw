@@ -232,7 +232,7 @@ export class SlackSessionPoller implements Poller {
     }
 
     const res = await this.client.conversations.history(
-      params as Parameters<WebClient["conversations"]["history"]>[0],
+      params as unknown as Parameters<WebClient["conversations"]["history"]>[0],
     );
     const messages = res.messages ?? [];
 
