@@ -23,3 +23,12 @@ export { PRIORITY_ORDER } from "./types.js";
 export { resolveInboundStorePath, readInboundStore, writeInboundStore } from "./store.js";
 export { InboundService } from "./service.js";
 export type { InboundServiceDeps } from "./service.js";
+export {
+  setInboundBridge,
+  clearInboundBridge,
+  isInboundBridgeActive,
+  forwardToInbound,
+  normalizeDiscordMessage,
+  normalizeTelegramMessage,
+  normalizeSlackMessage,
+} from "./bridge.js";
