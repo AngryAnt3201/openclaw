@@ -53,6 +53,10 @@ export class SlackSessionPoller implements Poller {
   private latestTs = new Map<string, string>();
   /** Cached Slack channel ID -> name mapping */
   private channelNames = new Map<string, string>();
+  /** Cached Slack user ID -> profile (display name + avatar) */
+  private userProfiles = new Map<string, { displayName: string; avatarUrl: string }>();
+  /** Workspace metadata (fetched once via team.info) */
+  private workspaceMeta: { name: string; icon?: string } | null = null;
   /** Resolved list of Slack channel IDs to poll */
   private targetChannels: string[] = [];
   /** Our own Slack user/bot id (from auth.test) so we can optionally skip self */
@@ -118,6 +122,9 @@ export class SlackSessionPoller implements Poller {
 
     // Pre-resolve channel names
     await this.resolveChannelNames(this.targetChannels);
+
+    // Fetch workspace metadata (name + icon)
+    await this.resolveWorkspaceMeta();
 
     this._status = "connected";
 
@@ -202,6 +209,63 @@ export class SlackSessionPoller implements Poller {
     }
   }
 
+  private async resolveUserProfile(
+    userId: string,
+  ): Promise<{ displayName: string; avatarUrl: string } | undefined> {
+    if (!this.client || !userId) {
+      return undefined;
+    }
+
+    const cached = this.userProfiles.get(userId);
+    if (cached) {
+      return cached;
+    }
+
+    try {
+      const res = await this.client.users.info({ user: userId });
+      const user = res.user as Record<string, unknown> | undefined;
+      if (!user) {
+        return undefined;
+      }
+
+      const profile = user.profile as Record<string, unknown> | undefined;
+      const displayName =
+        (profile?.display_name as string) ||
+        (profile?.real_name as string) ||
+        (user.name as string) ||
+        userId;
+      const avatarUrl = (profile?.image_72 as string) || (profile?.image_48 as string) || "";
+
+      const entry = { displayName, avatarUrl };
+      this.userProfiles.set(userId, entry);
+      return entry;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async resolveWorkspaceMeta(): Promise<void> {
+    if (!this.client || this.workspaceMeta) {
+      return;
+    }
+
+    try {
+      const res = await this.client.team.info();
+      const team = res.team as Record<string, unknown> | undefined;
+      if (!team) {
+        return;
+      }
+
+      const icon = team.icon as Record<string, unknown> | undefined;
+      this.workspaceMeta = {
+        name: (team.name as string) ?? this.config.channelName,
+        icon: (icon?.image_88 as string) || (icon?.image_68 as string) || undefined,
+      };
+    } catch {
+      // Non-critical — fall back to channel name
+    }
+  }
+
   /**
    * Backfill all available history for every target channel.
    * Paginates through conversations.history until no more messages.
@@ -273,6 +337,8 @@ export class SlackSessionPoller implements Poller {
                 size?: number;
               }>) ?? undefined;
 
+            const userProfile = await this.resolveUserProfile(msg.user as string);
+
             const raw = normalizeSlackMessage({
               messageTs: ts,
               text: (msg.text as string) ?? "",
@@ -283,6 +349,10 @@ export class SlackSessionPoller implements Poller {
               threadTs: msg.thread_ts as string | undefined,
               accountId: this.config.credentials.accountId,
               files: files && files.length > 0 ? files : undefined,
+              senderDisplayName: userProfile?.displayName,
+              senderAvatar: userProfile?.avatarUrl,
+              workspaceName: this.workspaceMeta?.name,
+              workspaceIcon: this.workspaceMeta?.icon,
             });
 
             forwardToInbound(raw);
@@ -409,6 +479,8 @@ export class SlackSessionPoller implements Poller {
           size?: number;
         }>) ?? undefined;
 
+      const userProfile = await this.resolveUserProfile(msg.user as string);
+
       const raw = normalizeSlackMessage({
         messageTs: ts,
         text: (msg.text as string) ?? "",
@@ -419,6 +491,10 @@ export class SlackSessionPoller implements Poller {
         threadTs: msg.thread_ts as string | undefined,
         accountId: this.config.credentials.accountId,
         files: files && files.length > 0 ? files : undefined,
+        senderDisplayName: userProfile?.displayName,
+        senderAvatar: userProfile?.avatarUrl,
+        workspaceName: this.workspaceMeta?.name,
+        workspaceIcon: this.workspaceMeta?.icon,
       });
 
       forwardToInbound(raw);

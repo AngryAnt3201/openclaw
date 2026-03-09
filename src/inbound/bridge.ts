@@ -157,6 +157,10 @@ export function normalizeSlackMessage(params: {
   botId?: string;
   threadTs?: string;
   accountId?: string;
+  senderDisplayName?: string;
+  senderAvatar?: string;
+  workspaceName?: string;
+  workspaceIcon?: string;
   files?: Array<{
     id: string;
     name: string;
@@ -171,10 +175,17 @@ export function normalizeSlackMessage(params: {
       channelId: params.channelId,
       channelName: params.channelName ?? params.channelId,
       senderId: params.userId ?? params.botId,
-      senderName: params.username ?? params.userId ?? params.botId ?? "unknown",
+      senderName:
+        params.senderDisplayName ?? params.username ?? params.userId ?? params.botId ?? "unknown",
+      senderAvatar: params.senderAvatar,
       platformMeta: {
+        messageTs: params.messageTs,
         threadTs: params.threadTs,
         accountId: params.accountId,
+        workspaceName: params.workspaceName,
+        workspaceIcon: params.workspaceIcon,
+        slackChannelId: params.channelId,
+        slackChannelName: params.channelName,
       },
     },
     body: params.text,
