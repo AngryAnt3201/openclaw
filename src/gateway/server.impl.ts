@@ -594,7 +594,7 @@ export async function startGatewayServer(
     broadcast,
     getTaskService: () => taskService,
   });
-  const { inboundService, storePath: inboundStorePath } = inboundState;
+  const { inboundService, pollerManager, storePath: inboundStorePath } = inboundState;
 
   // Prune inbound messages every 6 hours
   const inboundPruneInterval = setInterval(
@@ -768,6 +768,7 @@ export async function startGatewayServer(
       workspaceRuntime,
       workspaceStorePath,
       inboundService,
+      pollerManager,
       inboundStorePath,
       groupService,
       groupStorePath,
@@ -919,6 +920,7 @@ export async function startGatewayServer(
       portProxy.destroyAll();
       processManager.shutdownAll();
       clearInterval(inboundPruneInterval);
+      await pollerManager.stopAll();
       clearInboundBridge();
       await workspaceRuntime.deactivateAll();
       await close(opts);

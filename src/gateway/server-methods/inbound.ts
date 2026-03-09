@@ -210,6 +210,10 @@ export const inboundHandlers: GatewayRequestHandlers = {
       return;
     }
     const channel = await svc.addChannel(input);
+    const pm = (context as any).pollerManager;
+    if (pm) {
+      pm.handleChannelEvent("inbound.channel.added", channel);
+    }
     respond(true, channel, undefined);
   },
 
@@ -233,6 +237,10 @@ export const inboundHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, `channel not found: ${id}`));
       return;
     }
+    const pm = (context as any).pollerManager;
+    if (pm) {
+      pm.handleChannelEvent("inbound.channel.updated", channel);
+    }
     respond(true, channel, undefined);
   },
 
@@ -254,6 +262,10 @@ export const inboundHandlers: GatewayRequestHandlers = {
     if (!removed) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, `channel not found: ${id}`));
       return;
+    }
+    const pm = (context as any).pollerManager;
+    if (pm) {
+      pm.handleChannelEvent("inbound.channel.removed", { id } as any);
     }
     respond(true, { removed: true }, undefined);
   },

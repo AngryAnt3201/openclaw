@@ -7,12 +7,14 @@ import type { loadConfig } from "../config/config.js";
 import type { InboundMessage, InboundRoute, InboundProcessingResult } from "../inbound/types.js";
 import type { TaskService } from "../tasks/service.js";
 import { setInboundBridge } from "../inbound/bridge.js";
+import { PollerManager } from "../inbound/pollers/manager.js";
 import { InboundService } from "../inbound/service.js";
 import { resolveInboundStorePath } from "../inbound/store.js";
 import { getChildLogger } from "../logging.js";
 
 export type GatewayInboundState = {
   inboundService: InboundService;
+  pollerManager: PollerManager;
   storePath: string;
 };
 
@@ -22,6 +24,8 @@ export function buildGatewayInboundService(params: {
   broadcast: (event: string, payload: unknown, opts?: { dropIfSlow?: boolean }) => void;
   /** Lazy getter — task service may not exist yet at build time. */
   getTaskService?: () => TaskService | null;
+  /** Lazy getter — credential service may not exist yet at build time. */
+  getCredentialService?: () => any;
 }): GatewayInboundState {
   const inboundLogger = getChildLogger({ module: "inbound" });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -126,5 +130,31 @@ export function buildGatewayInboundService(params: {
     error: (msg) => inboundLogger.error(msg),
   });
 
-  return { inboundService, storePath };
+  // ---------------------------------------------------------------------------
+  // Poller Manager — manages per-channel polling lifecycles
+  // ---------------------------------------------------------------------------
+
+  const pollerManager = new PollerManager({
+    inboundService,
+    log: {
+      info: (msg) => inboundLogger.info(msg),
+      warn: (msg) => inboundLogger.warn(msg),
+      error: (msg) => inboundLogger.error(msg),
+    },
+    broadcast: (event, payload) => params.broadcast(event, payload, { dropIfSlow: true }),
+    resolveCredentials: async (_credentialAccountId: string) => {
+      // Placeholder — returns empty object. Will be wired to credential service in Task 11.
+      return {};
+    },
+    onWhatsAppQr: (channelId, qr) => {
+      params.broadcast("inbound.whatsapp.qr", { channelId, qr }, { dropIfSlow: true });
+    },
+  });
+
+  // Fire-and-forget: start pollers for all existing enabled channels
+  void inboundService.listChannels().then((channels) => {
+    void pollerManager.startAll(channels);
+  });
+
+  return { inboundService, pollerManager, storePath };
 }
