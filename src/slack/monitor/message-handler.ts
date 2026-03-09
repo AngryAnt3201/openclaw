@@ -77,11 +77,14 @@ export function createSlackMessageHandler(params: {
                 channelId: lastEntry.message.channel ?? "",
                 userId: lastEntry.message.user,
                 username: lastEntry.message.username,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 botId: (lastEntry.message as any).bot_id,
                 threadTs: lastEntry.message.thread_ts,
                 accountId: ctx.accountId,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 files: Array.isArray((lastEntry.message as any).files)
-                  ? (lastEntry.message as any).files.map((f: any) => ({
+                  ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (lastEntry.message as any).files.map((f: any) => ({
                       id: f.id ?? String(Math.random()),
                       name: f.name ?? "file",
                       mimetype: f.mimetype,

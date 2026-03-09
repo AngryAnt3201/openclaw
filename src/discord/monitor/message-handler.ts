@@ -96,7 +96,8 @@ export function createDiscordMessageHandler(params: {
                 authorName: last.data.author?.globalName ?? last.data.author?.username ?? "unknown",
                 channelId: msg.channelId,
                 attachments: Array.isArray(msg.attachments)
-                  ? msg.attachments.map((a: any) => ({
+                  ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    msg.attachments.map((a: any) => ({
                       id: a.id ?? String(Math.random()),
                       filename: a.filename ?? "attachment",
                       content_type: a.content_type,

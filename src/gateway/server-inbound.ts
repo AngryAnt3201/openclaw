@@ -6,7 +6,7 @@ import type { CliDeps } from "../cli/deps.js";
 import type { loadConfig } from "../config/config.js";
 import type { InboundMessage, InboundRoute, InboundProcessingResult } from "../inbound/types.js";
 import type { TaskService } from "../tasks/service.js";
-import { setInboundBridge, clearInboundBridge } from "../inbound/bridge.js";
+import { setInboundBridge } from "../inbound/bridge.js";
 import { InboundService } from "../inbound/service.js";
 import { resolveInboundStorePath } from "../inbound/store.js";
 import { getChildLogger } from "../logging.js";
@@ -24,6 +24,7 @@ export function buildGatewayInboundService(params: {
   getTaskService?: () => TaskService | null;
 }): GatewayInboundState {
   const inboundLogger = getChildLogger({ module: "inbound" });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const storePath = resolveInboundStorePath((params.cfg as any).inbound?.store);
 
   const inboundService = new InboundService({

@@ -127,7 +127,8 @@ export const registerTelegramHandlers = ({
                 accountId,
                 media:
                   lastEntry.allMedia?.length > 0
-                    ? lastEntry.allMedia.map((m: any) => ({
+                    ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      lastEntry.allMedia.map((m: any) => ({
                         path: m.path,
                         contentType: m.contentType,
                       }))
