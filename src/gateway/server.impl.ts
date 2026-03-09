@@ -593,6 +593,7 @@ export async function startGatewayServer(
     deps,
     broadcast,
     getTaskService: () => taskService,
+    getCredentialService: () => credentialService,
   });
   const { inboundService, pollerManager, storePath: inboundStorePath } = inboundState;
 

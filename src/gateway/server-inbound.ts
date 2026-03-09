@@ -4,13 +4,70 @@
 
 import type { CliDeps } from "../cli/deps.js";
 import type { loadConfig } from "../config/config.js";
+import type { CredentialService } from "../credentials/service.js";
+import type { CredentialSecret } from "../credentials/types.js";
 import type { InboundMessage, InboundRoute, InboundProcessingResult } from "../inbound/types.js";
 import type { TaskService } from "../tasks/service.js";
+import { SYSTEM_AGENT_ID } from "../credentials/system-agent.js";
 import { setInboundBridge } from "../inbound/bridge.js";
 import { PollerManager } from "../inbound/pollers/manager.js";
 import { InboundService } from "../inbound/service.js";
 import { resolveInboundStorePath } from "../inbound/store.js";
 import { getChildLogger } from "../logging.js";
+
+// ---------------------------------------------------------------------------
+// flattenSecret – convert typed CredentialSecret into flat key-value pairs
+// ---------------------------------------------------------------------------
+
+function flattenSecret(secret: CredentialSecret, out: Record<string, string>): void {
+  switch (secret.kind) {
+    case "api_key":
+      out.key = secret.key;
+      if (secret.email) {
+        out.imapUser = secret.email;
+      }
+      if (secret.metadata) {
+        for (const [k, v] of Object.entries(secret.metadata)) {
+          out[k] = v;
+        }
+      }
+      break;
+
+    case "token":
+      out.token = secret.token;
+      if (secret.refreshToken) {
+        out.refreshToken = secret.refreshToken;
+      }
+      if (secret.email) {
+        out.email = secret.email;
+      }
+      break;
+
+    case "oauth":
+      out.accessToken = secret.accessToken;
+      out.refreshToken = secret.refreshToken;
+      if (secret.clientId) {
+        out.clientId = secret.clientId;
+      }
+      if (secret.email) {
+        out.email = secret.email;
+      }
+      if (secret.scopes) {
+        out.scopes = secret.scopes.join(",");
+      }
+      break;
+
+    case "ssh_key":
+      out.privateKey = secret.privateKey;
+      if (secret.publicKey) {
+        out.publicKey = secret.publicKey;
+      }
+      if (secret.passphrase) {
+        out.passphrase = secret.passphrase;
+      }
+      break;
+  }
+}
 
 export type GatewayInboundState = {
   inboundService: InboundService;
@@ -25,7 +82,7 @@ export function buildGatewayInboundService(params: {
   /** Lazy getter — task service may not exist yet at build time. */
   getTaskService?: () => TaskService | null;
   /** Lazy getter — credential service may not exist yet at build time. */
-  getCredentialService?: () => any;
+  getCredentialService?: () => CredentialService | null;
 }): GatewayInboundState {
   const inboundLogger = getChildLogger({ module: "inbound" });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -142,9 +199,52 @@ export function buildGatewayInboundService(params: {
       error: (msg) => inboundLogger.error(msg),
     },
     broadcast: (event, payload) => params.broadcast(event, payload, { dropIfSlow: true }),
-    resolveCredentials: async (_credentialAccountId: string) => {
-      // Placeholder — returns empty object. Will be wired to credential service in Task 11.
-      return {};
+    resolveCredentials: async (credentialAccountId: string) => {
+      const credSvc = params.getCredentialService?.();
+      if (!credSvc) {
+        inboundLogger.warn(
+          `[resolveCredentials] credential service not available for account ${credentialAccountId}`,
+        );
+        return {};
+      }
+
+      // Look up the account to get its credential IDs
+      const account = await credSvc.getAccount(credentialAccountId);
+      if (!account) {
+        inboundLogger.warn(`[resolveCredentials] account not found: ${credentialAccountId}`);
+        return {};
+      }
+
+      if (account.credentialIds.length === 0) {
+        inboundLogger.warn(
+          `[resolveCredentials] account ${credentialAccountId} has no credentials`,
+        );
+        return {};
+      }
+
+      // Start with account metadata — may contain host/user info set during
+      // channel creation (e.g. imapHost, imapUser).
+      const result: Record<string, string> = { ...account.metadata };
+
+      // Checkout each credential and flatten decrypted secrets into the map.
+      // Uses SYSTEM_AGENT_ID which is auto-bound to channel accounts.
+      for (const credentialId of account.credentialIds) {
+        try {
+          const checkout = await credSvc.checkout({
+            credentialId,
+            agentId: SYSTEM_AGENT_ID,
+            action: "inbound-poller",
+          });
+
+          flattenSecret(checkout.secret, result);
+        } catch (err) {
+          inboundLogger.warn(
+            `[resolveCredentials] checkout failed for credential ${credentialId}: ${String(err)}`,
+          );
+        }
+      }
+
+      return result;
     },
     onWhatsAppQr: (channelId, qr) => {
       params.broadcast("inbound.whatsapp.qr", { channelId, qr }, { dropIfSlow: true });
