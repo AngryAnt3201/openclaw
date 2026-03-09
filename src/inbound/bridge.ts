@@ -188,3 +188,79 @@ export function normalizeSlackMessage(params: {
     })),
   };
 }
+
+/**
+ * Normalize an email (IMAP) message into a RawInboundMessage.
+ */
+export function normalizeEmailMessage(params: {
+  messageId: string;
+  subject: string;
+  body: string;
+  from: string;
+  fromName?: string;
+  to?: string;
+  date?: Date;
+  channelId: string;
+  attachments?: Array<{
+    filename: string;
+    contentType?: string;
+    size?: number;
+  }>;
+}): RawInboundMessage {
+  return {
+    source: {
+      type: "email" as InboundSourceType,
+      channelId: params.channelId,
+      channelName: params.to ?? params.channelId,
+      senderId: params.from,
+      senderName: params.fromName ?? params.from,
+    },
+    body: params.body,
+    subject: params.subject,
+    externalId: `email:${params.channelId}:${params.messageId}`,
+    attachments: params.attachments?.map((a, i) => ({
+      id: `email-att-${i}`,
+      filename: a.filename,
+      mimeType: a.contentType ?? "application/octet-stream",
+      sizeBytes: a.size,
+    })),
+    metadata: {
+      date: params.date?.toISOString(),
+    },
+  };
+}
+
+/**
+ * Normalize a WhatsApp (Baileys) message into a RawInboundMessage.
+ */
+export function normalizeWhatsAppMessage(params: {
+  messageId: string;
+  body: string;
+  remoteJid: string;
+  senderJid?: string;
+  senderName?: string;
+  channelId: string;
+  isGroup: boolean;
+  timestamp?: number;
+}): RawInboundMessage {
+  return {
+    source: {
+      type: "whatsapp" as InboundSourceType,
+      channelId: params.channelId,
+      channelName: params.isGroup
+        ? params.remoteJid.split("@")[0]
+        : (params.senderName ?? params.remoteJid),
+      senderId: params.senderJid ?? params.remoteJid,
+      senderName: params.senderName ?? params.remoteJid.split("@")[0],
+      platformMeta: {
+        isGroup: params.isGroup,
+        remoteJid: params.remoteJid,
+      },
+    },
+    body: params.body,
+    externalId: `whatsapp:${params.messageId}`,
+    metadata: {
+      timestamp: params.timestamp,
+    },
+  };
+}
