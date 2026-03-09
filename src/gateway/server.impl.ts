@@ -65,6 +65,7 @@ import { buildGatewayCronService } from "./server-cron.js";
 import { buildGatewayDeviceService } from "./server-devices-registry.js";
 import { startGatewayDiscovery } from "./server-discovery-runtime.js";
 import { buildGatewayGroupService } from "./server-groups.js";
+import { buildGatewayInboundService } from "./server-inbound.js";
 import { buildGatewayKBService } from "./server-knowledge-base.js";
 import { applyGatewayLaneConcurrency } from "./server-lanes.js";
 import { buildGatewayLauncherService } from "./server-launcher.js";
@@ -586,6 +587,21 @@ export async function startGatewayServer(
   });
   const { workspaceService, workspaceRuntime, storePath: workspaceStorePath } = workspaceState;
 
+  const inboundState = buildGatewayInboundService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+  });
+  const { inboundService, storePath: inboundStorePath } = inboundState;
+
+  // Prune inbound messages every 6 hours
+  const inboundPruneInterval = setInterval(
+    () => {
+      void inboundService.prune().catch(() => {});
+    },
+    6 * 60 * 60 * 1000,
+  );
+
   // Register workspace resolve hook so agents auto-activate workspaces
   registerWorkspaceResolveHook(async (sessionKey, agentId) => {
     const ws = await workspaceService.resolveForSession(sessionKey, agentId);
@@ -749,6 +765,8 @@ export async function startGatewayServer(
       workspaceService,
       workspaceRuntime,
       workspaceStorePath,
+      inboundService,
+      inboundStorePath,
       groupService,
       groupStorePath,
       loadGatewayModelCatalog,
@@ -898,6 +916,7 @@ export async function startGatewayServer(
       await kbState.close();
       portProxy.destroyAll();
       processManager.shutdownAll();
+      clearInterval(inboundPruneInterval);
       await workspaceRuntime.deactivateAll();
       await close(opts);
     },

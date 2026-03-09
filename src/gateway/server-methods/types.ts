@@ -5,6 +5,7 @@ import type { CredentialService } from "../../credentials/service.js";
 import type { CronService } from "../../cron/service.js";
 import type { DeviceService } from "../../devices/service.js";
 import type { GroupService } from "../../groups/service.js";
+import type { InboundService } from "../../inbound/service.js";
 import type { KBService } from "../../knowledge-base/service.js";
 import type { AppPortProxy } from "../../launcher/port-proxy.js";
 import type { AppProcessManager } from "../../launcher/process-manager.js";
@@ -73,6 +74,8 @@ export type GatewayRequestContext = {
   workspaceService?: WorkspaceService;
   workspaceRuntime?: WorkspaceRuntime;
   workspaceStorePath?: string;
+  inboundService?: InboundService;
+  inboundStorePath?: string;
   groupService?: GroupService;
   groupStorePath?: string;
   projectService?: ProjectService;

@@ -19,6 +19,7 @@ import { fileHandlers } from "./server-methods/files.js";
 import { githubHandlers } from "./server-methods/github.js";
 import { groupHandlers } from "./server-methods/groups.js";
 import { healthHandlers } from "./server-methods/health.js";
+import { inboundHandlers } from "./server-methods/inbound.js";
 import { knowledgeBaseHandlers } from "./server-methods/knowledge-base.js";
 import { launcherHandlers } from "./server-methods/launcher.js";
 import { logsHandlers } from "./server-methods/logs.js";
@@ -331,6 +332,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...knowledgeBaseHandlers,
   ...projectHandlers,
   ...scraplingHandlers,
+  ...inboundHandlers,
 };
 
 export async function handleGatewayRequest(
