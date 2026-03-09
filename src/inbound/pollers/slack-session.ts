@@ -21,6 +21,8 @@ export interface SlackSessionPollerConfig extends PollerConfig {
     slackChannelIds?: string[];
     /** Poll interval in ms (default 15 000) */
     pollIntervalMs?: number;
+    /** If true, backfill all available history on first connect (default false) */
+    backfill?: boolean;
   };
 }
 
@@ -55,6 +57,8 @@ export class SlackSessionPoller implements Poller {
   private targetChannels: string[] = [];
   /** Our own Slack user/bot id (from auth.test) so we can optionally skip self */
   private selfUserId: string | undefined;
+  /** Whether initial backfill has been completed */
+  private backfillDone = false;
 
   constructor(config: SlackSessionPollerConfig, log: PollerLog) {
     this.channelId = config.channelId;
@@ -116,6 +120,16 @@ export class SlackSessionPoller implements Poller {
     await this.resolveChannelNames(this.targetChannels);
 
     this._status = "connected";
+
+    // Backfill history if requested
+    if (this.config.options?.backfill && !this.backfillDone) {
+      this._status = "syncing";
+      this.log.info("slack-session: starting history backfill...");
+      await this.backfillAll();
+      this.backfillDone = true;
+      this.log.info("slack-session: backfill complete");
+      this._status = "connected";
+    }
 
     // Start polling loop
     const intervalMs = this.config.options?.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
@@ -186,6 +200,122 @@ export class SlackSessionPoller implements Poller {
         // Ignore — we'll fall back to the channel ID
       }
     }
+  }
+
+  /**
+   * Backfill all available history for every target channel.
+   * Paginates through conversations.history until no more messages.
+   */
+  private async backfillAll(): Promise<void> {
+    if (!this.client || this.stopped) {
+      return;
+    }
+
+    let totalIngested = 0;
+
+    for (const slackChannelId of this.targetChannels) {
+      if (this.stopped) {
+        break;
+      }
+
+      const channelName = this.channelNames.get(slackChannelId) ?? slackChannelId;
+      this.log.info(`slack-session: backfilling #${channelName}...`);
+
+      let cursor: string | undefined;
+      let channelCount = 0;
+      let maxTs = "0";
+
+      try {
+        do {
+          if (this.stopped) {
+            break;
+          }
+
+          const params: Record<string, unknown> = {
+            channel: slackChannelId,
+            limit: 200, // max per page
+          };
+          if (cursor) {
+            params.cursor = cursor;
+          }
+
+          const res = await this.client!.conversations.history(
+            params as unknown as Parameters<WebClient["conversations"]["history"]>[0],
+          );
+
+          const messages = res.messages ?? [];
+          if (messages.length === 0) {
+            break;
+          }
+
+          for (const msg of messages) {
+            const ts = msg.ts as string | undefined;
+            if (!ts) {
+              continue;
+            }
+            if (msg.bot_id) {
+              continue;
+            }
+            if (msg.subtype && msg.subtype !== "file_share" && msg.subtype !== "thread_broadcast") {
+              continue;
+            }
+
+            if (ts > maxTs) {
+              maxTs = ts;
+            }
+
+            const files =
+              (msg.files as Array<{
+                id: string;
+                name: string;
+                mimetype?: string;
+                url_private?: string;
+                size?: number;
+              }>) ?? undefined;
+
+            const raw = normalizeSlackMessage({
+              messageTs: ts,
+              text: (msg.text as string) ?? "",
+              channelId: slackChannelId,
+              channelName,
+              userId: msg.user as string | undefined,
+              username: msg.user as string | undefined,
+              threadTs: msg.thread_ts as string | undefined,
+              accountId: this.config.credentials.accountId,
+              files: files && files.length > 0 ? files : undefined,
+            });
+
+            forwardToInbound(raw);
+            channelCount++;
+          }
+
+          cursor = res.response_metadata?.next_cursor || undefined;
+
+          // Rate limit respect: small delay between pages
+          if (cursor) {
+            await this.sleep(500);
+          }
+        } while (cursor);
+      } catch (err) {
+        if (this.isRateLimited(err)) {
+          this.log.warn(
+            `slack-session: rate limited during backfill of #${channelName}, pausing 10s`,
+          );
+          await this.sleep(10_000);
+        } else {
+          this.log.error(`slack-session: backfill error on #${channelName} — ${String(err)}`);
+        }
+      }
+
+      if (maxTs !== "0") {
+        this.latestTs.set(slackChannelId, maxTs);
+      }
+
+      totalIngested += channelCount;
+      this.log.info(`slack-session: backfilled ${channelCount} messages from #${channelName}`);
+    }
+
+    this.log.info(`slack-session: backfill complete — ${totalIngested} total messages ingested`);
   }
 
   private async pollOnce(): Promise<void> {
