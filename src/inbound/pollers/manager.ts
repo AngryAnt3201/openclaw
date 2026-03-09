@@ -69,6 +69,15 @@ export class PollerManager {
       }
     }
 
+    // Fallback: merge inline credentials from channel.config (for direct setup without vault)
+    if (channel.config) {
+      for (const [k, v] of Object.entries(channel.config)) {
+        if (k !== "credentialAccountId" && typeof v === "string" && !credentials[k]) {
+          credentials[k] = v;
+        }
+      }
+    }
+
     // Create the appropriate poller
     let poller: Poller | null = null;
 
