@@ -90,6 +90,20 @@ export const pipelineHandlers: GatewayRequestHandlers = {
       return;
     }
     const patch = p.patch ?? {};
+    const existing = await context.pipelineService.get(id);
+    if (existing?.builtIn) {
+      const patchKeys = Object.keys(patch).filter(
+        (k) => (patch as Record<string, unknown>)[k] !== undefined,
+      );
+      const disallowed = patchKeys.filter((k) => k !== "enabled");
+      if (disallowed.length > 0) {
+        return respond(
+          false,
+          undefined,
+          `Cannot modify ${disallowed.join(", ")} on built-in pipeline — only 'enabled' can be toggled`,
+        );
+      }
+    }
     try {
       const pipeline = await context.pipelineService.update(id, patch as PipelinePatch);
       respond(true, pipeline, undefined);
@@ -118,6 +132,10 @@ export const pipelineHandlers: GatewayRequestHandlers = {
     if (!id || typeof id !== "string") {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing id"));
       return;
+    }
+    const existing = await context.pipelineService.get(id);
+    if (existing?.builtIn) {
+      return respond(false, undefined, "Cannot delete built-in pipeline");
     }
     await context.pipelineService.delete(id);
     respond(true, { ok: true }, undefined);
