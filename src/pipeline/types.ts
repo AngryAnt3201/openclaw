@@ -232,6 +232,7 @@ export type Pipeline = {
   name: string;
   description: string;
   enabled: boolean;
+  builtIn?: boolean;
   nodes: PipelineNode[];
   edges: PipelineEdge[];
   status: PipelineStatus;
@@ -246,6 +247,8 @@ export type Pipeline = {
 // ===========================================================================
 
 export type PipelineCreate = {
+  id?: string;
+  builtIn?: boolean;
   name: string;
   description?: string;
   enabled?: boolean;
@@ -295,6 +298,7 @@ export type PipelineRun = {
   trigger: string;
   triggerData?: Record<string, unknown>;
   nodeResults: PipelineRunNodeResult[];
+  output?: unknown;
   startedAtMs: number;
   completedAtMs?: number;
   error?: string;

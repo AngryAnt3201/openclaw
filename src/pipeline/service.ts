@@ -139,7 +139,8 @@ export class PipelineService {
       }));
 
       const pipeline: Pipeline = {
-        id: randomUUID(),
+        id: input.id ?? randomUUID(),
+        ...(input.builtIn ? { builtIn: true } : {}),
         name: input.name,
         description: input.description ?? "",
         enabled: input.enabled ?? false,
