@@ -139,17 +139,19 @@ export function buildSlackDigestPipelineCreate(): PipelineCreate {
 // ===========================================================================
 
 /**
- * Ensures the Slack digest pipeline exists in the store.
- * If it already exists, does nothing. Otherwise creates it.
+ * Ensures the Slack digest pipeline exists in the store with the latest
+ * definition. If it already exists, it is deleted and recreated so that
+ * node configs (prompts, models, templates) stay in sync with the code.
  *
- * @returns `{ created: true }` if the pipeline was created, `{ created: false }` if it already existed.
+ * @returns `{ created: true }` if the pipeline was freshly created,
+ *          `{ created: false }` should not occur (always recreates).
  */
 export async function ensureSlackDigestPipeline(
   service: PipelineService,
 ): Promise<{ created: boolean }> {
   const existing = await service.get(SLACK_DIGEST_PIPELINE_ID);
   if (existing) {
-    return { created: false };
+    await service.delete(SLACK_DIGEST_PIPELINE_ID);
   }
 
   await service.create(buildSlackDigestPipelineCreate());

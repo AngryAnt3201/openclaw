@@ -206,16 +206,16 @@ describe("ensureSlackDigestPipeline", () => {
     expect(pipeline?.builtIn).toBe(true);
   });
 
-  it("skips creation if pipeline already exists", async () => {
+  it("recreates pipeline if it already exists (keeps definition in sync)", async () => {
     const service = makeService(storePath);
 
     // Create it the first time
     const first = await ensureSlackDigestPipeline(service);
     expect(first.created).toBe(true);
 
-    // Attempt to create again — should be a no-op
+    // Call again — should recreate (delete + create)
     const second = await ensureSlackDigestPipeline(service);
-    expect(second.created).toBe(false);
+    expect(second.created).toBe(true);
 
     // Only one pipeline should exist
     const all = await service.list();
