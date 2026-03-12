@@ -339,7 +339,12 @@ export const pipelineHandlers: GatewayRequestHandlers = {
             .toReversed()
             .find((r) => r.status === "success");
           const lastOutput = lastResult?.output as Record<string, unknown> | undefined;
-          const outputText = lastOutput?.result ?? lastOutput?.outputText;
+          // Agent result is nested: { result: { payloads: [{ text }], meta }, status, ... }
+          const agentResult = lastOutput?.result as
+            | { payloads?: Array<{ text?: string }> }
+            | undefined;
+          const outputText =
+            agentResult?.payloads?.[0]?.text ?? (lastOutput?.outputText as string | undefined);
           const summary =
             typeof outputText === "string" ? outputText.slice(0, 200) : "Digest completed";
           enqueueSystemEvent(`[slack-digest] ${summary}`, { sessionKey: "main" });

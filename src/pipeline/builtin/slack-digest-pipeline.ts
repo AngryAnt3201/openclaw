@@ -106,7 +106,7 @@ export function buildSlackDigestPipelineCreate(): PipelineCreate {
       label: "Send Telegram Notification",
       config: {
         channels: ["telegram"],
-        message: "{{input.result}}",
+        message: "{{input.result.payloads.0.text}}",
         priority: "medium",
       },
       position: { x: 1000, y: 60 },
