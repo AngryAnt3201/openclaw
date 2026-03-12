@@ -143,7 +143,7 @@ describe("buildSlackDigestPipelineCreate", () => {
       prompt: string;
     };
     expect(config.session).toBe("isolated");
-    expect(config.model).toBe("anthropic/claude-sonnet-4-5");
+    expect(config.model).toBe("openai/gpt-5.2");
     expect(config.timeout).toBe(300);
     expect(typeof config.prompt).toBe("string");
     expect(config.prompt.length).toBeGreaterThan(0);
@@ -165,7 +165,7 @@ describe("buildSlackDigestPipelineCreate", () => {
       prompt: string;
     };
     expect(config.session).toBe("isolated");
-    expect(config.model).toBe("anthropic/claude-haiku-4-5");
+    expect(config.model).toBe("openai/gpt-4.1-mini");
     expect(config.timeout).toBe(180);
     expect(Array.isArray(config.tools)).toBe(true);
     expect(config.tools).toContain("vault");

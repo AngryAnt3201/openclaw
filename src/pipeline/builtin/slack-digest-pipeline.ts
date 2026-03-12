@@ -71,7 +71,7 @@ export function buildSlackDigestPipelineCreate(): PipelineCreate {
       label: "Summarize Messages",
       config: {
         prompt: SUMMARIZE_PROMPT,
-        model: "anthropic/claude-sonnet-4-5",
+        model: "openai/gpt-5.2",
         session: "isolated",
         timeout: 300,
       },
@@ -88,7 +88,7 @@ export function buildSlackDigestPipelineCreate(): PipelineCreate {
       label: "Vault & Format",
       config: {
         prompt: VAULT_AND_FORMAT_PROMPT,
-        model: "anthropic/claude-haiku-4-5",
+        model: "openai/gpt-4.1-mini",
         session: "isolated",
         timeout: 180,
         tools: ["vault"],
