@@ -7,6 +7,7 @@
 
 import type { PipelineNode } from "../types.js";
 import type { ExecutorContext, NodeExecutionResult, NodeExecutorFn } from "./types.js";
+import { executeFetchMessages } from "./slack-digest/index.js";
 
 interface CodeNodeConfig {
   description: string;
@@ -23,6 +24,11 @@ export const executeCodeNode: NodeExecutorFn = async (
 ): Promise<NodeExecutionResult> => {
   const startMs = Date.now();
   const config = node.config as CodeNodeConfig;
+
+  // Route built-in custom code executors
+  if (config.description === "slack-digest:fetch-messages") {
+    return executeFetchMessages(node, input, context);
+  }
 
   if (!config.description) {
     return {

@@ -333,6 +333,18 @@ export const pipelineHandlers: GatewayRequestHandlers = {
       .then(async (completedRun) => {
         // Persist the completed run record.
         await appendPipelineRun(storePath, completedRun);
+        // Fire system event for slack-digest pipeline completion
+        if (pipeline.id === "builtin:slack-digest" && completedRun.status === "success") {
+          const lastResult = [...completedRun.nodeResults]
+            .toReversed()
+            .find((r) => r.status === "success");
+          const outputText = (lastResult?.output as Record<string, unknown> | undefined)
+            ?.outputText;
+          const summary =
+            typeof outputText === "string" ? outputText.slice(0, 200) : "Digest completed";
+          enqueueSystemEvent(`[slack-digest] ${summary}`, { sessionKey: "main" });
+          requestHeartbeatNow({ reason: "slack-digest:complete" });
+        }
       })
       .catch((err) => {
         context.logGateway?.error?.("[pipeline:run] execution failed:", err);

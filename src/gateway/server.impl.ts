@@ -50,6 +50,7 @@ import { AppProcessManager } from "../launcher/process-manager.js";
 import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/diagnostic.js";
 import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js";
 import { MaestroNodeBridge } from "../maestro/maestro-node-bridge.js";
+import { ensureSlackDigestPipeline } from "../pipeline/builtin/slack-digest-pipeline.js";
 import { runOnboardingWizard } from "../wizard/onboarding.js";
 import {
   registerWorkspaceResolveHook,
@@ -563,6 +564,16 @@ export async function startGatewayServer(
     broadcast,
   });
   const { pipelineService, pipelineNodeRegistry, storePath: pipelineStorePath } = pipelineState;
+
+  // Ensure built-in pipelines
+  try {
+    const { created } = await ensureSlackDigestPipeline(pipelineService);
+    if (created) {
+      log.info("gateway: registered built-in Slack Digest pipeline");
+    }
+  } catch (err) {
+    log.error(`gateway: failed to register Slack Digest pipeline: ${String(err)}`);
+  }
 
   const widgetState = buildGatewayWidgetService({
     cfg: cfgAtStart,
