@@ -274,11 +274,17 @@ export async function executePipeline(
     totalDurationMs,
   });
 
+  // Store final output from last successful node
+  const lastSuccessResult = [...nodeResults].toReversed().find((r) => r.status === "success");
+  const finalOutput =
+    lastSuccessResult?.output !== undefined ? lastSuccessResult.output : undefined;
+
   return {
     ...run,
     status: finalStatus as PipelineRun["status"],
     nodeResults,
     completedAtMs: Date.now(),
+    ...(finalOutput !== undefined ? { output: finalOutput } : {}),
   };
 }
 
