@@ -594,6 +594,38 @@ export const OpenClawSchema = z
       })
       .strict()
       .optional(),
+    vault: z
+      .object({
+        vaultPath: z.string().optional(),
+        dailyNoteFormat: z.string().optional(),
+        defaultTemplate: z.string().optional(),
+        ignoreFolders: z.array(z.string()).optional(),
+      })
+      .strict()
+      .optional(),
+    knowledgeBase: z
+      .object({
+        enabled: z.boolean().optional(),
+        provider: z.string().optional(),
+        vaultPath: z.string().optional(),
+        vaultName: z.string().optional(),
+        location: z
+          .union([z.literal("gateway"), z.literal("local"), z.literal("device")])
+          .optional(),
+        deviceId: z.string().optional(),
+        syncFolder: z.string().optional(),
+        openCommand: z.string().optional(),
+        searchCommand: z.string().optional(),
+      })
+      .strict()
+      .optional(),
+    notifications: z
+      .object({
+        store: z.string().optional(),
+        channelTargets: z.record(z.string(), z.string()).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((cfg, ctx) => {
