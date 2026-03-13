@@ -5,6 +5,7 @@
 import type { CliDeps } from "../cli/deps.js";
 import type { loadConfig } from "../config/config.js";
 import type { NodeRegistry } from "./node-registry.js";
+import { deliverOutboundPayloads } from "../infra/outbound/deliver.js";
 import { getChildLogger } from "../logging.js";
 import { NotificationService } from "../notifications/service.js";
 import { resolveNotificationStorePath } from "../notifications/store.js";
@@ -66,6 +67,15 @@ export function buildGatewayNotificationService(params: {
     dispatch: {
       cfg: params.cfg,
       channelTargets,
+      deliverOutbound: async (p) => {
+        return deliverOutboundPayloads({
+          cfg: p.cfg,
+          channel: p.channel as Parameters<typeof deliverOutboundPayloads>[0]["channel"],
+          to: p.to,
+          payloads: p.payloads,
+          bestEffort: p.bestEffort,
+        });
+      },
       log: {
         info: (msg) => notifLogger.info(msg),
         warn: (msg) => notifLogger.warn(msg),
