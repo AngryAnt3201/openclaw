@@ -120,7 +120,10 @@ export function buildGatewayInboundService(params: {
           const task = await taskService.create({
             title: message.subject ?? `Inbound: ${message.body.slice(0, 80)}`,
             description: message.body,
-            priority: (action.createTask.priority ?? message.priority) as "high" | "medium" | "low",
+            priority: (action.createTask.priority ?? message.priority ?? "medium") as
+              | "high"
+              | "medium"
+              | "low",
             type: (action.createTask.type ?? "instruction") as "instruction",
             source: "api" as const,
             agentId: action.createTask.agentId,

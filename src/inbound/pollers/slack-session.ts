@@ -3,8 +3,179 @@
 // ---------------------------------------------------------------------------
 
 import { WebClient } from "@slack/web-api";
+import type { InboundMention } from "../types.js";
 import type { Poller, PollerConfig, PollerStatus, PollerLog } from "./types.js";
 import { forwardToInbound, normalizeSlackMessage } from "../bridge.js";
+
+// ---------------------------------------------------------------------------
+// Mention extraction types
+// ---------------------------------------------------------------------------
+
+interface ExtractedMention {
+  rawMatch: string;
+  id: string;
+  type: "user" | "channel" | "group";
+  /** Pre-extracted label from Slack markup (channel/group names) */
+  label?: string;
+}
+
+// ---------------------------------------------------------------------------
+// extractMentions – Scan Slack mrkdwn for user, channel, and group mentions
+// ---------------------------------------------------------------------------
+
+export function extractMentions(body: string): ExtractedMention[] {
+  const mentions: ExtractedMention[] = [];
+  const seen = new Set<string>();
+
+  // User mentions: <@U0AHCEM322K>
+  const userRe = /<@(U\w+)>/g;
+  let match: RegExpExecArray | null;
+  while ((match = userRe.exec(body)) !== null) {
+    const key = `user:${match[1]}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      mentions.push({ rawMatch: match[0], id: match[1]!, type: "user" });
+    }
+  }
+
+  // Channel mentions: <#C0AHCEM322K|channel-name>
+  const channelRe = /<#(C\w+)\|([^>]+)>/g;
+  while ((match = channelRe.exec(body)) !== null) {
+    const key = `channel:${match[1]}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      mentions.push({
+        rawMatch: match[0],
+        id: match[1]!,
+        type: "channel",
+        label: match[2],
+      });
+    }
+  }
+
+  // User group mentions: <!subteam^S0AHCEM322K|@group-name>
+  const groupRe = /<!subteam\^(S\w+)\|@([^>]+)>/g;
+  while ((match = groupRe.exec(body)) !== null) {
+    const key = `group:${match[1]}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      mentions.push({
+        rawMatch: match[0],
+        id: match[1]!,
+        type: "group",
+        label: match[2],
+      });
+    }
+  }
+
+  return mentions;
+}
+
+// ---------------------------------------------------------------------------
+// resolveMentions – Resolve extracted mentions to InboundMention[]
+// ---------------------------------------------------------------------------
+
+export async function resolveMentions(
+  extracted: ExtractedMention[],
+  resolveUser: (userId: string) => Promise<{ displayName: string; avatarUrl: string } | undefined>,
+): Promise<InboundMention[]> {
+  const resolved: InboundMention[] = [];
+
+  for (const m of extracted) {
+    switch (m.type) {
+      case "user": {
+        const profile = await resolveUser(m.id);
+        resolved.push({
+          id: m.id,
+          name: profile?.displayName ?? m.id,
+          avatar: profile?.avatarUrl || undefined,
+          type: "user",
+        });
+        break;
+      }
+      case "channel": {
+        resolved.push({
+          id: m.id,
+          name: m.label ?? m.id,
+          type: "channel",
+        });
+        break;
+      }
+      case "group": {
+        resolved.push({
+          id: m.id,
+          name: m.label ?? m.id,
+          type: "group",
+        });
+        break;
+      }
+    }
+  }
+
+  return resolved;
+}
+
+// ---------------------------------------------------------------------------
+// generateBodyResolved – Replace Slack markup with display names in plain text
+// ---------------------------------------------------------------------------
+
+export function generateBodyResolved(body: string, mentions: InboundMention[]): string {
+  let result = body;
+
+  // Build lookup maps for fast replacement
+  const userMap = new Map<string, string>();
+  const channelMap = new Map<string, string>();
+  const groupMap = new Map<string, string>();
+
+  for (const m of mentions) {
+    switch (m.type) {
+      case "user":
+        userMap.set(m.id, m.name);
+        break;
+      case "channel":
+        channelMap.set(m.id, m.name);
+        break;
+      case "group":
+        groupMap.set(m.id, m.name);
+        break;
+    }
+  }
+
+  // Replace user mentions: <@U123> → @DisplayName
+  result = result.replace(/<@(U\w+)>/g, (_match, userId: string) => {
+    return `@${userMap.get(userId) ?? userId}`;
+  });
+
+  // Replace channel mentions: <#C123|name> → #name
+  result = result.replace(/<#C\w+\|([^>]+)>/g, (_match, name: string) => {
+    return `#${name}`;
+  });
+
+  // Replace user group mentions: <!subteam^S123|@name> → @name
+  result = result.replace(/<!subteam\^S\w+\|@([^>]+)>/g, (_match, name: string) => {
+    return `@${name}`;
+  });
+
+  // Replace URL labels: <url|label> → label
+  result = result.replace(
+    /<(https?:\/\/[^|>]+)\|([^>]+)>/g,
+    (_match, _url: string, label: string) => {
+      return label;
+    },
+  );
+
+  // Replace bare URLs: <url> → url (remove angle brackets)
+  result = result.replace(/<(https?:\/\/[^>]+)>/g, (_match, url: string) => {
+    return url;
+  });
+
+  // Replace special Slack markup: <!here>, <!channel>, <!everyone>
+  result = result.replace(/<!here\|?[^>]*>/g, "@here");
+  result = result.replace(/<!channel\|?[^>]*>/g, "@channel");
+  result = result.replace(/<!everyone\|?[^>]*>/g, "@everyone");
+
+  return result;
+}
 
 // ---------------------------------------------------------------------------
 // Config
@@ -339,9 +510,17 @@ export class SlackSessionPoller implements Poller {
 
             const userProfile = await this.resolveUserProfile(msg.user as string);
 
+            // Extract and resolve mentions in the message body
+            const messageText = (msg.text as string) ?? "";
+            const extracted = extractMentions(messageText);
+            const mentions = await resolveMentions(extracted, (uid) =>
+              this.resolveUserProfile(uid),
+            );
+            const bodyResolved = generateBodyResolved(messageText, mentions);
+
             const raw = normalizeSlackMessage({
               messageTs: ts,
-              text: (msg.text as string) ?? "",
+              text: messageText,
               channelId: slackChannelId,
               channelName,
               userId: msg.user as string | undefined,
@@ -354,6 +533,10 @@ export class SlackSessionPoller implements Poller {
               workspaceName: this.workspaceMeta?.name,
               workspaceIcon: this.workspaceMeta?.icon,
             });
+
+            // Attach resolved mentions and body to the raw message
+            raw.bodyResolved = bodyResolved;
+            raw.mentions = mentions;
 
             forwardToInbound(raw);
             channelCount++;
@@ -481,9 +664,15 @@ export class SlackSessionPoller implements Poller {
 
       const userProfile = await this.resolveUserProfile(msg.user as string);
 
+      // Extract and resolve mentions in the message body
+      const messageText = (msg.text as string) ?? "";
+      const extracted = extractMentions(messageText);
+      const mentions = await resolveMentions(extracted, (uid) => this.resolveUserProfile(uid));
+      const bodyResolved = generateBodyResolved(messageText, mentions);
+
       const raw = normalizeSlackMessage({
         messageTs: ts,
-        text: (msg.text as string) ?? "",
+        text: messageText,
         channelId: slackChannelId,
         channelName,
         userId: msg.user as string | undefined,
@@ -496,6 +685,10 @@ export class SlackSessionPoller implements Poller {
         workspaceName: this.workspaceMeta?.name,
         workspaceIcon: this.workspaceMeta?.icon,
       });
+
+      // Attach resolved mentions and body to the raw message
+      raw.bodyResolved = bodyResolved;
+      raw.mentions = mentions;
 
       forwardToInbound(raw);
     }
