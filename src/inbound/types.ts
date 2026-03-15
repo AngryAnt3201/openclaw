@@ -11,15 +11,10 @@ export type InboundSourceType =
   | "webhook"
   | "api"
   | "sms"
+  | "instagram"
   | "custom";
 
-export type InboundMessageStatus =
-  | "pending"
-  | "queued"
-  | "processing"
-  | "processed"
-  | "failed"
-  | "ignored";
+export type InboundMessageStatus = "unread" | "read" | "flagged" | "snoozed" | "archived";
 
 export type InboundPriority = "critical" | "high" | "medium" | "low";
 
@@ -48,6 +43,13 @@ export interface InboundAttachment {
   sizeBytes?: number;
 }
 
+export interface InboundMention {
+  id: string;
+  name: string;
+  avatar?: string;
+  type: "user" | "channel" | "group";
+}
+
 export interface InboundProcessingResult {
   taskId?: string;
   agentId?: string;
@@ -65,19 +67,20 @@ export interface InboundMessage {
   id: string;
   source: InboundSource;
   status: InboundMessageStatus;
-  priority: InboundPriority;
   body: string;
+  bodyResolved: string;
+  mentions: InboundMention[];
   subject?: string;
-  intent?: string;
   attachments?: InboundAttachment[];
   taskId?: string;
-  result?: InboundProcessingResult;
-  pendingAction?: InboundPendingAction;
+  snoozedUntilMs?: number;
+  readAtMs?: number;
+  flaggedAtMs?: number;
+  archivedAtMs?: number;
   metadata?: Record<string, unknown>;
   externalId?: string;
   createdAtMs: number;
   updatedAtMs: number;
-  processedAtMs?: number;
 }
 
 export interface InboundChannel {
@@ -131,7 +134,7 @@ export interface InboundRoute {
 // ---- Store schema ----
 
 export interface InboundStoreFile {
-  version: 1;
+  version: 1 | 2;
   messages: InboundMessage[];
   channels: InboundChannel[];
   routes: InboundRoute[];
@@ -139,6 +142,10 @@ export interface InboundStoreFile {
 
 // ---- Query / filter helpers ----
 
+/**
+ * @deprecated Use InboundMessageQuery instead for listing/querying messages.
+ * Kept for backward compatibility with existing code that references it.
+ */
 export interface InboundMessageFilter {
   status?: InboundMessageStatus | InboundMessageStatus[];
   sourceType?: InboundSourceType | InboundSourceType[];
@@ -149,14 +156,44 @@ export interface InboundMessageFilter {
   limit?: number;
 }
 
+export interface InboundMessageQuery {
+  sourceTypes?: InboundSourceType[];
+  channelIds?: string[];
+  senderName?: string;
+  status?: InboundMessageStatus[];
+  hasAttachment?: boolean;
+  hasTask?: boolean;
+  hasThread?: boolean;
+  mentionsUser?: string;
+  beforeMs?: number;
+  afterMs?: number;
+  searchText?: string;
+}
+
+export interface InboundMessagePage {
+  messages: InboundMessage[];
+  nextCursor: string | null;
+  totalCount: number;
+}
+
+export interface InboundCounts {
+  unread: number;
+  read: number;
+  flagged: number;
+  snoozed: number;
+  archived: number;
+  bySource: Record<string, number>;
+  byChannel: Record<string, number>;
+}
+
 // ---- Input types ----
 
 export interface RawInboundMessage {
   source: InboundSource;
   body: string;
+  bodyResolved?: string;
   subject?: string;
-  intent?: string;
-  priority?: InboundPriority;
+  mentions?: InboundMention[];
   attachments?: InboundAttachment[];
   metadata?: Record<string, unknown>;
   externalId?: string;

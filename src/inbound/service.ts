@@ -8,8 +8,10 @@
 import { randomUUID } from "node:crypto";
 import type {
   InboundMessage,
-  InboundMessageFilter,
   InboundMessageStatus,
+  InboundMessageQuery,
+  InboundMessagePage,
+  InboundCounts,
   InboundChannel,
   InboundChannelCreateInput,
   InboundChannelPatch,
@@ -17,12 +19,11 @@ import type {
   InboundRouteCreateInput,
   InboundRoutePatch,
   InboundFilter,
-  InboundPriority,
   InboundProcessingResult,
   RawInboundMessage,
+  InboundStoreFile,
 } from "./types.js";
 import { readInboundStore, writeInboundStore } from "./store.js";
-import { PRIORITY_ORDER } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Dependencies (injected at construction)
@@ -44,6 +45,8 @@ export type InboundServiceDeps = {
   nowMs?: () => number;
   /** Optional executor for auto-execute route actions. */
   executeAction?: InboundActionExecutor;
+  /** Optional task creator for non-auto routes (replaces pendingAction). */
+  createPendingTask?: (message: InboundMessage, route: InboundRoute) => Promise<string | null>;
 };
 
 // ---------------------------------------------------------------------------
@@ -88,6 +91,7 @@ async function locked<T>(state: ServiceState, fn: () => Promise<T>): Promise<T> 
 
 const PRUNE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const PRUNE_MAX_COUNT = 10_000;
+const DEFAULT_PAGE_LIMIT = 50;
 
 // ---------------------------------------------------------------------------
 // InboundService
@@ -106,6 +110,149 @@ export class InboundService {
 
   private emit(event: string, payload: unknown): void {
     this.state.deps.broadcast(event, payload);
+  }
+
+  // =========================================================================
+  // Snooze expiry (private)
+  // =========================================================================
+
+  /**
+   * Scan for snoozed messages past their `snoozedUntilMs` and revert them
+   * to `unread`. Returns true if any messages were unsnoozed (store was
+   * mutated and needs persisting).
+   */
+  private checkSnoozeExpiry(store: InboundStoreFile): boolean {
+    const now = this.now();
+    let mutated = false;
+
+    for (const msg of store.messages) {
+      if (
+        msg.status === "snoozed" &&
+        msg.snoozedUntilMs !== undefined &&
+        msg.snoozedUntilMs <= now
+      ) {
+        msg.status = "unread";
+        msg.snoozedUntilMs = undefined;
+        msg.updatedAtMs = now;
+        mutated = true;
+      }
+    }
+
+    return mutated;
+  }
+
+  // =========================================================================
+  // Query matching (private)
+  // =========================================================================
+
+  /**
+   * Apply an InboundMessageQuery filter to a message. Returns true if the
+   * message matches all specified query criteria.
+   */
+  private queryMatches(
+    query: InboundMessageQuery,
+    msg: InboundMessage,
+    allMessages: InboundMessage[],
+  ): boolean {
+    if (query.sourceTypes && query.sourceTypes.length > 0) {
+      if (!query.sourceTypes.includes(msg.source.type)) {
+        return false;
+      }
+    }
+
+    if (query.channelIds && query.channelIds.length > 0) {
+      if (!query.channelIds.includes(msg.source.channelId)) {
+        return false;
+      }
+    }
+
+    if (query.senderName) {
+      const senderName = msg.source.senderName ?? "";
+      if (!senderName.toLowerCase().includes(query.senderName.toLowerCase())) {
+        return false;
+      }
+    }
+
+    if (query.status && query.status.length > 0) {
+      const set = new Set<InboundMessageStatus>(query.status);
+      if (!set.has(msg.status)) {
+        return false;
+      }
+    }
+
+    if (query.hasAttachment !== undefined) {
+      const has = Array.isArray(msg.attachments) && msg.attachments.length > 0;
+      if (query.hasAttachment !== has) {
+        return false;
+      }
+    }
+
+    if (query.hasTask !== undefined) {
+      const has = msg.taskId !== undefined && msg.taskId !== null && msg.taskId !== "";
+      if (query.hasTask !== has) {
+        return false;
+      }
+    }
+
+    if (query.hasThread !== undefined) {
+      // For Slack: check if any other message shares the same threadTs
+      const meta = msg.source.platformMeta as Record<string, unknown> | undefined;
+      let hasThread = false;
+      if (meta && msg.source.type === "slack") {
+        const messageTs = meta.messageTs as string | undefined;
+        const threadTs = meta.threadTs as string | undefined;
+        const ts = threadTs ?? messageTs;
+        if (ts) {
+          hasThread = allMessages.some((other) => {
+            if (other.id === msg.id) {
+              return false;
+            }
+            const otherMeta = other.source.platformMeta as Record<string, unknown> | undefined;
+            if (!otherMeta || other.source.type !== "slack") {
+              return false;
+            }
+            const otherMessageTs = otherMeta.messageTs as string | undefined;
+            const otherThreadTs = otherMeta.threadTs as string | undefined;
+            return otherThreadTs === ts || otherMessageTs === ts;
+          });
+        }
+      }
+      if (query.hasThread !== hasThread) {
+        return false;
+      }
+    }
+
+    if (query.mentionsUser) {
+      const searchName = query.mentionsUser.toLowerCase();
+      const found = msg.mentions.some((m) => m.name.toLowerCase().includes(searchName));
+      if (!found) {
+        return false;
+      }
+    }
+
+    if (query.beforeMs !== undefined) {
+      if (msg.createdAtMs >= query.beforeMs) {
+        return false;
+      }
+    }
+
+    if (query.afterMs !== undefined) {
+      if (msg.createdAtMs <= query.afterMs) {
+        return false;
+      }
+    }
+
+    if (query.searchText) {
+      const text = query.searchText.toLowerCase();
+      const searchable = [msg.bodyResolved, msg.subject ?? "", msg.source.senderName ?? ""]
+        .join(" ")
+        .toLowerCase();
+      if (!searchable.includes(text)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   // =========================================================================
@@ -130,23 +277,14 @@ export class InboundService {
         }
       }
 
-      // Resolve priority: raw → channel default → "medium"
-      let priority: InboundPriority = raw.priority ?? "medium";
-      if (!raw.priority) {
-        const channel = store.channels.find((c) => c.id === raw.source.channelId);
-        if (channel?.defaultPriority) {
-          priority = channel.defaultPriority;
-        }
-      }
-
       const message: InboundMessage = {
         id: randomUUID(),
         source: raw.source,
-        status: "pending",
-        priority,
+        status: "unread",
         body: raw.body,
+        bodyResolved: raw.bodyResolved ?? raw.body,
+        mentions: raw.mentions ?? [],
         subject: raw.subject,
-        intent: raw.intent,
         attachments: raw.attachments,
         metadata: raw.metadata,
         externalId: raw.externalId,
@@ -158,7 +296,8 @@ export class InboundService {
       const matched = this.matchRouteSync(store.routes, message);
       if (matched) {
         if (matched.autoExecute) {
-          message.status = "processing";
+          message.status = "read";
+          message.readAtMs = now;
           // Execute the action after persisting (fire-and-forget outside lock)
           const executeAfter = this.state.deps.executeAction;
           if (executeAfter) {
@@ -169,7 +308,10 @@ export class InboundService {
               void executeAfter(msgCopy, routeCopy)
                 .then(async (result) => {
                   if (result) {
-                    await this.markProcessed(msgCopy.id, result);
+                    await this.setStatus(msgCopy.id, "archived");
+                    if (result.taskId) {
+                      await this.linkToTask(msgCopy.id, result.taskId);
+                    }
                   }
                 })
                 .catch((err) => {
@@ -178,11 +320,23 @@ export class InboundService {
             });
           }
         } else {
-          message.pendingAction = {
-            routeId: matched.id,
-            routeName: matched.name,
-            action: matched.action,
-          };
+          // Non-auto route: create a pending task and link via taskId
+          const createTask = this.state.deps.createPendingTask;
+          if (createTask) {
+            const msgCopy = { ...message };
+            const routeCopy = { ...matched };
+            queueMicrotask(() => {
+              void createTask(msgCopy, routeCopy)
+                .then(async (taskId) => {
+                  if (taskId) {
+                    await this.linkToTask(msgCopy.id, taskId);
+                  }
+                })
+                .catch((err) => {
+                  this.state.deps.log.error(`inbound pending task creation failed: ${String(err)}`);
+                });
+            });
+          }
         }
       }
 
@@ -204,44 +358,58 @@ export class InboundService {
   }
 
   // -------------------------------------------------------------------------
-  // listMessages
+  // listMessages (paginated with InboundMessageQuery)
   // -------------------------------------------------------------------------
 
-  async listMessages(filter?: InboundMessageFilter): Promise<InboundMessage[]> {
-    const store = await readInboundStore(this.state.deps.storePath);
-    let msgs = store.messages;
+  async listMessages(
+    query?: InboundMessageQuery,
+    cursor?: string,
+    limit?: number,
+  ): Promise<InboundMessagePage> {
+    return locked(this.state, async () => {
+      const store = await readInboundStore(this.state.deps.storePath);
 
-    if (filter) {
-      if (filter.status) {
-        const statuses = Array.isArray(filter.status) ? filter.status : [filter.status];
-        const set = new Set<InboundMessageStatus>(statuses);
-        msgs = msgs.filter((m) => set.has(m.status));
+      // Lazy snooze expiry check
+      const snoozeMutated = this.checkSnoozeExpiry(store);
+      if (snoozeMutated) {
+        await writeInboundStore(this.state.deps.storePath, store);
       }
-      if (filter.sourceType) {
-        const types = Array.isArray(filter.sourceType) ? filter.sourceType : [filter.sourceType];
-        const set = new Set(types);
-        msgs = msgs.filter((m) => set.has(m.source.type));
-      }
-      if (filter.channelId) {
-        msgs = msgs.filter((m) => m.source.channelId === filter.channelId);
-      }
-      if (filter.priority) {
-        const priorities = Array.isArray(filter.priority) ? filter.priority : [filter.priority];
-        const set = new Set(priorities);
-        msgs = msgs.filter((m) => set.has(m.priority));
-      }
-      if (filter.taskId) {
-        msgs = msgs.filter((m) => m.taskId === filter.taskId);
-      }
-      if (filter.since) {
-        msgs = msgs.filter((m) => m.createdAtMs >= filter.since!);
-      }
-      if (filter.limit && filter.limit > 0) {
-        msgs = msgs.slice(0, filter.limit);
-      }
-    }
 
-    return msgs;
+      // Sort by createdAtMs descending (newest first)
+      let msgs = [...store.messages].toSorted((a, b) => b.createdAtMs - a.createdAtMs);
+
+      // Apply query filters
+      if (query) {
+        msgs = msgs.filter((m) => this.queryMatches(query, m, store.messages));
+      }
+
+      const totalCount = msgs.length;
+
+      // Apply cursor (cursor = createdAtMs of last message in previous page)
+      if (cursor) {
+        const cursorMs = Number(cursor);
+        if (!Number.isNaN(cursorMs)) {
+          // Since sorted descending, skip messages with createdAtMs >= cursorMs
+          const cursorIdx = msgs.findIndex((m) => m.createdAtMs < cursorMs);
+          if (cursorIdx === -1) {
+            return { messages: [], nextCursor: null, totalCount };
+          }
+          msgs = msgs.slice(cursorIdx);
+        }
+      }
+
+      // Apply limit
+      const pageLimit = limit ?? DEFAULT_PAGE_LIMIT;
+      const page = msgs.slice(0, pageLimit);
+
+      // Compute next cursor
+      let nextCursor: string | null = null;
+      if (page.length > 0 && page.length < msgs.length) {
+        nextCursor = String(page[page.length - 1]!.createdAtMs);
+      }
+
+      return { messages: page, nextCursor, totalCount };
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -254,28 +422,48 @@ export class InboundService {
   }
 
   // -------------------------------------------------------------------------
-  // markProcessed
+  // setStatus
   // -------------------------------------------------------------------------
 
-  async markProcessed(
-    id: string,
-    result?: InboundProcessingResult,
+  async setStatus(
+    messageId: string,
+    status: InboundMessageStatus,
+    snoozedUntilMs?: number,
   ): Promise<InboundMessage | null> {
     return locked(this.state, async () => {
       const store = await readInboundStore(this.state.deps.storePath);
-      const idx = store.messages.findIndex((m) => m.id === id);
+      const idx = store.messages.findIndex((m) => m.id === messageId);
       if (idx === -1) {
         return null;
       }
 
       const msg = store.messages[idx]!;
-      msg.status = "processed";
-      msg.processedAtMs = this.now();
-      msg.pendingAction = undefined;
-      if (result) {
-        msg.result = result;
+      const now = this.now();
+
+      msg.status = status;
+      msg.updatedAtMs = now;
+
+      // Set appropriate timestamp fields
+      switch (status) {
+        case "read":
+          if (msg.readAtMs === undefined) {
+            msg.readAtMs = now;
+          }
+          break;
+        case "flagged":
+          msg.flaggedAtMs = now;
+          break;
+        case "archived":
+          msg.archivedAtMs = now;
+          break;
+        case "snoozed":
+          msg.snoozedUntilMs = snoozedUntilMs;
+          break;
+        case "unread":
+          // Clear snooze when reverting to unread
+          msg.snoozedUntilMs = undefined;
+          break;
       }
-      msg.updatedAtMs = this.now();
 
       store.messages[idx] = msg;
       await writeInboundStore(this.state.deps.storePath, store);
@@ -283,6 +471,135 @@ export class InboundService {
       this.emit("inbound.message.updated", msg);
       return msg;
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // bulkSetStatus
+  // -------------------------------------------------------------------------
+
+  async bulkSetStatus(
+    messageIds: string[],
+    status: InboundMessageStatus,
+    snoozedUntilMs?: number,
+  ): Promise<InboundMessage[]> {
+    return locked(this.state, async () => {
+      const store = await readInboundStore(this.state.deps.storePath);
+      const now = this.now();
+      const idSet = new Set(messageIds);
+      const updated: InboundMessage[] = [];
+
+      for (let i = 0; i < store.messages.length; i++) {
+        const msg = store.messages[i]!;
+        if (!idSet.has(msg.id)) {
+          continue;
+        }
+
+        msg.status = status;
+        msg.updatedAtMs = now;
+
+        switch (status) {
+          case "read":
+            if (msg.readAtMs === undefined) {
+              msg.readAtMs = now;
+            }
+            break;
+          case "flagged":
+            msg.flaggedAtMs = now;
+            break;
+          case "archived":
+            msg.archivedAtMs = now;
+            break;
+          case "snoozed":
+            msg.snoozedUntilMs = snoozedUntilMs;
+            break;
+          case "unread":
+            msg.snoozedUntilMs = undefined;
+            break;
+        }
+
+        store.messages[i] = msg;
+        updated.push(msg);
+      }
+
+      if (updated.length > 0) {
+        await writeInboundStore(this.state.deps.storePath, store);
+        for (const msg of updated) {
+          this.emit("inbound.message.updated", msg);
+        }
+      }
+
+      return updated;
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // getCounts
+  // -------------------------------------------------------------------------
+
+  async getCounts(): Promise<InboundCounts> {
+    return locked(this.state, async () => {
+      const store = await readInboundStore(this.state.deps.storePath);
+
+      // Lazy snooze expiry check
+      const snoozeMutated = this.checkSnoozeExpiry(store);
+      if (snoozeMutated) {
+        await writeInboundStore(this.state.deps.storePath, store);
+      }
+
+      const counts: InboundCounts = {
+        unread: 0,
+        read: 0,
+        flagged: 0,
+        snoozed: 0,
+        archived: 0,
+        bySource: {},
+        byChannel: {},
+      };
+
+      for (const msg of store.messages) {
+        // Count by status
+        switch (msg.status) {
+          case "unread":
+            counts.unread++;
+            break;
+          case "read":
+            counts.read++;
+            break;
+          case "flagged":
+            counts.flagged++;
+            break;
+          case "snoozed":
+            counts.snoozed++;
+            break;
+          case "archived":
+            counts.archived++;
+            break;
+        }
+
+        // Count by source type
+        counts.bySource[msg.source.type] = (counts.bySource[msg.source.type] ?? 0) + 1;
+
+        // Count by channel
+        counts.byChannel[msg.source.channelId] = (counts.byChannel[msg.source.channelId] ?? 0) + 1;
+      }
+
+      return counts;
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // markProcessed (deprecated — use setStatus instead)
+  // -------------------------------------------------------------------------
+
+  /**
+   * @deprecated Use `setStatus(id, "archived")` instead.
+   * Kept for backward compatibility.
+   */
+  async markProcessed(
+    id: string,
+    _result?: InboundProcessingResult,
+  ): Promise<InboundMessage | null> {
+    return this.setStatus(id, "archived");
   }
 
   // -------------------------------------------------------------------------
@@ -330,13 +647,16 @@ export class InboundService {
   }
 
   // -------------------------------------------------------------------------
-  // getUnprocessedCount
+  // getUnprocessedCount (deprecated — use getCounts instead)
   // -------------------------------------------------------------------------
 
+  /**
+   * @deprecated Use `getCounts()` instead which returns counts per status.
+   * Kept for backward compatibility.
+   */
   async getUnprocessedCount(): Promise<number> {
-    const store = await readInboundStore(this.state.deps.storePath);
-    const done = new Set<InboundMessageStatus>(["processed", "ignored"]);
-    return store.messages.filter((m) => !done.has(m.status)).length;
+    const counts = await this.getCounts();
+    return counts.unread + counts.read + counts.flagged + counts.snoozed;
   }
 
   // =========================================================================
@@ -561,14 +881,8 @@ export class InboundService {
       }
     }
 
-    // minPriority
-    if (filter.minPriority) {
-      const msgRank = PRIORITY_ORDER[msg.priority];
-      const minRank = PRIORITY_ORDER[filter.minPriority];
-      if (msgRank > minRank) {
-        return false;
-      } // higher number = lower priority
-    }
+    // minPriority — no-op (priority field removed from messages)
+    // Existing routes with minPriority set will simply match all messages.
 
     // keywords (case-insensitive body + subject search)
     if (filter.keywords && filter.keywords.length > 0) {
@@ -579,12 +893,8 @@ export class InboundService {
       }
     }
 
-    // intents
-    if (filter.intents && filter.intents.length > 0) {
-      if (!msg.intent || !filter.intents.includes(msg.intent)) {
-        return false;
-      }
-    }
+    // intents — no-op (intent field removed from messages)
+    // Existing routes with intents set will simply match all messages.
 
     return true;
   }
