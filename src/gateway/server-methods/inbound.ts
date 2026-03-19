@@ -169,6 +169,37 @@ export const inboundHandlers: GatewayRequestHandlers = {
   },
 
   // -------------------------------------------------------------------------
+  // inbound.message.reply
+  // -------------------------------------------------------------------------
+  "inbound.message.reply": async ({ params, respond, context }) => {
+    const svc = (context as any).inboundService;
+    if (!svc) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "inbound not enabled"));
+      return;
+    }
+    const messageId = requireString(params, "messageId", "id");
+    if (!messageId) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing messageId"));
+      return;
+    }
+    const body = requireString(params, "body");
+    if (!body) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing body"));
+      return;
+    }
+    const reply = await svc.replyToMessage(messageId, body);
+    if (!reply) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, `message not found: ${messageId}`),
+      );
+      return;
+    }
+    respond(true, reply, undefined);
+  },
+
+  // -------------------------------------------------------------------------
   // inbound.message.bulkSetStatus
   // -------------------------------------------------------------------------
   "inbound.message.bulkSetStatus": async ({ params, respond, context }) => {

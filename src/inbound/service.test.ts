@@ -8,8 +8,9 @@ import type {
   InboundRoute,
   RawInboundMessage,
   InboundSourceType,
+  InboundStoreFile,
 } from "./types.js";
-import { InboundService } from "./service.js";
+import { InboundService, type InboundServiceDeps } from "./service.js";
 import { readInboundStore, writeInboundStore } from "./store.js";
 
 // ---------------------------------------------------------------------------
@@ -22,7 +23,7 @@ let fakeNow: number;
 let broadcasts: Array<{ event: string; payload: unknown }>;
 let service: InboundService;
 
-function makeService(sp: string) {
+function makeService(sp: string, extraDeps: Partial<InboundServiceDeps> = {}) {
   broadcasts = [];
   fakeNow = 1_000_000;
   const svc = new InboundService({
@@ -36,6 +37,7 @@ function makeService(sp: string) {
       broadcasts.push({ event, payload });
     },
     nowMs: () => fakeNow,
+    ...extraDeps,
   });
   return svc;
 }
@@ -72,8 +74,8 @@ describe("ingestMessage", () => {
 
     expect(msg.id).toBeTruthy();
     expect(msg.body).toBe("Hello world");
-    expect(msg.status).toBe("pending");
-    expect(msg.priority).toBe("medium");
+    expect(msg.status).toBe("unread");
+    expect(msg.direction).toBe("inbound");
     expect(msg.createdAtMs).toBe(1_000_000);
 
     const store = await readInboundStore(storePath);
@@ -95,22 +97,7 @@ describe("ingestMessage", () => {
     expect(store.messages).toHaveLength(1);
   });
 
-  it("uses channel defaultPriority when raw has none", async () => {
-    // Add channel with defaultPriority=high
-    await service.addChannel({
-      type: "discord",
-      name: "General",
-      defaultPriority: "high",
-    });
-    const channels = await service.listChannels();
-    const channelId = channels[0]!.id;
-
-    const msg = await service.ingestMessage(rawMsg({ source: { type: "discord", channelId } }));
-
-    expect(msg.priority).toBe("high");
-  });
-
-  it("route matching with autoExecute=true sets status to processing", async () => {
+  it("route matching with autoExecute=true sets status to read", async () => {
     await service.addRoute({
       name: "Auto Route",
       filter: { sourceTypes: ["discord"] },
@@ -120,11 +107,10 @@ describe("ingestMessage", () => {
 
     const msg = await service.ingestMessage(rawMsg());
 
-    expect(msg.status).toBe("processing");
-    expect(msg.pendingAction).toBeUndefined();
+    expect(msg.status).toBe("read");
   });
 
-  it("route matching with autoExecute=false sets pendingAction", async () => {
+  it("route matching with autoExecute=false leaves status as unread", async () => {
     await service.addRoute({
       name: "Manual Route",
       filter: { sourceTypes: ["discord"] },
@@ -134,13 +120,11 @@ describe("ingestMessage", () => {
 
     const msg = await service.ingestMessage(rawMsg());
 
-    expect(msg.status).toBe("pending");
-    expect(msg.pendingAction).toBeDefined();
-    expect(msg.pendingAction!.routeName).toBe("Manual Route");
-    expect(msg.pendingAction!.action.forwardToAgent).toBe("agent-1");
+    // Non-auto routes leave status as unread (createPendingTask fires in background)
+    expect(msg.status).toBe("unread");
   });
 
-  it("no route match leaves status as pending", async () => {
+  it("no route match leaves status as unread", async () => {
     // Route for telegram only, message is discord
     await service.addRoute({
       name: "Telegram Only",
@@ -151,8 +135,23 @@ describe("ingestMessage", () => {
 
     const msg = await service.ingestMessage(rawMsg());
 
-    expect(msg.status).toBe("pending");
-    expect(msg.pendingAction).toBeUndefined();
+    expect(msg.status).toBe("unread");
+  });
+
+  it("calls resolvePerson when dep is provided", async () => {
+    const resolvePerson = vi.fn().mockResolvedValue({ personId: "person-42" });
+    service = makeService(storePath, { resolvePerson });
+
+    const msg = await service.ingestMessage(rawMsg());
+
+    // resolvePerson fires in a queueMicrotask, flush it
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(resolvePerson).toHaveBeenCalledWith("user-1", "discord", undefined);
+
+    // personId should be set on the stored message
+    const store = await readInboundStore(storePath);
+    expect(store.messages[0]!.personId).toBe("person-42");
   });
 });
 
@@ -161,41 +160,33 @@ describe("ingestMessage", () => {
 // ---------------------------------------------------------------------------
 
 describe("listMessages", () => {
-  it("returns all messages", async () => {
+  it("returns paginated messages", async () => {
     await service.ingestMessage(rawMsg({ body: "One" }));
     await service.ingestMessage(rawMsg({ body: "Two" }));
 
-    const all = await service.listMessages();
-    expect(all).toHaveLength(2);
+    const page = await service.listMessages();
+    expect(page.messages).toHaveLength(2);
+    expect(page.totalCount).toBe(2);
   });
 
   it("filters by status", async () => {
     const msg = await service.ingestMessage(rawMsg());
-    await service.markProcessed(msg.id);
+    await service.setStatus(msg.id, "archived");
 
-    await service.ingestMessage(rawMsg({ body: "Still pending" }));
+    await service.ingestMessage(rawMsg({ body: "Still unread" }));
 
-    const processed = await service.listMessages({ status: "processed" });
-    expect(processed).toHaveLength(1);
-    expect(processed[0]!.status).toBe("processed");
+    const archived = await service.listMessages({ status: ["archived"] });
+    expect(archived.messages).toHaveLength(1);
+    expect(archived.messages[0]!.status).toBe("archived");
   });
 
   it("filters by sourceType", async () => {
     await service.ingestMessage(rawMsg());
     await service.ingestMessage(rawMsg({ source: { type: "telegram", channelId: "tg-1" } }));
 
-    const discord = await service.listMessages({ sourceType: "discord" });
-    expect(discord).toHaveLength(1);
-    expect(discord[0]!.source.type).toBe("discord");
-  });
-
-  it("filters by priority", async () => {
-    await service.ingestMessage(rawMsg({ priority: "critical" }));
-    await service.ingestMessage(rawMsg({ priority: "low" }));
-
-    const critical = await service.listMessages({ priority: "critical" });
-    expect(critical).toHaveLength(1);
-    expect(critical[0]!.priority).toBe("critical");
+    const discord = await service.listMessages({ sourceTypes: ["discord"] });
+    expect(discord.messages).toHaveLength(1);
+    expect(discord.messages[0]!.source.type).toBe("discord");
   });
 
   it("respects limit", async () => {
@@ -203,8 +194,8 @@ describe("listMessages", () => {
       await service.ingestMessage(rawMsg({ body: `msg-${i}` }));
     }
 
-    const limited = await service.listMessages({ limit: 2 });
-    expect(limited).toHaveLength(2);
+    const limited = await service.listMessages(undefined, undefined, 2);
+    expect(limited.messages).toHaveLength(2);
   });
 });
 
@@ -227,33 +218,58 @@ describe("getMessage", () => {
 });
 
 // ---------------------------------------------------------------------------
-// markProcessed
+// setStatus
+// ---------------------------------------------------------------------------
+
+describe("setStatus", () => {
+  it("updates status and broadcasts", async () => {
+    const msg = await service.ingestMessage(rawMsg());
+    fakeNow = 2_000_000;
+    const updated = await service.setStatus(msg.id, "archived");
+
+    expect(updated).not.toBeNull();
+    expect(updated!.status).toBe("archived");
+    expect(updated!.archivedAtMs).toBe(2_000_000);
+
+    const evt = broadcasts.find((b) => b.event === "inbound.message.updated");
+    expect(evt).toBeDefined();
+  });
+
+  it("sets readAtMs on read", async () => {
+    const msg = await service.ingestMessage(rawMsg());
+    fakeNow = 2_000_000;
+    const updated = await service.setStatus(msg.id, "read");
+    expect(updated!.readAtMs).toBe(2_000_000);
+  });
+
+  it("sets snoozedUntilMs on snooze", async () => {
+    const msg = await service.ingestMessage(rawMsg());
+    const updated = await service.setStatus(msg.id, "snoozed", 9_000_000);
+    expect(updated!.status).toBe("snoozed");
+    expect(updated!.snoozedUntilMs).toBe(9_000_000);
+  });
+
+  it("clears snoozedUntilMs on unread", async () => {
+    const msg = await service.ingestMessage(rawMsg());
+    await service.setStatus(msg.id, "snoozed", 9_000_000);
+    const updated = await service.setStatus(msg.id, "unread");
+    expect(updated!.snoozedUntilMs).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// markProcessed (deprecated — delegates to setStatus("archived"))
 // ---------------------------------------------------------------------------
 
 describe("markProcessed", () => {
-  it("updates status, sets processedAtMs, clears pendingAction", async () => {
-    // Set up a route so pendingAction is set
-    await service.addRoute({
-      name: "Route",
-      filter: {},
-      action: { forwardToAgent: "a1" },
-      autoExecute: false,
-    });
-
+  it("archives the message (deprecated)", async () => {
     const msg = await service.ingestMessage(rawMsg());
-    expect(msg.pendingAction).toBeDefined();
-
     fakeNow = 2_000_000;
-    const processed = await service.markProcessed(msg.id, { summary: "Done" });
+    const processed = await service.markProcessed(msg.id);
 
     expect(processed).not.toBeNull();
-    expect(processed!.status).toBe("processed");
-    expect(processed!.processedAtMs).toBe(2_000_000);
-    expect(processed!.pendingAction).toBeUndefined();
-    expect(processed!.result!.summary).toBe("Done");
-
-    const updated = broadcasts.find((b) => b.event === "inbound.message.updated");
-    expect(updated).toBeDefined();
+    expect(processed!.status).toBe("archived");
+    expect(processed!.archivedAtMs).toBe(2_000_000);
   });
 });
 
@@ -303,13 +319,213 @@ describe("linkToTask", () => {
 // ---------------------------------------------------------------------------
 
 describe("getUnprocessedCount", () => {
-  it("counts non-processed/non-ignored", async () => {
+  it("counts non-archived", async () => {
     const m1 = await service.ingestMessage(rawMsg({ body: "a" }));
     await service.ingestMessage(rawMsg({ body: "b" }));
-    await service.markProcessed(m1.id);
+    await service.setStatus(m1.id, "archived");
 
     const count = await service.getUnprocessedCount();
     expect(count).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// replyToMessage
+// ---------------------------------------------------------------------------
+
+describe("replyToMessage", () => {
+  it("creates an outbound reply message in the same thread", async () => {
+    const original = await service.ingestMessage(rawMsg());
+    broadcasts = []; // reset
+
+    fakeNow = 2_000_000;
+    const reply = await service.replyToMessage(original.id, "Thanks for your message!");
+
+    expect(reply).not.toBeNull();
+    expect(reply!.direction).toBe("outbound");
+    expect(reply!.status).toBe("read");
+    expect(reply!.body).toBe("Thanks for your message!");
+    expect(reply!.replyToId).toBe(original.id);
+    expect(reply!.threadId).toBe(`thread:${original.id}`);
+    expect(reply!.source.type).toBe("discord");
+    expect(reply!.source.channelId).toBe("ch-1");
+    expect(reply!.createdAtMs).toBe(2_000_000);
+
+    // Verify stored
+    const store = await readInboundStore(storePath);
+    expect(store.messages).toHaveLength(2);
+    const storedReply = store.messages.find((m) => m.id === reply!.id);
+    expect(storedReply).toBeDefined();
+    expect(storedReply!.direction).toBe("outbound");
+
+    // Original should have threadId set now too
+    const storedOriginal = store.messages.find((m) => m.id === original.id);
+    expect(storedOriginal!.threadId).toBe(`thread:${original.id}`);
+
+    // Event
+    const evt = broadcasts.find((b) => b.event === "inbound.message.replied");
+    expect(evt).toBeDefined();
+  });
+
+  it("uses existing threadId if original already has one", async () => {
+    // Ingest, then manually set threadId via store
+    const original = await service.ingestMessage(rawMsg());
+    const store = await readInboundStore(storePath);
+    store.messages[0]!.threadId = "existing-thread-123";
+    await writeInboundStore(storePath, store);
+
+    const reply = await service.replyToMessage(original.id, "Reply");
+
+    expect(reply!.threadId).toBe("existing-thread-123");
+  });
+
+  it("returns null for nonexistent message", async () => {
+    const reply = await service.replyToMessage("nonexistent", "Hello");
+    expect(reply).toBeNull();
+  });
+
+  it("calls deliverReply dep if available", async () => {
+    const deliverReply = vi.fn().mockResolvedValue(undefined);
+    service = makeService(storePath, { deliverReply });
+
+    const original = await service.ingestMessage(rawMsg());
+    await service.replyToMessage(original.id, "Reply body");
+
+    // deliverReply fires in queueMicrotask
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(deliverReply).toHaveBeenCalledTimes(1);
+    expect(deliverReply).toHaveBeenCalledWith(
+      "discord",
+      expect.any(Object), // channelConfig
+      "Reply body",
+      expect.objectContaining({
+        channelId: "ch-1",
+        senderId: "user-1",
+      }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Snooze expiry
+// ---------------------------------------------------------------------------
+
+describe("snooze expiry", () => {
+  it("unsnoozes time-based snoozeConfig when expired", async () => {
+    const msg = await service.ingestMessage(rawMsg());
+
+    // Manually set snooze with snoozeConfig
+    const store = await readInboundStore(storePath);
+    store.messages[0]!.status = "snoozed";
+    store.messages[0]!.snoozeConfig = {
+      type: "time",
+      untilMs: 5_000_000,
+      snoozedAtMs: 1_000_000,
+    };
+    await writeInboundStore(storePath, store);
+
+    // Before expiry: should stay snoozed
+    fakeNow = 4_000_000;
+    const page1 = await service.listMessages();
+    expect(page1.messages[0]!.status).toBe("snoozed");
+
+    // After expiry: should be unsnoozed
+    fakeNow = 5_000_001;
+    const page2 = await service.listMessages();
+    expect(page2.messages[0]!.status).toBe("unread");
+    expect(page2.messages[0]!.snoozeConfig).toBeUndefined();
+    expect(page2.messages[0]!.snoozedUntilMs).toBeUndefined();
+  });
+
+  it("unsnoozes reply-based snoozeConfig when reply arrives", async () => {
+    // Create original message from person-A
+    const msg = await service.ingestMessage(rawMsg());
+
+    // Set it as snoozed until reply from person-B
+    const store = await readInboundStore(storePath);
+    store.messages[0]!.status = "snoozed";
+    store.messages[0]!.snoozeConfig = {
+      type: "reply",
+      untilReplyFromPersonId: "person-B",
+      snoozedAtMs: 1_000_000,
+    };
+    await writeInboundStore(storePath, store);
+
+    // No reply yet — should stay snoozed
+    fakeNow = 2_000_000;
+    const page1 = await service.listMessages();
+    expect(page1.messages[0]!.status).toBe("snoozed");
+
+    // Now simulate a new inbound message from person-B
+    const store2 = await readInboundStore(storePath);
+    store2.messages.push({
+      id: "reply-from-B",
+      source: { type: "discord", channelId: "ch-1", senderId: "person-B" },
+      status: "unread",
+      direction: "inbound",
+      body: "Reply from B",
+      bodyResolved: "Reply from B",
+      mentions: [],
+      personId: "person-B",
+      createdAtMs: 2_000_000,
+      updatedAtMs: 2_000_000,
+    });
+    await writeInboundStore(storePath, store2);
+
+    // Now check — should be unsnoozed
+    fakeNow = 3_000_000;
+    const page2 = await service.listMessages();
+    const snoozedMsg = page2.messages.find((m) => m.id === msg.id);
+    expect(snoozedMsg!.status).toBe("unread");
+  });
+
+  it("legacy snoozedUntilMs (no snoozeConfig) still works", async () => {
+    const msg = await service.ingestMessage(rawMsg());
+
+    const store = await readInboundStore(storePath);
+    store.messages[0]!.status = "snoozed";
+    store.messages[0]!.snoozedUntilMs = 3_000_000;
+    await writeInboundStore(storePath, store);
+
+    fakeNow = 3_000_001;
+    const page = await service.listMessages();
+    expect(page.messages[0]!.status).toBe("unread");
+    expect(page.messages[0]!.snoozedUntilMs).toBeUndefined();
+  });
+
+  it("task-based snooze is skipped (not yet wired)", async () => {
+    const msg = await service.ingestMessage(rawMsg());
+
+    const store = await readInboundStore(storePath);
+    store.messages[0]!.status = "snoozed";
+    store.messages[0]!.snoozeConfig = {
+      type: "task",
+      untilTaskId: "task-123",
+      snoozedAtMs: 1_000_000,
+    };
+    await writeInboundStore(storePath, store);
+
+    fakeNow = 99_000_000;
+    const page = await service.listMessages();
+    expect(page.messages[0]!.status).toBe("snoozed"); // still snoozed
+  });
+
+  it("pipeline-based snooze is skipped (not yet wired)", async () => {
+    const msg = await service.ingestMessage(rawMsg());
+
+    const store = await readInboundStore(storePath);
+    store.messages[0]!.status = "snoozed";
+    store.messages[0]!.snoozeConfig = {
+      type: "pipeline",
+      untilPipelineRunId: "run-456",
+      snoozedAtMs: 1_000_000,
+    };
+    await writeInboundStore(storePath, store);
+
+    fakeNow = 99_000_000;
+    const page = await service.listMessages();
+    expect(page.messages[0]!.status).toBe("snoozed"); // still snoozed
   });
 });
 
@@ -466,7 +682,8 @@ describe("routes", () => {
 // ---------------------------------------------------------------------------
 
 describe("route matching", () => {
-  it("minPriority filter — critical > high > medium > low", async () => {
+  it("minPriority filter is a no-op (matches all)", async () => {
+    // minPriority filter was deprecated in v2 — routes with it simply match all messages
     await service.addRoute({
       name: "High+ Only",
       filter: { minPriority: "high" },
@@ -474,21 +691,9 @@ describe("route matching", () => {
       autoExecute: true,
     });
 
-    // Critical matches (rank 0 <= rank 1)
-    const critical = await service.ingestMessage(rawMsg({ priority: "critical" }));
-    expect(critical.status).toBe("processing");
-
-    // High matches (rank 1 <= rank 1)
-    const high = await service.ingestMessage(rawMsg({ priority: "high" }));
-    expect(high.status).toBe("processing");
-
-    // Medium does NOT match (rank 2 > rank 1)
-    const medium = await service.ingestMessage(rawMsg({ priority: "medium" }));
-    expect(medium.status).toBe("pending");
-
-    // Low does NOT match (rank 3 > rank 1)
-    const low = await service.ingestMessage(rawMsg({ priority: "low" }));
-    expect(low.status).toBe("pending");
+    // All messages match since minPriority is now a no-op
+    const msg = await service.ingestMessage(rawMsg());
+    expect(msg.status).toBe("read"); // autoExecute sets to read
   });
 
   it("keyword filter — case-insensitive body+subject search", async () => {
@@ -501,17 +706,17 @@ describe("route matching", () => {
 
     // Match in body (case-insensitive)
     const m1 = await service.ingestMessage(rawMsg({ body: "this is urgent please" }));
-    expect(m1.status).toBe("processing");
+    expect(m1.status).toBe("read");
 
     // Match in subject
     const m2 = await service.ingestMessage(
       rawMsg({ body: "normal body", subject: "Urgent Request" }),
     );
-    expect(m2.status).toBe("processing");
+    expect(m2.status).toBe("read");
 
     // No match
     const m3 = await service.ingestMessage(rawMsg({ body: "nothing special" }));
-    expect(m3.status).toBe("pending");
+    expect(m3.status).toBe("unread");
   });
 });
 
@@ -545,9 +750,11 @@ describe("prune", () => {
       store.messages.push({
         id: `msg-${i}`,
         source: { type: "discord", channelId: "ch-1" },
-        status: "pending",
-        priority: "medium",
+        status: "unread",
+        direction: "inbound",
         body: `msg ${i}`,
+        bodyResolved: `msg ${i}`,
+        mentions: [],
         createdAtMs: i, // oldest first
         updatedAtMs: i,
       });

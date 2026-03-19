@@ -22,6 +22,7 @@ import type {
   InboundProcessingResult,
   RawInboundMessage,
   InboundStoreFile,
+  InboundSourceType,
 } from "./types.js";
 import { readInboundStore, writeInboundStore } from "./store.js";
 
@@ -47,6 +48,23 @@ export type InboundServiceDeps = {
   executeAction?: InboundActionExecutor;
   /** Optional task creator for non-auto routes (replaces pendingAction). */
   createPendingTask?: (message: InboundMessage, route: InboundRoute) => Promise<string | null>;
+  /** Deliver a reply back to the originating platform. */
+  deliverReply?: (
+    platform: InboundSourceType,
+    channelConfig: unknown,
+    body: string,
+    replyMeta: unknown,
+  ) => Promise<void>;
+  /** Resolve a sender to a Person in the people system. */
+  resolvePerson?: (
+    senderId: string,
+    platform: InboundSourceType,
+    senderName?: string,
+  ) => Promise<{ personId?: string }>;
+  /** Check the status of a task by ID (for task-based snooze). */
+  getTaskStatus?: (taskId: string) => Promise<string | null>;
+  /** Check the status of a pipeline run by ID (for pipeline-based snooze). */
+  getPipelineRunStatus?: (runId: string) => Promise<string | null>;
 };
 
 // ---------------------------------------------------------------------------
@@ -117,24 +135,73 @@ export class InboundService {
   // =========================================================================
 
   /**
-   * Scan for snoozed messages past their `snoozedUntilMs` and revert them
-   * to `unread`. Returns true if any messages were unsnoozed (store was
-   * mutated and needs persisting).
+   * Scan for snoozed messages and check their snooze conditions:
+   * - `type: "time"` → check `snoozeConfig.untilMs <= now`
+   * - `type: "reply"` → check if any newer inbound message exists from `untilReplyFromPersonId`
+   * - `type: "task"` / `type: "pipeline"` → skipped (need task/pipeline service deps wired later)
+   * - Legacy `snoozedUntilMs` (no snoozeConfig) → check `snoozedUntilMs <= now`
+   *
+   * Returns true if any messages were unsnoozed (store was mutated and needs persisting).
    */
   private checkSnoozeExpiry(store: InboundStoreFile): boolean {
     const now = this.now();
     let mutated = false;
 
     for (const msg of store.messages) {
-      if (
-        msg.status === "snoozed" &&
-        msg.snoozedUntilMs !== undefined &&
-        msg.snoozedUntilMs <= now
-      ) {
+      if (msg.status !== "snoozed") {
+        continue;
+      }
+
+      let shouldUnsnooze = false;
+
+      if (msg.snoozeConfig) {
+        switch (msg.snoozeConfig.type) {
+          case "time":
+            if (msg.snoozeConfig.untilMs !== undefined && msg.snoozeConfig.untilMs <= now) {
+              shouldUnsnooze = true;
+            }
+            break;
+
+          case "reply": {
+            // Check if any newer inbound message exists from the target person
+            const targetPersonId = msg.snoozeConfig.untilReplyFromPersonId;
+            if (targetPersonId) {
+              const snoozedAt = msg.snoozeConfig.snoozedAtMs;
+              const hasReply = store.messages.some(
+                (other) =>
+                  other.id !== msg.id &&
+                  other.direction === "inbound" &&
+                  other.personId === targetPersonId &&
+                  other.createdAtMs > snoozedAt,
+              );
+              if (hasReply) {
+                shouldUnsnooze = true;
+              }
+            }
+            break;
+          }
+
+          case "task":
+            // Skip — needs task service dep (wired later)
+            break;
+
+          case "pipeline":
+            // Skip — needs pipeline service dep (wired later)
+            break;
+        }
+      } else if (msg.snoozedUntilMs !== undefined && msg.snoozedUntilMs <= now) {
+        // Legacy backward compat: plain snoozedUntilMs without snoozeConfig
+        shouldUnsnooze = true;
+      }
+
+      if (shouldUnsnooze) {
         msg.status = "unread";
         msg.snoozedUntilMs = undefined;
+        msg.snoozeConfig = undefined;
         msg.updatedAtMs = now;
         mutated = true;
+
+        this.emit("inbound.message.unsnoozed", msg);
       }
     }
 
@@ -353,6 +420,26 @@ export class InboundService {
 
       this.emit("inbound.message.created", message);
       this.state.deps.log.info(`inbound message created: ${message.id}`);
+
+      // Identity resolution: resolve sender to a Person (fire-and-forget outside lock)
+      const resolvePerson = this.state.deps.resolvePerson;
+      if (resolvePerson && raw.source.senderId) {
+        const msgId = message.id;
+        const senderId = raw.source.senderId;
+        const platform = raw.source.type;
+        const senderName = raw.source.senderName;
+        queueMicrotask(() => {
+          void resolvePerson(senderId, platform, senderName)
+            .then(async (result) => {
+              if (result.personId) {
+                await this.setPersonId(msgId, result.personId);
+              }
+            })
+            .catch((err) => {
+              this.state.deps.log.error(`inbound identity resolution failed: ${String(err)}`);
+            });
+        });
+      }
 
       return message;
     });
@@ -644,6 +731,98 @@ export class InboundService {
 
       this.emit("inbound.message.updated", msg);
       return msg;
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // setPersonId (private helper for identity resolution)
+  // -------------------------------------------------------------------------
+
+  private async setPersonId(messageId: string, personId: string): Promise<void> {
+    await locked(this.state, async () => {
+      const store = await readInboundStore(this.state.deps.storePath);
+      const idx = store.messages.findIndex((m) => m.id === messageId);
+      if (idx === -1) {
+        return;
+      }
+
+      const msg = store.messages[idx]!;
+      msg.personId = personId;
+      msg.updatedAtMs = this.now();
+      store.messages[idx] = msg;
+      await writeInboundStore(this.state.deps.storePath, store);
+
+      this.emit("inbound.message.updated", msg);
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // replyToMessage
+  // -------------------------------------------------------------------------
+
+  /**
+   * Reply to an existing inbound message. The reply is stored as an outbound
+   * message in the same thread. If a `deliverReply` dep is available, the
+   * reply is also delivered back to the originating platform.
+   */
+  async replyToMessage(messageId: string, body: string): Promise<InboundMessage | null> {
+    return locked(this.state, async () => {
+      const store = await readInboundStore(this.state.deps.storePath);
+      const original = store.messages.find((m) => m.id === messageId);
+      if (!original) {
+        return null;
+      }
+
+      const now = this.now();
+
+      // Determine threadId: use original's threadId, or generate from original message ID
+      const threadId = original.threadId ?? `thread:${original.id}`;
+
+      // Also set the threadId on the original if it didn't have one
+      if (!original.threadId) {
+        original.threadId = threadId;
+        original.updatedAtMs = now;
+      }
+
+      const reply: InboundMessage = {
+        id: randomUUID(),
+        source: original.source,
+        status: "read",
+        direction: "outbound",
+        body,
+        bodyResolved: body,
+        mentions: [],
+        threadId,
+        replyToId: messageId,
+        createdAtMs: now,
+        updatedAtMs: now,
+      };
+
+      store.messages.push(reply);
+      await writeInboundStore(this.state.deps.storePath, store);
+
+      this.emit("inbound.message.replied", reply);
+      this.state.deps.log.info(`inbound reply created: ${reply.id} → ${messageId}`);
+
+      // Deliver reply to originating platform (fire-and-forget outside lock)
+      const deliverReply = this.state.deps.deliverReply;
+      if (deliverReply) {
+        const platform = original.source.type;
+        const channelConfig = original.source.platformMeta ?? {};
+        const replyMeta = {
+          channelId: original.source.channelId,
+          senderId: original.source.senderId,
+          originalExternalId: original.externalId,
+          platformMeta: original.source.platformMeta,
+        };
+        queueMicrotask(() => {
+          void deliverReply(platform, channelConfig, body, replyMeta).catch((err) => {
+            this.state.deps.log.error(`inbound reply delivery failed: ${String(err)}`);
+          });
+        });
+      }
+
+      return reply;
     });
   }
 
