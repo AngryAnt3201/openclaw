@@ -4,6 +4,7 @@ import { accountHandlers } from "./server-methods/accounts.js";
 import { agentProfileHandlers } from "./server-methods/agent-profiles.js";
 import { agentHandlers } from "./server-methods/agent.js";
 import { agentsHandlers } from "./server-methods/agents.js";
+import { analyticsHandlers } from "./server-methods/analytics.js";
 import { browserHandlers } from "./server-methods/browser.js";
 import { channelsHandlers } from "./server-methods/channels.js";
 import { chatHandlers } from "./server-methods/chat.js";
@@ -38,6 +39,7 @@ import { skillsHandlers } from "./server-methods/skills.js";
 import { systemHandlers } from "./server-methods/system.js";
 import { talkHandlers } from "./server-methods/talk.js";
 import { taskHandlers } from "./server-methods/tasks.js";
+import { triageHandlers } from "./server-methods/triage.js";
 import { ttsHandlers } from "./server-methods/tts.js";
 import { updateHandlers } from "./server-methods/update.js";
 import { usageHandlers } from "./server-methods/usage.js";
@@ -134,6 +136,12 @@ const READ_METHODS = new Set([
   "scrape.health",
   "scrape.session.list",
   "scrape.session.get",
+  "triage.get",
+  "analytics.get",
+  "analytics.responseTime",
+  "sla.profile.list",
+  "sla.status",
+  "sla.overdue",
 ]);
 const WRITE_METHODS = new Set([
   "send",
@@ -216,6 +224,12 @@ const WRITE_METHODS = new Set([
   "scrape.login",
   "scrape.session.create",
   "scrape.session.destroy",
+  "triage.addTag",
+  "triage.removeTag",
+  "triage.regenerateDraft",
+  "sla.profile.create",
+  "sla.profile.update",
+  "sla.profile.delete",
 ]);
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
@@ -338,6 +352,8 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...scraplingHandlers,
   ...inboundHandlers,
   ...peopleHandlers,
+  ...triageHandlers,
+  ...analyticsHandlers,
 };
 
 export async function handleGatewayRequest(

@@ -59,6 +59,7 @@ import {
 import { startGatewayConfigReloader } from "./config-reload.js";
 import { ExecApprovalManager } from "./exec-approval-manager.js";
 import { NodeRegistry } from "./node-registry.js";
+import { buildGatewayAnalyticsService } from "./server-analytics.js";
 import { createChannelManager } from "./server-channels.js";
 import { createAgentEventHandler } from "./server-chat.js";
 import { createGatewayCloseHandler } from "./server-close.js";
@@ -92,6 +93,7 @@ import { logGatewayStartup } from "./server-startup-log.js";
 import { startGatewaySidecars } from "./server-startup.js";
 import { startGatewayTailscaleExposure } from "./server-tailscale.js";
 import { buildGatewayTaskService } from "./server-tasks.js";
+import { buildGatewayTriageService } from "./server-triage.js";
 import { buildGatewayVaultService } from "./server-vault.js";
 import { buildGatewayWidgetService } from "./server-widgets.js";
 import { createWizardSessionTracker } from "./server-wizard-sessions.js";
@@ -616,6 +618,20 @@ export async function startGatewayServer(
   });
   const { peopleService, storePath: peopleStorePath } = peopleState;
 
+  const triageState = buildGatewayTriageService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+  });
+  const { triageService, storePath: triageStorePath } = triageState;
+
+  const analyticsState = buildGatewayAnalyticsService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+  });
+  const { analyticsService, storePath: analyticsStorePath } = analyticsState;
+
   // Prune inbound messages every 6 hours
   const inboundPruneInterval = setInterval(
     () => {
@@ -792,6 +808,10 @@ export async function startGatewayServer(
       inboundStorePath,
       peopleService,
       peopleStorePath,
+      triageService,
+      triageStorePath,
+      analyticsService,
+      analyticsStorePath,
       groupService,
       groupStorePath,
       loadGatewayModelCatalog,

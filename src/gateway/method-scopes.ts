@@ -150,6 +150,11 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "people.group.get",
     "people.group.list",
     "suggestion.list",
+    "analytics.get",
+    "analytics.responseTime",
+    "sla.profile.list",
+    "sla.status",
+    "sla.overdue",
   ],
   [WRITE_SCOPE]: [
     "send",
@@ -271,6 +276,9 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "people.group.delete",
     "suggestion.accept",
     "suggestion.dismiss",
+    "sla.profile.create",
+    "sla.profile.update",
+    "sla.profile.delete",
   ],
   [ADMIN_SCOPE]: [
     "channels.logout",
