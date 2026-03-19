@@ -80,6 +80,7 @@ import { hasConnectedMobileNode } from "./server-mobile-nodes.js";
 import { loadGatewayModelCatalog } from "./server-model-catalog.js";
 import { createNodeSubscriptionManager } from "./server-node-subscriptions.js";
 import { buildGatewayNotificationService } from "./server-notifications.js";
+import { buildGatewayPeopleService } from "./server-people.js";
 import { buildGatewayPipelineService } from "./server-pipeline.js";
 import { loadGatewayPlugins } from "./server-plugins.js";
 import { buildGatewayProjectService } from "./server-projects.js";
@@ -608,6 +609,13 @@ export async function startGatewayServer(
   });
   const { inboundService, pollerManager, storePath: inboundStorePath } = inboundState;
 
+  const peopleState = buildGatewayPeopleService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+  });
+  const { peopleService, storePath: peopleStorePath } = peopleState;
+
   // Prune inbound messages every 6 hours
   const inboundPruneInterval = setInterval(
     () => {
@@ -782,6 +790,8 @@ export async function startGatewayServer(
       inboundService,
       pollerManager,
       inboundStorePath,
+      peopleService,
+      peopleStorePath,
       groupService,
       groupStorePath,
       loadGatewayModelCatalog,

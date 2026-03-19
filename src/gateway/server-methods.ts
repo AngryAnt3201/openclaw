@@ -23,9 +23,11 @@ import { inboundHandlers } from "./server-methods/inbound.js";
 import { knowledgeBaseHandlers } from "./server-methods/knowledge-base.js";
 import { launcherHandlers } from "./server-methods/launcher.js";
 import { logsHandlers } from "./server-methods/logs.js";
+import { mediaHandlers } from "./server-methods/media.js";
 import { modelsHandlers } from "./server-methods/models.js";
 import { nodeHandlers } from "./server-methods/nodes.js";
 import { notificationHandlers } from "./server-methods/notifications.js";
+import { peopleHandlers } from "./server-methods/people.js";
 import { pipelineHandlers } from "./server-methods/pipeline.js";
 import { pluginsHandlers } from "./server-methods/plugins.js";
 import { projectHandlers } from "./server-methods/projects.js";
@@ -143,6 +145,7 @@ const WRITE_METHODS = new Set([
   "tts.disable",
   "tts.convert",
   "tts.setProvider",
+  "media.transcribe",
   "voicewake.set",
   "node.invoke",
   "chat.send",
@@ -290,6 +293,7 @@ function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["c
 export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...connectHandlers,
   ...logsHandlers,
+  ...mediaHandlers,
   ...voicewakeHandlers,
   ...healthHandlers,
   ...channelsHandlers,
@@ -333,6 +337,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...projectHandlers,
   ...scraplingHandlers,
   ...inboundHandlers,
+  ...peopleHandlers,
 };
 
 export async function handleGatewayRequest(
