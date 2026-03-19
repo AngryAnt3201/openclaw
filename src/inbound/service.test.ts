@@ -2,14 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-  InboundMessage,
-  InboundChannel,
-  InboundRoute,
-  RawInboundMessage,
-  InboundSourceType,
-  InboundStoreFile,
-} from "./types.js";
+import type { RawInboundMessage } from "./types.js";
 import { InboundService, type InboundServiceDeps } from "./service.js";
 import { readInboundStore, writeInboundStore } from "./store.js";
 
@@ -142,7 +135,7 @@ describe("ingestMessage", () => {
     const resolvePerson = vi.fn().mockResolvedValue({ personId: "person-42" });
     service = makeService(storePath, { resolvePerson });
 
-    const msg = await service.ingestMessage(rawMsg());
+    await service.ingestMessage(rawMsg());
 
     // resolvePerson fires in a queueMicrotask, flush it
     await new Promise((r) => setTimeout(r, 50));
@@ -413,7 +406,7 @@ describe("replyToMessage", () => {
 
 describe("snooze expiry", () => {
   it("unsnoozes time-based snoozeConfig when expired", async () => {
-    const msg = await service.ingestMessage(rawMsg());
+    await service.ingestMessage(rawMsg());
 
     // Manually set snooze with snoozeConfig
     const store = await readInboundStore(storePath);
@@ -481,7 +474,7 @@ describe("snooze expiry", () => {
   });
 
   it("legacy snoozedUntilMs (no snoozeConfig) still works", async () => {
-    const msg = await service.ingestMessage(rawMsg());
+    await service.ingestMessage(rawMsg());
 
     const store = await readInboundStore(storePath);
     store.messages[0]!.status = "snoozed";
@@ -495,7 +488,7 @@ describe("snooze expiry", () => {
   });
 
   it("task-based snooze is skipped (not yet wired)", async () => {
-    const msg = await service.ingestMessage(rawMsg());
+    await service.ingestMessage(rawMsg());
 
     const store = await readInboundStore(storePath);
     store.messages[0]!.status = "snoozed";
@@ -512,7 +505,7 @@ describe("snooze expiry", () => {
   });
 
   it("pipeline-based snooze is skipped (not yet wired)", async () => {
-    const msg = await service.ingestMessage(rawMsg());
+    await service.ingestMessage(rawMsg());
 
     const store = await readInboundStore(storePath);
     store.messages[0]!.status = "snoozed";
