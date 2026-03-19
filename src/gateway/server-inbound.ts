@@ -2,12 +2,15 @@
 // Gateway Inbound Service Builder – follows server-tasks.ts pattern
 // ---------------------------------------------------------------------------
 
+import type { AnalyticsService } from "../analytics/service.js";
 import type { CliDeps } from "../cli/deps.js";
 import type { loadConfig } from "../config/config.js";
 import type { CredentialService } from "../credentials/service.js";
 import type { CredentialSecret } from "../credentials/types.js";
 import type { InboundMessage, InboundRoute, InboundProcessingResult } from "../inbound/types.js";
+import type { PeopleService } from "../people/service.js";
 import type { TaskService } from "../tasks/service.js";
+import type { TriageService } from "../triage/service.js";
 import { SYSTEM_AGENT_ID } from "../credentials/system-agent.js";
 import { setInboundBridge } from "../inbound/bridge.js";
 import { PollerManager } from "../inbound/pollers/manager.js";
@@ -83,6 +86,12 @@ export function buildGatewayInboundService(params: {
   getTaskService?: () => TaskService | null;
   /** Lazy getter — credential service may not exist yet at build time. */
   getCredentialService?: () => CredentialService | null;
+  /** Lazy getter — people service for identity resolution. */
+  getPeopleService?: () => PeopleService | null;
+  /** Lazy getter — triage service for message triage. */
+  getTriageService?: () => TriageService | null;
+  /** Lazy getter — analytics service for response time tracking. */
+  getAnalyticsService?: () => AnalyticsService | null;
 }): GatewayInboundState {
   const inboundLogger = getChildLogger({ module: "inbound" });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -97,6 +106,59 @@ export function buildGatewayInboundService(params: {
     },
     broadcast: (event, payload) => {
       params.broadcast(event, payload, { dropIfSlow: true });
+
+      // Wire inbound.message.created → triage + analytics (identity handled via resolvePerson dep)
+      if (event === "inbound.message.created") {
+        const msg = payload as InboundMessage;
+        const triageService = params.getTriageService?.();
+        const analyticsService = params.getAnalyticsService?.();
+
+        // Record inbound for analytics (personId may be undefined at this point; updated later via identity)
+        if (analyticsService) {
+          void analyticsService
+            .recordInbound(msg.id, msg.personId, msg.createdAtMs)
+            .catch((err) => {
+              inboundLogger.error(`inbound analytics recordInbound failed: ${String(err)}`);
+            });
+        }
+
+        // Fire-and-forget triage
+        if (triageService) {
+          void triageService
+            .triageMessage(msg.id, {
+              messageBody: msg.body,
+              senderName: msg.source.senderName,
+            })
+            .catch((err) => {
+              inboundLogger.error(`inbound triage wiring failed: ${String(err)}`);
+            });
+        }
+      }
+
+      // Wire inbound.message.replied → analytics response tracking
+      if (event === "inbound.message.replied") {
+        const reply = payload as InboundMessage;
+        const analyticsService = params.getAnalyticsService?.();
+        if (analyticsService && reply.replyToId) {
+          void analyticsService.recordResponse(reply.replyToId, reply.createdAtMs).catch((err) => {
+            inboundLogger.error(`inbound analytics recordResponse failed: ${String(err)}`);
+          });
+        }
+      }
+    },
+    // Wire people service identity resolution so personId is set on inbound messages
+    resolvePerson: async (senderId, platform, senderName) => {
+      const peopleService = params.getPeopleService?.();
+      if (!peopleService) {
+        return {};
+      }
+      try {
+        const result = await peopleService.resolveIdentity(senderId, platform, senderName);
+        return { personId: result.personId };
+      } catch (err) {
+        inboundLogger.error(`inbound resolvePerson via peopleService failed: ${String(err)}`);
+        return {};
+      }
     },
     executeAction: async (
       message: InboundMessage,

@@ -602,19 +602,16 @@ export async function startGatewayServer(
   });
   const { workspaceService, workspaceRuntime, storePath: workspaceStorePath } = workspaceState;
 
-  const inboundState = buildGatewayInboundService({
-    cfg: cfgAtStart,
-    deps,
-    broadcast,
-    getTaskService: () => taskService,
-    getCredentialService: () => credentialService,
-  });
-  const { inboundService, pollerManager, storePath: inboundStorePath } = inboundState;
-
+  const peopleBroadcast: typeof broadcast = (event, payload, opts) => {
+    broadcast(event, payload, opts);
+    if (event === "people.suggestion.created") {
+      void notificationTriggers.handleBroadcastEvent(event, payload);
+    }
+  };
   const peopleState = buildGatewayPeopleService({
     cfg: cfgAtStart,
     deps,
-    broadcast,
+    broadcast: peopleBroadcast,
   });
   const { peopleService, storePath: peopleStorePath } = peopleState;
 
@@ -632,6 +629,18 @@ export async function startGatewayServer(
   });
   const { analyticsService, storePath: analyticsStorePath } = analyticsState;
 
+  const inboundState = buildGatewayInboundService({
+    cfg: cfgAtStart,
+    deps,
+    broadcast,
+    getTaskService: () => taskService,
+    getCredentialService: () => credentialService,
+    getPeopleService: () => peopleService,
+    getTriageService: () => triageService,
+    getAnalyticsService: () => analyticsService,
+  });
+  const { inboundService, pollerManager, storePath: inboundStorePath } = inboundState;
+
   // Prune inbound messages every 6 hours
   const inboundPruneInterval = setInterval(
     () => {
@@ -639,6 +648,50 @@ export async function startGatewayServer(
     },
     6 * 60 * 60 * 1000,
   );
+
+  // SLA watcher — check for overdue messages every 60 seconds and broadcast breach/warning events
+  const slaWatchInterval = setInterval(() => {
+    void (async () => {
+      try {
+        const overdue = await analyticsService.getOverdueMessages();
+        const profiles = await analyticsService.listSLAProfiles();
+        const now = Date.now();
+        for (const entry of overdue) {
+          let personName: string | undefined;
+          if (entry.personId) {
+            try {
+              const person = await peopleService.getPerson(entry.personId);
+              personName = person?.displayName;
+            } catch {
+              // best-effort
+            }
+          }
+          // Determine if this is a warning (approaching breach) or a full breach
+          // Find the SLA profile for this entry's person to get escalateAfterMs
+          const profile = profiles.find((p) => p.entityIds.includes(entry.personId ?? ""));
+          const elapsed = now - entry.receivedAtMs;
+          const slaPayload = {
+            messageId: entry.messageId,
+            personId: entry.personId,
+            personName: personName ?? entry.personId ?? "Unknown",
+            receivedAtMs: entry.receivedAtMs,
+            elapsedMs: elapsed,
+          };
+          if (profile && elapsed > profile.escalateAfterMs) {
+            // Past escalation threshold — treat as full breach
+            broadcast("sla.breach", slaPayload);
+            void notificationTriggers.handleBroadcastEvent("sla.breach", slaPayload);
+          } else {
+            // Overdue but within escalation window — warning
+            broadcast("sla.warning", slaPayload);
+            void notificationTriggers.handleBroadcastEvent("sla.warning", slaPayload);
+          }
+        }
+      } catch (err) {
+        log.warn(`SLA watcher error: ${String(err)}`);
+      }
+    })();
+  }, 60_000);
 
   // Register workspace resolve hook so agents auto-activate workspaces
   registerWorkspaceResolveHook(async (sessionKey, agentId) => {
@@ -962,6 +1015,7 @@ export async function startGatewayServer(
       portProxy.destroyAll();
       processManager.shutdownAll();
       clearInterval(inboundPruneInterval);
+      clearInterval(slaWatchInterval);
       await pollerManager.stopAll();
       clearInboundBridge();
       await workspaceRuntime.deactivateAll();
