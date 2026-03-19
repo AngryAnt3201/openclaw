@@ -88,6 +88,42 @@ export function createNotificationTriggers(deps: TriggerDeps) {
           agentId: task.agentId,
           source: "task.input_required",
         });
+      } else if (event === "sla.warning") {
+        const p = payload as { personName?: string; messageId?: string };
+        await notificationService.create({
+          type: "task_state_change",
+          title: "SLA at risk",
+          body: `SLA at risk: ${p.personName ?? "Unknown"} — response overdue soon`,
+          priority: "high",
+          source: "sla.warning",
+          data: { messageId: p.messageId },
+        });
+      } else if (event === "sla.breach") {
+        const p = payload as { personName?: string; messageId?: string };
+        await notificationService.create({
+          type: "task_state_change",
+          title: "SLA breached",
+          body: `SLA breached: ${p.personName ?? "Unknown"} — response overdue`,
+          priority: "high",
+          source: "sla.breach",
+          data: { messageId: p.messageId },
+        });
+      } else if (event === "people.suggestion.created") {
+        const p = payload as {
+          accountLink?: { platformUsername?: string };
+          personId?: string;
+          reason?: string;
+        };
+        const platformUsername = p.accountLink?.platformUsername ?? "unknown";
+        const personName = p.reason?.match(/≈ "(.+?)"/)?.[1] ?? p.personId ?? "unknown";
+        await notificationService.create({
+          type: "task_state_change",
+          title: "Identity match suggestion",
+          body: `Identity match suggestion: ${platformUsername} may be ${personName}`,
+          priority: "medium",
+          source: "people.suggestion.created",
+          data: { suggestionId: (payload as { id?: string }).id },
+        });
       }
     } catch (err) {
       deps.log.error(`notification trigger failed for ${event}: ${String(err)}`);
