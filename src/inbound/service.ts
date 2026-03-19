@@ -281,6 +281,7 @@ export class InboundService {
         id: randomUUID(),
         source: raw.source,
         status: "unread",
+        direction: "inbound",
         body: raw.body,
         bodyResolved: raw.bodyResolved ?? raw.body,
         mentions: raw.mentions ?? [],

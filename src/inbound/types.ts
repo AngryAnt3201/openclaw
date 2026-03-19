@@ -57,6 +57,20 @@ export interface InboundProcessingResult {
   error?: string;
 }
 
+// ---- Snooze configuration ----
+
+export type SnoozeConfigType = "time" | "reply" | "task" | "pipeline";
+
+export interface SnoozeConfig {
+  type: SnoozeConfigType;
+  untilMs?: number;
+  untilReplyFromPersonId?: string;
+  untilTaskId?: string;
+  untilPipelineRunId?: string;
+  followUpDraftOnExpiry?: boolean;
+  snoozedAtMs: number;
+}
+
 export interface InboundPendingAction {
   routeId: string;
   routeName: string;
@@ -67,13 +81,19 @@ export interface InboundMessage {
   id: string;
   source: InboundSource;
   status: InboundMessageStatus;
+  direction: "inbound" | "outbound";
   body: string;
   bodyResolved: string;
   mentions: InboundMention[];
   subject?: string;
   attachments?: InboundAttachment[];
   taskId?: string;
+  threadId?: string;
+  replyToId?: string;
+  personId?: string;
+  /** @deprecated Use snoozeConfig instead. Kept for backward compatibility. */
   snoozedUntilMs?: number;
+  snoozeConfig?: SnoozeConfig;
   readAtMs?: number;
   flaggedAtMs?: number;
   archivedAtMs?: number;
@@ -134,7 +154,7 @@ export interface InboundRoute {
 // ---- Store schema ----
 
 export interface InboundStoreFile {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   messages: InboundMessage[];
   channels: InboundChannel[];
   routes: InboundRoute[];

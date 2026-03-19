@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { InboundMessage, InboundStoreFile } from "./types.js";
+import type { InboundMessage, InboundStoreFile, SnoozeConfig } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Path resolution
@@ -105,11 +105,58 @@ export function migrateV1ToV2(store: Record<string, unknown>): InboundStoreFile 
 }
 
 // ---------------------------------------------------------------------------
+// V2 → V3 migration
+// ---------------------------------------------------------------------------
+
+/**
+ * Migrate a v2 store to v3 in place.
+ * - Backfills `direction: "inbound"` on all messages
+ * - Converts `snoozedUntilMs` → `snoozeConfig` (type: "time")
+ * - Sets `personId: undefined` on all messages
+ * - Bumps version to 3
+ */
+export function migrateV2ToV3(store: Record<string, unknown>): InboundStoreFile {
+  const messages = (store.messages ?? []) as Array<Record<string, unknown>>;
+  const channels = (store.channels ?? []) as unknown[];
+  const routes = (store.routes ?? []) as unknown[];
+
+  for (const msg of messages) {
+    // Backfill direction
+    if (msg.direction === undefined) {
+      msg.direction = "inbound";
+    }
+
+    // Convert snoozedUntilMs → snoozeConfig
+    if (msg.snoozedUntilMs !== undefined && msg.snoozeConfig === undefined) {
+      const snoozeConfig: SnoozeConfig = {
+        type: "time",
+        untilMs: msg.snoozedUntilMs as number,
+        snoozedAtMs: (msg.updatedAtMs as number) ?? Date.now(),
+      };
+      msg.snoozeConfig = snoozeConfig;
+      // Keep snoozedUntilMs for backward compatibility — do NOT delete
+    }
+
+    // Set personId if missing
+    if (msg.personId === undefined) {
+      msg.personId = undefined;
+    }
+  }
+
+  return {
+    version: 3,
+    messages: messages as unknown as InboundMessage[],
+    channels: channels as unknown as InboundStoreFile["channels"],
+    routes: routes as unknown as InboundStoreFile["routes"],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Read / write store file (atomic)
 // ---------------------------------------------------------------------------
 
 function emptyStore(): InboundStoreFile {
-  return { version: 2, messages: [], channels: [], routes: [] };
+  return { version: 3, messages: [], channels: [], routes: [] };
 }
 
 export async function readInboundStore(storePath: string): Promise<InboundStoreFile> {
@@ -122,16 +169,29 @@ export async function readInboundStore(storePath: string): Promise<InboundStoreF
       return emptyStore();
     }
 
-    // Accept v1 (auto-migrate) or v2
+    // Chain migrations: v1 → v2 → v3
+    let store: Record<string, unknown> = parsed;
+    let migrated = false;
+
     if (version === 1) {
-      const migrated = migrateV1ToV2(parsed);
-      // Persist migration so it only runs once
-      await writeInboundStore(storePath, migrated);
-      return migrated;
+      store = migrateV1ToV2(store) as unknown as Record<string, unknown>;
+      migrated = true;
     }
 
-    if (version === 2) {
-      return parsed as unknown as InboundStoreFile;
+    const currentVersion = (store as { version?: number }).version;
+
+    if (currentVersion === 2) {
+      store = migrateV2ToV3(store) as unknown as Record<string, unknown>;
+      migrated = true;
+    }
+
+    if ((store as { version?: number }).version === 3) {
+      const result = store as unknown as InboundStoreFile;
+      if (migrated) {
+        // Persist migration so it only runs once
+        await writeInboundStore(storePath, result);
+      }
+      return result;
     }
 
     // Unknown version
