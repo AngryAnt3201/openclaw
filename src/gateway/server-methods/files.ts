@@ -1,6 +1,12 @@
 import type { GatewayRequestHandlers } from "./types.js";
 import { loadConfig } from "../../config/config.js";
-import { handleFileList, handleFileRead, handleFileStat } from "../../node-host/file-commands.js";
+import {
+  handleFileList,
+  handleFileRead,
+  handleFileStat,
+  handleFileMkdir,
+  handleFileDelete,
+} from "../../node-host/file-commands.js";
 import { isNodeCommandAllowed, resolveNodeCommandAllowlist } from "../node-command-policy.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { respondUnavailableOnThrow, safeParseJson } from "./nodes.helpers.js";
@@ -172,6 +178,62 @@ export const fileHandlers: GatewayRequestHandlers = {
         nodeId,
         command: "file.stat",
         commandParams: { path: filePath },
+      });
+    });
+  },
+
+  "file.mkdir": async ({ params, respond, context }) => {
+    const p = params as { nodeId?: string; path?: string };
+    const nodeId = typeof p.nodeId === "string" ? p.nodeId.trim() : "";
+    const filePath = typeof p.path === "string" ? p.path.trim() : "";
+    if (!filePath) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "path required"));
+      return;
+    }
+
+    if (isLocal(nodeId)) {
+      await respondUnavailableOnThrow(respond, async () => {
+        const result = await handleFileMkdir({ path: filePath });
+        respond(true, result, undefined);
+      });
+      return;
+    }
+
+    await respondUnavailableOnThrow(respond, async () => {
+      await invokeFileCommand({
+        context,
+        respond,
+        nodeId,
+        command: "file.mkdir",
+        commandParams: { path: filePath },
+      });
+    });
+  },
+
+  "file.delete": async ({ params, respond, context }) => {
+    const p = params as { nodeId?: string; path?: string; recursive?: boolean };
+    const nodeId = typeof p.nodeId === "string" ? p.nodeId.trim() : "";
+    const filePath = typeof p.path === "string" ? p.path.trim() : "";
+    if (!filePath) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "path required"));
+      return;
+    }
+
+    if (isLocal(nodeId)) {
+      await respondUnavailableOnThrow(respond, async () => {
+        const result = await handleFileDelete({ path: filePath, recursive: p.recursive });
+        respond(true, result, undefined);
+      });
+      return;
+    }
+
+    await respondUnavailableOnThrow(respond, async () => {
+      await invokeFileCommand({
+        context,
+        respond,
+        nodeId,
+        command: "file.delete",
+        commandParams: { path: filePath, recursive: p.recursive },
       });
     });
   },

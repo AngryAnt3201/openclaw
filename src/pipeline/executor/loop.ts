@@ -5,12 +5,32 @@
 // evaluates to false. Each iteration passes the previous output as input
 // to the next. The loop node itself emits "body" (each iteration) and
 // "done" (final output) handles.
+//
+// Resource limits (configurable via ExecutorContext.loopResourceLimits):
+//   - Max iterations: default 100 (hard cap on per-node iterations)
+//   - Max execution time: default 5 minutes per loop node
+//   - Max nested depth: default 5 levels
 // ---------------------------------------------------------------------------
 
 import type { LoopConfig, PipelineNode } from "../types.js";
-import type { ExecutorContext, NodeExecutionResult, NodeExecutorFn } from "./types.js";
+import type {
+  ExecutorContext,
+  LoopResourceLimits,
+  NodeExecutionResult,
+  NodeExecutorFn,
+} from "./types.js";
 
-const DEFAULT_MAX_ITERATIONS = 10;
+const DEFAULT_MAX_ITERATIONS = 100;
+const DEFAULT_MAX_EXECUTION_TIME_MS = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_MAX_NESTED_DEPTH = 5;
+
+function resolveLoopLimits(limits?: LoopResourceLimits): Required<LoopResourceLimits> {
+  return {
+    maxIterations: limits?.maxIterations ?? DEFAULT_MAX_ITERATIONS,
+    maxExecutionTimeMs: limits?.maxExecutionTimeMs ?? DEFAULT_MAX_EXECUTION_TIME_MS,
+    maxNestedDepth: limits?.maxNestedDepth ?? DEFAULT_MAX_NESTED_DEPTH,
+  };
+}
 
 export const executeLoopNode: NodeExecutorFn = async (
   node: PipelineNode,
@@ -19,15 +39,30 @@ export const executeLoopNode: NodeExecutorFn = async (
 ): Promise<NodeExecutionResult> => {
   const startMs = Date.now();
   const config = node.config as LoopConfig;
+  const limits = resolveLoopLimits(context.loopResourceLimits);
 
-  const maxIterations = config.maxIterations ?? DEFAULT_MAX_ITERATIONS;
-  if (maxIterations <= 0) {
+  // --- Nested depth check ---
+  const currentDepth = context._loopDepth ?? 0;
+  if (currentDepth >= limits.maxNestedDepth) {
+    return {
+      status: "failure",
+      error:
+        `Loop nested depth limit exceeded (max ${limits.maxNestedDepth}). ` +
+        "Reduce loop nesting to prevent resource exhaustion.",
+      durationMs: Date.now() - startMs,
+    };
+  }
+
+  // Clamp maxIterations from config to the resource limit ceiling
+  const configMax = config.maxIterations ?? DEFAULT_MAX_ITERATIONS;
+  if (configMax <= 0) {
     return {
       status: "failure",
       error: "Loop maxIterations must be > 0",
       durationMs: Date.now() - startMs,
     };
   }
+  const maxIterations = Math.min(configMax, limits.maxIterations);
 
   try {
     let currentInput = input;
@@ -35,6 +70,21 @@ export const executeLoopNode: NodeExecutorFn = async (
     const iterationOutputs: unknown[] = [];
 
     while (iteration < maxIterations) {
+      // --- Execution time check ---
+      const elapsed = Date.now() - startMs;
+      if (elapsed >= limits.maxExecutionTimeMs) {
+        context.log?.error(
+          `Pipeline loop node "${node.id}" timed out after ${elapsed}ms (limit: ${limits.maxExecutionTimeMs}ms) at iteration ${iteration}`,
+        );
+        return {
+          status: "failure",
+          error:
+            `Loop execution time limit exceeded (${limits.maxExecutionTimeMs}ms). ` +
+            `Completed ${iteration} of ${maxIterations} iterations before timeout.`,
+          durationMs: Date.now() - startMs,
+        };
+      }
+
       // If a condition is set, evaluate it before each iteration.
       if (config.condition && iteration > 0) {
         const shouldContinue = evaluateLoopCondition(config.condition, currentInput, iteration);

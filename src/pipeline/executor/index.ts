@@ -2,7 +2,12 @@
 // Pipeline Executor – Barrel Export
 // ---------------------------------------------------------------------------
 
-export type { ExecutorContext, NodeExecutionResult, NodeExecutorFn } from "./types.js";
+export type {
+  ExecutorContext,
+  LoopResourceLimits,
+  NodeExecutionResult,
+  NodeExecutorFn,
+} from "./types.js";
 
 export { executeAgentNode } from "./agent.js";
 export { executeApprovalNode } from "./approval.js";

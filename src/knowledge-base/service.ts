@@ -33,9 +33,7 @@ export class KBService {
 
   constructor(opts: KBServiceOptions) {
     this.config = opts.config;
-    this.kbPath = opts.config.vaultPath
-      ? resolveKBPath(opts.config.vaultPath)
-      : resolveKBPath();
+    this.kbPath = opts.config.vaultPath ? resolveKBPath(opts.config.vaultPath) : resolveKBPath();
     this.log = opts.log ?? {
       info: () => {},
       warn: () => {},
@@ -129,7 +127,9 @@ export class KBService {
     const lowerQuery = query.toLowerCase();
 
     for (const note of notes) {
-      if (results.length >= limit) break;
+      if (results.length >= limit) {
+        break;
+      }
       if (
         note.title.toLowerCase().includes(lowerQuery) ||
         note.tags.some((t) => t.toLowerCase().includes(lowerQuery))
@@ -161,22 +161,83 @@ export class KBService {
     };
   }
 
+  /** Build a URI to open the vault root in the configured provider app. */
+  private buildVaultUri(): string | null {
+    const provider = this.config.provider;
+    const vaultName = this.config.vaultName;
+    if (provider === "obsidian" && vaultName) {
+      return `obsidian://open?vault=${encodeURIComponent(vaultName)}`;
+    }
+    if (provider === "logseq" && vaultName) {
+      return `logseq://graph/${encodeURIComponent(vaultName)}`;
+    }
+    return null;
+  }
+
+  /** Build a URI to open a specific note in the configured provider app. */
+  private buildNoteUri(notePath: string): string | null {
+    const provider = this.config.provider;
+    const vaultName = this.config.vaultName;
+    if (provider === "obsidian" && vaultName) {
+      // Obsidian expects the file path without .md extension
+      const filePath = notePath.replace(/\.md$/i, "");
+      return `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(filePath)}`;
+    }
+    if (provider === "logseq" && vaultName) {
+      const pageName = path.basename(notePath, ".md");
+      return `logseq://graph/${encodeURIComponent(vaultName)}?page=${encodeURIComponent(pageName)}`;
+    }
+    return null;
+  }
+
+  /** Execute a shell command to open a URI or path. */
+  private async execOpen(target: string): Promise<void> {
+    const { exec } = await import("node:child_process");
+    const platform = process.platform;
+    const cmd =
+      platform === "darwin"
+        ? `open "${target}"`
+        : platform === "win32"
+          ? `start "" "${target}"`
+          : `xdg-open "${target}"`;
+    exec(cmd);
+  }
+
   async openKB(): Promise<{ opened: boolean }> {
-    // Delegate to OS-level open via the configured openCommand
+    // 1. Custom open command takes priority
     if (this.config.openCommand) {
       const { exec } = await import("node:child_process");
       exec(this.config.openCommand);
       return { opened: true };
     }
-    return { opened: false };
+    // 2. Provider-specific URI
+    const uri = this.buildVaultUri();
+    if (uri) {
+      await this.execOpen(uri);
+      return { opened: true };
+    }
+    // 3. Fallback: open the vault directory in the OS file manager
+    try {
+      await fs.access(this.kbPath);
+      await this.execOpen(this.kbPath);
+      return { opened: true };
+    } catch {
+      return { opened: false };
+    }
   }
 
   async openNote(notePath: string): Promise<{ opened: boolean }> {
+    // 1. Provider-specific URI (opens in Obsidian/Logseq)
+    const uri = this.buildNoteUri(notePath);
+    if (uri) {
+      await this.execOpen(uri);
+      return { opened: true };
+    }
+    // 2. Fallback: open the file directly in the OS default editor
     const fullPath = path.join(this.kbPath, notePath);
     try {
       await fs.access(fullPath);
-      const { exec } = await import("node:child_process");
-      exec(`open "${fullPath}"`);
+      await this.execOpen(fullPath);
       return { opened: true };
     } catch {
       return { opened: false };

@@ -23,7 +23,13 @@ import {
   type MaestroClient,
   type MaestroSessionDetail,
 } from "../agents/tools/maestro-client.js";
-import { handleFileList, handleFileRead, handleFileStat } from "../node-host/file-commands.js";
+import {
+  handleFileList,
+  handleFileRead,
+  handleFileStat,
+  handleFileMkdir,
+  handleFileDelete,
+} from "../node-host/file-commands.js";
 import { HeadlessApiServer } from "./headless-api-server.js";
 
 type Logger = { info(msg: string): void; warn(msg: string): void; error(msg: string): void };
@@ -168,6 +174,8 @@ export class MaestroNodeBridge {
       "file.list",
       "file.read",
       "file.stat",
+      "file.mkdir",
+      "file.delete",
     ];
 
     // Register as a virtual node so node.list / node.invoke work natively
@@ -334,6 +342,17 @@ export class MaestroNodeBridge {
         }
         case "file.stat": {
           const result = await handleFileStat({ path: String(p.path ?? "") });
+          return { ok: true, payload: result };
+        }
+        case "file.mkdir": {
+          const result = await handleFileMkdir({ path: String(p.path ?? "") });
+          return { ok: true, payload: result };
+        }
+        case "file.delete": {
+          const result = await handleFileDelete({
+            path: String(p.path ?? ""),
+            recursive: typeof p.recursive === "boolean" ? p.recursive : undefined,
+          });
           return { ok: true, payload: result };
         }
         default:

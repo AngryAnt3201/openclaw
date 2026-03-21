@@ -51,6 +51,25 @@ export type FileStatResult = {
   permissions: string;
 };
 
+export type FileMkdirParams = {
+  path: string;
+};
+
+export type FileMkdirResult = {
+  path: string;
+  created: boolean;
+};
+
+export type FileDeleteParams = {
+  path: string;
+  recursive?: boolean;
+};
+
+export type FileDeleteResult = {
+  path: string;
+  deleted: boolean;
+};
+
 const MAX_READ_BYTES = 1024 * 1024; // 1MB
 const MAX_LIST_ENTRIES = 1000;
 
@@ -198,6 +217,46 @@ export async function handleFileRead(params: FileReadParams): Promise<FileReadRe
   } finally {
     await fd.close();
   }
+}
+
+export async function handleFileMkdir(params: FileMkdirParams): Promise<FileMkdirResult> {
+  const targetPath = resolvePath(params.path);
+  if (isDeniedPath(targetPath)) {
+    throw new Error("PERMISSION_DENIED: access to this path is restricted");
+  }
+
+  const parentDir = path.dirname(targetPath);
+  try {
+    const parentStat = await fs.stat(parentDir);
+    if (!parentStat.isDirectory()) {
+      throw new Error("INVALID_REQUEST: parent path is not a directory");
+    }
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error("INVALID_REQUEST: parent directory does not exist", { cause: err });
+    }
+    throw err;
+  }
+
+  await fs.mkdir(targetPath, { recursive: true });
+  return { path: targetPath, created: true };
+}
+
+export async function handleFileDelete(params: FileDeleteParams): Promise<FileDeleteResult> {
+  const targetPath = resolvePath(params.path);
+  if (isDeniedPath(targetPath)) {
+    throw new Error("PERMISSION_DENIED: access to this path is restricted");
+  }
+
+  // Refuse to delete filesystem root or home directory root
+  const home = os.homedir();
+  if (targetPath === "/" || targetPath === home) {
+    throw new Error("PERMISSION_DENIED: cannot delete root or home directory");
+  }
+
+  const recursive = params.recursive ?? false;
+  await fs.rm(targetPath, { recursive, force: false });
+  return { path: targetPath, deleted: true };
 }
 
 export async function handleFileStat(params: FileStatParams): Promise<FileStatResult> {

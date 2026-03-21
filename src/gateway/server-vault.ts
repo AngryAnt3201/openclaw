@@ -20,7 +20,11 @@ export async function buildGatewayVaultService(params: {
   broadcast: (event: string, payload: unknown, opts?: { dropIfSlow?: boolean }) => void;
 }): Promise<GatewayVaultState> {
   const vaultLogger = getChildLogger({ module: "vault" });
-  const vaultPath = resolveVaultPath(params.cfg.vault?.vaultPath);
+  // Prefer explicit vault.vaultPath, fall back to knowledgeBase.vaultPath so both
+  // the vault tool and KB service share a single source of truth (e.g. Obsidian vault).
+  const vaultPath = resolveVaultPath(
+    params.cfg.vault?.vaultPath ?? params.cfg.knowledgeBase?.vaultPath,
+  );
 
   const vaultService = new VaultService({
     vaultPath,

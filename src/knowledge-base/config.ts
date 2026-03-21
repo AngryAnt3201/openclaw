@@ -8,5 +8,6 @@ export const DEFAULT_KB_CONFIG: KBConfig = {
   enabled: false,
   provider: "obsidian",
   vaultPath: "",
+  location: "gateway",
   syncFolder: "_miranda",
 };

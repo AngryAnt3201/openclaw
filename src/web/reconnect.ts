@@ -11,10 +11,10 @@ export type ReconnectPolicy = BackoffPolicy & {
 export const DEFAULT_HEARTBEAT_SECONDS = 60;
 export const DEFAULT_RECONNECT_POLICY: ReconnectPolicy = {
   initialMs: 2_000,
-  maxMs: 30_000,
+  maxMs: 60_000,
   factor: 1.8,
   jitter: 0.25,
-  maxAttempts: 12,
+  maxAttempts: 0,
 };
 
 export function resolveHeartbeatSeconds(cfg: OpenClawConfig, overrideSeconds?: number): number {
@@ -49,4 +49,24 @@ export { computeBackoff, sleepWithAbort };
 
 export function newConnectionId() {
   return randomUUID();
+}
+
+/**
+ * Three-phase adaptive backoff:
+ *   Phase 1 (aggressive):  attempts 1-5   → 1-5s
+ *   Phase 2 (patient):     attempts 6-20  → 5-30s
+ *   Phase 3 (idle):        attempts 21+   → 30-60s
+ */
+export function computeAdaptiveBackoff(attempt: number, jitter = 0.25): number {
+  let baseMs: number;
+  if (attempt <= 5) {
+    baseMs = 1_000 + (attempt - 1) * 1_000;
+  } else if (attempt <= 20) {
+    const progress = (attempt - 6) / 14;
+    baseMs = 5_000 + progress * 25_000;
+  } else {
+    baseMs = 30_000 + Math.min((attempt - 21) * 5_000, 30_000);
+  }
+  const jitterMs = baseMs * jitter * Math.random();
+  return Math.round(baseMs + jitterMs);
 }

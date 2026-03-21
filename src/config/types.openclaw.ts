@@ -1,3 +1,4 @@
+import type { KBConfig } from "../knowledge-base/types.js";
 import type { VaultConfig } from "../vault/types.js";
 import type { AgentBinding, AgentsConfig } from "./types.agents.js";
 import type { ApprovalsConfig } from "./types.approvals.js";
@@ -111,6 +112,7 @@ export type OpenClawConfig = {
   memory?: MemoryConfig;
   credentials?: CredentialsConfig;
   vault?: VaultConfig;
+  knowledgeBase?: KBConfig;
 };
 
 export type ConfigValidationIssue = {

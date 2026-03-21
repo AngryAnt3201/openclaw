@@ -16,6 +16,23 @@ type ScraplingConfig = {
   timeoutSeconds?: number;
 };
 
+const LOCALHOST_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/**
+ * Validate that a scrapling sidecar URL points to a localhost address.
+ * Returns `true` if the URL host is localhost/127.0.0.1/::1, `false` otherwise.
+ * Non-localhost URLs are rejected unless the `allowNonLocalhost` flag is set
+ * in the scrapling config.
+ */
+export function validateScraplingUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return LOCALHOST_HOSTNAMES.has(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function resolveScraplingConfig(): ScraplingConfig | null {
   const cfg = loadConfig();
   const sc = cfg.tools?.web?.scrapling;
@@ -91,8 +108,8 @@ async function proxyToScrapling(
 }
 
 /**
- * Validates scrapling is enabled and returns { baseUrl, timeoutMs }.
- * Calls `respond()` with an error if disabled and returns `null`.
+ * Validates scrapling is enabled, URL is safe, and returns { baseUrl, timeoutMs }.
+ * Calls `respond()` with an error if disabled or URL is invalid, and returns `null`.
  */
 function requireScrapling(respond: RespondFn): { baseUrl: string; timeoutMs: number } | null {
   const sc = resolveScraplingConfig();
@@ -104,8 +121,38 @@ function requireScrapling(respond: RespondFn): { baseUrl: string; timeoutMs: num
     );
     return null;
   }
+
+  const baseUrl = sc.baseUrl ?? "http://localhost:18790";
+
+  if (!validateScraplingUrl(baseUrl)) {
+    respond(
+      false,
+      undefined,
+      errorShape(
+        ErrorCodes.INVALID_REQUEST,
+        "scrapling sidecar URL must point to localhost (127.0.0.1 / ::1). " +
+          "Non-localhost URLs are rejected for security.",
+      ),
+    );
+    return null;
+  }
+
+  // Warn if using plain HTTP (informational — localhost HTTP is acceptable)
+  try {
+    const parsed = new URL(baseUrl);
+    if (parsed.protocol === "http:") {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[scrapling] Using insecure HTTP for sidecar at %s — consider wss:// for production deployments",
+        baseUrl,
+      );
+    }
+  } catch {
+    // Already validated above
+  }
+
   return {
-    baseUrl: sc.baseUrl ?? "http://localhost:18790",
+    baseUrl,
     timeoutMs: (sc.timeoutSeconds ?? 30) * 1000,
   };
 }

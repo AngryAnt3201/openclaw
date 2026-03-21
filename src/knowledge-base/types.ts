@@ -2,11 +2,18 @@
 // Knowledge Base Types
 // ---------------------------------------------------------------------------
 
+/** Where the vault filesystem lives. */
+export type KBLocation = "gateway" | "local" | "device";
+
 export type KBConfig = {
   enabled: boolean;
   provider: string;
   vaultPath: string;
   vaultName?: string;
+  /** Where the vault is hosted. Default: "gateway". */
+  location?: KBLocation;
+  /** Device ID when location is "device". */
+  deviceId?: string;
   syncFolder?: string;
   openCommand?: string;
   searchCommand?: string;
@@ -22,6 +29,7 @@ export type KBNoteSummary = {
   path: string;
   title: string;
   tags: string[];
+  links: string[]; // wikilink targets for graph edges
   updatedAtMs: number;
   createdAtMs: number;
   sizeBytes: number;

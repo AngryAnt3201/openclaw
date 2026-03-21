@@ -25,6 +25,7 @@ import {
   handleControlUiHttpRequest,
   type ControlUiRootState,
 } from "./control-ui.js";
+import { handleHealthRequest } from "./health-endpoint.js";
 import { applyHookMappings } from "./hooks-mapping.js";
 import {
   extractHookToken,
@@ -316,6 +317,10 @@ export function createGatewayHttpServer(opts: {
     }
 
     try {
+      // Health endpoint — no auth required, always available
+      if (handleHealthRequest(req, res)) {
+        return;
+      }
       const configSnapshot = loadConfig();
       const trustedProxies = configSnapshot.gateway?.trustedProxies ?? [];
       if (await handleHooksRequest(req, res)) {

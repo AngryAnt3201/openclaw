@@ -25,7 +25,11 @@ import type { ChatAbortControllerEntry } from "../chat-abort.js";
 import type { ExecApprovalManager } from "../exec-approval-manager.js";
 import type { NodeRegistry } from "../node-registry.js";
 import type { ConnectParams, ErrorShape, RequestFrame } from "../protocol/index.js";
-import type { GatewayBroadcastFn, GatewayBroadcastToConnIdsFn } from "../server-broadcast.js";
+import type { createGatewayBroadcaster } from "../server-broadcast.js";
+
+type _Broadcaster = ReturnType<typeof createGatewayBroadcaster>;
+type GatewayBroadcastFn = _Broadcaster["broadcast"];
+type GatewayBroadcastToConnIdsFn = _Broadcaster["broadcastToConnIds"];
 import type { ChannelRuntimeSnapshot } from "../server-channels.js";
 import type { DedupeEntry } from "../server-shared.js";
 

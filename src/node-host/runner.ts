@@ -49,9 +49,13 @@ import {
   handleFileList,
   handleFileRead,
   handleFileStat,
+  handleFileMkdir,
+  handleFileDelete,
   type FileListParams,
   type FileReadParams,
   type FileStatParams,
+  type FileMkdirParams,
+  type FileDeleteParams,
 } from "./file-commands.js";
 
 type NodeHostRunOptions = {
@@ -624,6 +628,8 @@ export async function runNodeHost(opts: NodeHostRunOptions): Promise<void> {
       "file.list",
       "file.read",
       "file.stat",
+      "file.mkdir",
+      "file.delete",
       ...(browserProxyEnabled ? ["browser.proxy", "browser.snapshot", "browser.tabs"] : []),
     ],
     pathEnv,
@@ -995,6 +1001,46 @@ async function handleInvoke(
         throw new Error("INVALID_REQUEST: path required");
       }
       const result = await handleFileStat(params);
+      await sendInvokeResult(client, frame, {
+        ok: true,
+        payloadJSON: JSON.stringify(result),
+      });
+    } catch (err) {
+      await sendInvokeResult(client, frame, {
+        ok: false,
+        error: { code: "INVALID_REQUEST", message: String(err) },
+      });
+    }
+    return;
+  }
+
+  if (command === "file.mkdir") {
+    try {
+      const params = decodeParams<FileMkdirParams>(frame.paramsJSON);
+      if (!params.path || typeof params.path !== "string") {
+        throw new Error("INVALID_REQUEST: path required");
+      }
+      const result = await handleFileMkdir(params);
+      await sendInvokeResult(client, frame, {
+        ok: true,
+        payloadJSON: JSON.stringify(result),
+      });
+    } catch (err) {
+      await sendInvokeResult(client, frame, {
+        ok: false,
+        error: { code: "INVALID_REQUEST", message: String(err) },
+      });
+    }
+    return;
+  }
+
+  if (command === "file.delete") {
+    try {
+      const params = decodeParams<FileDeleteParams>(frame.paramsJSON);
+      if (!params.path || typeof params.path !== "string") {
+        throw new Error("INVALID_REQUEST: path required");
+      }
+      const result = await handleFileDelete(params);
       await sendInvokeResult(client, frame, {
         ok: true,
         payloadJSON: JSON.stringify(result),

@@ -44,7 +44,7 @@ describe("executeLoopNode", () => {
     expect(out.outputs).toHaveLength(3);
   });
 
-  it("runs default maxIterations (10) when not specified", async () => {
+  it("runs default maxIterations (10 from helper) when not overridden", async () => {
     const node = makeNode("loop-default");
     // The helper sets maxIterations: 10 by default — verify that behavior.
     const result = await executeLoopNode(node, null, makeContext());
@@ -470,5 +470,119 @@ describe("executeLoopNode", () => {
     expect(result.status).toBe("success");
     const out = result.output as { iterations: number };
     expect(out.iterations).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // Resource Limits — iteration cap
+  // -------------------------------------------------------------------------
+  it("clamps iterations to loopResourceLimits.maxIterations", async () => {
+    const node = makeNode("loop-clamped", { maxIterations: 500, condition: "" });
+    const ctx: ExecutorContext = {
+      ...makeContext(),
+      loopResourceLimits: { maxIterations: 20 },
+    };
+    const result = await executeLoopNode(node, null, ctx);
+
+    expect(result.status).toBe("success");
+    const out = result.output as { iterations: number };
+    // Config says 500 but resource limit caps at 20
+    expect(out.iterations).toBe(20);
+  });
+
+  it("uses config maxIterations when below resource limit", async () => {
+    const node = makeNode("loop-below-limit", { maxIterations: 5, condition: "" });
+    const ctx: ExecutorContext = {
+      ...makeContext(),
+      loopResourceLimits: { maxIterations: 200 },
+    };
+    const result = await executeLoopNode(node, null, ctx);
+
+    expect(result.status).toBe("success");
+    const out = result.output as { iterations: number };
+    expect(out.iterations).toBe(5);
+  });
+
+  // -------------------------------------------------------------------------
+  // Resource Limits — execution time
+  // -------------------------------------------------------------------------
+  it("aborts loop when execution time limit is exceeded", async () => {
+    // Use a tiny timeout (0ms) to guarantee the loop exceeds it immediately
+    const node = makeNode("loop-timeout", { maxIterations: 1000, condition: "" });
+    const ctx: ExecutorContext = {
+      ...makeContext(),
+      loopResourceLimits: { maxExecutionTimeMs: 0, maxIterations: 1000 },
+    };
+    const result = await executeLoopNode(node, null, ctx);
+
+    expect(result.status).toBe("failure");
+    expect(result.error).toMatch(/execution time limit exceeded/i);
+    expect(result.durationMs).toBeTypeOf("number");
+  });
+
+  it("succeeds when execution time is within limit", async () => {
+    const node = makeNode("loop-time-ok", { maxIterations: 3, condition: "" });
+    const ctx: ExecutorContext = {
+      ...makeContext(),
+      loopResourceLimits: { maxExecutionTimeMs: 60_000 },
+    };
+    const result = await executeLoopNode(node, null, ctx);
+
+    expect(result.status).toBe("success");
+    const out = result.output as { iterations: number };
+    expect(out.iterations).toBe(3);
+  });
+
+  // -------------------------------------------------------------------------
+  // Resource Limits — nested depth
+  // -------------------------------------------------------------------------
+  it("rejects execution when nested depth limit is exceeded", async () => {
+    const node = makeNode("loop-depth", { maxIterations: 5, condition: "" });
+    const ctx: ExecutorContext = {
+      ...makeContext(),
+      loopResourceLimits: { maxNestedDepth: 3 },
+      _loopDepth: 3,
+    };
+    const result = await executeLoopNode(node, null, ctx);
+
+    expect(result.status).toBe("failure");
+    expect(result.error).toMatch(/nested depth limit exceeded/i);
+    expect(result.error).toContain("max 3");
+  });
+
+  it("allows execution when depth is below limit", async () => {
+    const node = makeNode("loop-depth-ok", { maxIterations: 2, condition: "" });
+    const ctx: ExecutorContext = {
+      ...makeContext(),
+      loopResourceLimits: { maxNestedDepth: 5 },
+      _loopDepth: 2,
+    };
+    const result = await executeLoopNode(node, null, ctx);
+
+    expect(result.status).toBe("success");
+    const out = result.output as { iterations: number };
+    expect(out.iterations).toBe(2);
+  });
+
+  it("uses default depth limit of 5 when not configured", async () => {
+    const node = makeNode("loop-depth-default", { maxIterations: 1, condition: "" });
+    const ctx: ExecutorContext = {
+      ...makeContext(),
+      _loopDepth: 5,
+    };
+    const result = await executeLoopNode(node, null, ctx);
+
+    expect(result.status).toBe("failure");
+    expect(result.error).toMatch(/nested depth limit exceeded/i);
+  });
+
+  it("allows depth 0 (no nesting) by default", async () => {
+    const node = makeNode("loop-depth-zero", { maxIterations: 1, condition: "" });
+    const ctx: ExecutorContext = {
+      ...makeContext(),
+      _loopDepth: 0,
+    };
+    const result = await executeLoopNode(node, null, ctx);
+
+    expect(result.status).toBe("success");
   });
 });

@@ -87,7 +87,7 @@ export function createCodeTool(): AnyAgentTool {
               resolve({
                 stdout: stdout?.toString() ?? "",
                 stderr: stderr?.toString() ?? "",
-                exitCode: error?.code ?? (error ? 1 : 0),
+                exitCode: typeof error?.code === "number" ? error.code : error ? 1 : 0,
               });
             },
           );

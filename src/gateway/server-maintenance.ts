@@ -2,6 +2,7 @@ import type { HealthSummary } from "../commands/health.js";
 import type { ChatRunEntry } from "./server-chat.js";
 import type { DedupeEntry } from "./server-shared.js";
 import { abortChatRunById, type ChatAbortControllerEntry } from "./chat-abort.js";
+import { setHealthLastTick } from "./health-endpoint.js";
 import {
   DEDUPE_MAX,
   DEDUPE_TTL_MS,
@@ -57,6 +58,7 @@ export function startGatewayMaintenanceTimers(params: {
     const payload = { ts: Date.now() };
     params.broadcast("tick", payload, { dropIfSlow: true });
     params.nodeSendToAllSubscribed("tick", payload);
+    setHealthLastTick(payload.ts);
   }, TICK_INTERVAL_MS);
 
   // periodic health refresh to keep cached snapshot warm

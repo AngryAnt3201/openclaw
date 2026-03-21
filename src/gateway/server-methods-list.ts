@@ -158,6 +158,8 @@ const BASE_METHODS = [
   "file.list",
   "file.read",
   "file.stat",
+  "file.mkdir",
+  "file.delete",
   // WebChat WebSocket-native chat methods
   "chat.history",
   "chat.abort",
@@ -179,6 +181,22 @@ const BASE_METHODS = [
   "project.create",
   "project.update",
   "project.delete",
+  // Inbound methods
+  "inbound.message.list",
+  "inbound.message.get",
+  "inbound.message.ingest",
+  "inbound.message.markProcessed",
+  "inbound.message.delete",
+  "inbound.message.linkTask",
+  "inbound.message.unprocessedCount",
+  "inbound.channel.list",
+  "inbound.channel.add",
+  "inbound.channel.update",
+  "inbound.channel.remove",
+  "inbound.route.list",
+  "inbound.route.add",
+  "inbound.route.update",
+  "inbound.route.remove",
 ];
 
 export function listGatewayMethods(): string[] {
@@ -253,4 +271,21 @@ export const GATEWAY_EVENTS = [
   "project.created",
   "project.updated",
   "project.deleted",
+  // Inbound events
+  "inbound.message",
+  "inbound.message.created",
+  "inbound.message.updated",
+  "inbound.message.deleted",
+  "inbound.messages",
+  "inbound.channel.added",
+  "inbound.channel.updated",
+  "inbound.channel.removed",
+  "inbound.channel.status",
+  "inbound.channels",
+  "inbound.route.added",
+  "inbound.route.updated",
+  "inbound.route.removed",
+  "inbound.routes",
+  "inbound.whatsapp.qr",
+  "inbound.connected",
 ];

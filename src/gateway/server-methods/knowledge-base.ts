@@ -4,6 +4,7 @@
 
 import type { KBFilter, KBNoteCreateInput } from "../../knowledge-base/types.js";
 import type { GatewayRequestHandlers } from "./types.js";
+import { loadConfig, writeConfigFile } from "../../config/config.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 
 function requireString(params: Record<string, unknown>, key: string): string | null {
@@ -115,13 +116,28 @@ export const knowledgeBaseHandlers: GatewayRequestHandlers = {
   // -------------------------------------------------------------------------
   // kb.config.set
   // -------------------------------------------------------------------------
-  "kb.config.set": async ({ params: _params, respond, context }) => {
+  "kb.config.set": async ({ params, respond, context }) => {
     if (!context.kbService) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "KB service not available"));
       return;
     }
-    // Placeholder: full config persistence will be implemented with config integration
-    respond(true, { updated: true }, undefined);
+    const incoming = (params as { config?: unknown })?.config;
+    if (!incoming || typeof incoming !== "object") {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "missing config object"));
+      return;
+    }
+    try {
+      const currentCfg = loadConfig() as Record<string, unknown>;
+      currentCfg.knowledgeBase = incoming;
+      await writeConfigFile(currentCfg);
+      respond(true, { updated: true }, undefined);
+    } catch (err) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, `failed to persist KB config: ${String(err)}`),
+      );
+    }
   },
 
   // -------------------------------------------------------------------------

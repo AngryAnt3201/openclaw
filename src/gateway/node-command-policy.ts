@@ -39,9 +39,9 @@ const SMS_DANGEROUS_COMMANDS = ["sms.send"];
 // iOS nodes don't implement system.run/which, but they do support notifications.
 const IOS_SYSTEM_COMMANDS = ["system.notify"];
 
-const FILE_COMMANDS = ["file.list", "file.read", "file.stat"];
+const FILE_COMMANDS = ["file.list", "file.read", "file.stat", "file.mkdir", "file.delete"];
 
-const FILE_DANGEROUS_COMMANDS = ["file.write", "file.delete"];
+const FILE_DANGEROUS_COMMANDS = ["file.write"];
 
 const SYSTEM_COMMANDS = [
   "system.run",

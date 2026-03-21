@@ -137,8 +137,47 @@ function resolveScraplingFallbackEnabled(scrapling?: ScraplingFetchConfig): bool
   return true;
 }
 
+const LOCALHOST_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/**
+ * Validate that a scrapling sidecar URL points to a localhost address.
+ */
+export function validateScraplingUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return LOCALHOST_HOSTNAMES.has(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function resolveScraplingBaseUrl(scrapling?: ScraplingFetchConfig): string {
-  return scrapling?.baseUrl?.trim() || "http://localhost:18790";
+  const raw = scrapling?.baseUrl?.trim() || "http://localhost:18790";
+
+  if (!validateScraplingUrl(raw)) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[scrapling] Configured baseUrl %s is not localhost — rejecting, falling back to default",
+      raw,
+    );
+    return "http://localhost:18790";
+  }
+
+  // Warn if using plain HTTP
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol === "http:") {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[scrapling] Using insecure HTTP for sidecar at %s — consider wss:// for production deployments",
+        raw,
+      );
+    }
+  } catch {
+    // Already validated above
+  }
+
+  return raw;
 }
 
 function resolveScraplingTimeoutSeconds(scrapling?: ScraplingFetchConfig): number {

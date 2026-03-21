@@ -1,0 +1,17 @@
+pyproject.toml
+scrapling_service/__init__.py
+scrapling_service/__main__.py
+scrapling_service/app.py
+scrapling_service/cli.py
+scrapling_service/config.py
+scrapling_service/fetchers.py
+scrapling_service/sessions.py
+scrapling_service.egg-info/PKG-INFO
+scrapling_service.egg-info/SOURCES.txt
+scrapling_service.egg-info/dependency_links.txt
+scrapling_service.egg-info/entry_points.txt
+scrapling_service.egg-info/requires.txt
+scrapling_service.egg-info/top_level.txt
+tests/test_app.py
+tests/test_fetchers.py
+tests/test_sessions.py
